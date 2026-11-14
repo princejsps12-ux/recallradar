@@ -23,7 +23,8 @@ modules:
       name: Say hello
       function: hello-fn
       actionVerb: GET
-      description: Returns a greeting from RecallRadar. Use it when the user says hello or asks to test the agent.
+      description: Returns a greeting from RecallRadar. Use it when the user says
+        hello or asks to test the agent.
   function:
     - key: resolver
       handler: index.handler
@@ -35,6 +36,10 @@ resources:
 permissions:
   scopes:
     - read:jira-work
+  external:
+    fetch:
+      backend:
+        - address: api.fda.gov
 app:
   runtime:
     name: nodejs24.x
