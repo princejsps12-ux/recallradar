@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@forge/bridge';
 
 const styles = {
@@ -7,6 +7,8 @@ const styles = {
   title: { fontWeight: 600 },
   meta: { color: '#5e6c84', fontSize: '12px' },
   detail: { fontSize: '12px', marginTop: '2px' },
+  bar: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0 10px' },
+  button: { padding: '4px 10px', cursor: 'pointer' },
 };
 
 function Recall({ recall }) {
@@ -26,7 +28,58 @@ function Recall({ recall }) {
   );
 }
 
-function App() {
+// Shows how many devices the hospital has and lets the user add the demo devices.
+function DevicesBar() {
+  const [count, setCount] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const refresh = useCallback(async () => {
+    try {
+      const result = await invoke('listDevices');
+      if (result && result.ok) {
+        setCount(result.devices.length);
+      } else {
+        setMessage((result && result.error) || 'Could not load devices.');
+      }
+    } catch (e) {
+      setMessage('Could not reach RecallRadar.');
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const loadDemo = async () => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const result = await invoke('loadDemoHospital');
+      if (result && result.ok) {
+        setMessage(`Loaded ${result.count} demo devices.`);
+        await refresh();
+      } else {
+        setMessage((result && result.error) || 'Could not load the demo hospital.');
+      }
+    } catch (e) {
+      setMessage('Could not reach RecallRadar.');
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div style={styles.bar}>
+      <span>Hospital devices: {count === null ? '…' : count}</span>
+      <button style={styles.button} onClick={loadDemo} disabled={busy}>
+        {busy ? 'Loading…' : 'Load demo hospital'}
+      </button>
+      {message && <span style={styles.meta}>{message}</span>}
+    </div>
+  );
+}
+
+function Recalls() {
   const [state, setState] = useState({ status: 'loading', recalls: [], error: '' });
 
   useEffect(() => {
@@ -62,6 +115,15 @@ function App() {
           <Recall key={recall.recallNumber} recall={recall} />
         ))}
       </ul>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <DevicesBar />
+      <Recalls />
     </div>
   );
 }

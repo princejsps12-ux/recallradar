@@ -9,6 +9,7 @@ import {
   normalizeDevices,
   createDeviceStore,
 } from './deviceStore.js';
+import { fakeKv } from './fakeKv.mjs';
 
 const pump = {
   id: 'dev-001',
@@ -20,33 +21,6 @@ const pump = {
   ward: 'ICU',
   source: 'demo',
 };
-
-// In-memory stand-in for the Forge storage adapter. Also records the highest number of
-// writes that were in flight at the same time.
-function fakeKv(initial = {}) {
-  const data = new Map(Object.entries(initial));
-  let inFlight = 0;
-  const kv = {
-    data,
-    maxInFlight: 0,
-    async set(key, value) {
-      inFlight += 1;
-      kv.maxInFlight = Math.max(kv.maxInFlight, inFlight);
-      await new Promise((resolve) => setImmediate(resolve));
-      data.set(key, value);
-      inFlight -= 1;
-    },
-    async delete(key) {
-      data.delete(key);
-    },
-    async listByPrefix(prefix) {
-      return [...data.entries()]
-        .filter(([key]) => key.startsWith(prefix))
-        .map(([key, value]) => ({ key, value }));
-    },
-  };
-  return kv;
-}
 
 test('deviceKey puts every device under the shared prefix', () => {
   assert.equal(deviceKey('dev-001'), `${DEVICE_KEY_PREFIX}dev-001`);
@@ -139,6 +113,27 @@ test('clear removes only devices and reports how many', async () => {
   assert.equal(await store.clear(), 2);
   assert.deepEqual(await store.listDevices(), []);
   assert.ok(kv.data.has('settings:theme'));
+});
+
+test('removeBySource removes only devices from that source', async () => {
+  const kv = fakeKv({ 'settings:theme': { dark: true } });
+  const store = createDeviceStore(kv);
+  await store.saveDevices([
+    { ...pump, id: 'a', source: 'demo' },
+    { ...pump, id: 'b', source: 'manual' },
+    { ...pump, id: 'c', source: 'demo' },
+    { ...pump, id: 'd', source: 'assets' },
+  ]);
+  assert.equal(await store.removeBySource('demo'), 2);
+  assert.deepEqual((await store.listDevices()).map((d) => d.id), ['b', 'd']);
+  assert.ok(kv.data.has('settings:theme'));
+});
+
+test('removeBySource returns 0 when nothing matches', async () => {
+  const store = createDeviceStore(fakeKv());
+  await store.saveDevices([{ ...pump, source: 'manual' }]);
+  assert.equal(await store.removeBySource('demo'), 0);
+  assert.equal((await store.listDevices()).length, 1);
 });
 
 test('replaceAll swaps the whole list', async () => {

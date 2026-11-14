@@ -105,6 +105,15 @@ export function createDeviceStore(kv) {
     return items.length;
   }
 
+  // Delete only the devices that came from one source (e.g. just the demo ones) and leave the
+  // rest untouched. Returns how many were removed.
+  async function removeBySource(source) {
+    const items = await kv.listByPrefix(DEVICE_KEY_PREFIX);
+    const matching = items.filter((item) => item.value && item.value.source === source);
+    await inBatches(matching, WRITE_BATCH_SIZE, (item) => kv.delete(item.key));
+    return matching.length;
+  }
+
   // Replace the whole device list. Input is validated first, so invalid data never wipes
   // the existing list.
   async function replaceAll(inputs) {
@@ -114,5 +123,5 @@ export function createDeviceStore(kv) {
     return devices.length;
   }
 
-  return { listDevices, saveDevices, clear, replaceAll };
+  return { listDevices, saveDevices, clear, removeBySource, replaceAll };
 }
