@@ -7,9 +7,28 @@ modules:
       viewportSize: medium
       title: RecallRadar
       icon: https://developer.atlassian.com/platform/forge/images/issue-panel-icon.svg
+  rovo:agent:
+    - key: recallradar-assistant
+      name: RecallRadar Assistant
+      description: Test agent for RecallRadar. Greets the user using its hello action.
+      prompt: >
+        You are the RecallRadar Assistant. When the user says hello or asks you
+        to test, call the hello action and reply with exactly what it returns.
+      conversationStarters:
+        - Say hello
+      actions:
+        - hello-action
+  action:
+    - key: hello-action
+      name: Say hello
+      function: hello-fn
+      actionVerb: GET
+      description: Returns a greeting from RecallRadar. Use it when the user says hello or asks to test the agent.
   function:
     - key: resolver
       handler: index.handler
+    - key: hello-fn
+      handler: index.hello
 resources:
   - key: main
     path: static/hello-world/build

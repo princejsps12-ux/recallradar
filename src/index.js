@@ -19,3 +19,8 @@ resolver.define('fetchLabels', async (req) => {
 });
 
 export const handler = resolver.getDefinitions();
+
+// Rovo action: returns a fixed greeting so we can test that Rovo works on the site.
+export const hello = async () => {
+  return 'Hello from RecallRadar';
+};
