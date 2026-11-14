@@ -1,0 +1,118 @@
+// The hospital's device list sits behind this one small interface, so the rest of the app
+// never knows where devices are kept. Today devices live in Forge storage (see kvAdapter.js).
+// A read-only import from JSM Assets can later be added as another source that produces the
+// same device shape and calls saveDevices / replaceAll.
+//
+// Device shape (all strings):
+//   id            required  unique, e.g. "dev-001"
+//   name          required  human name, e.g. "Alaris infusion pump"
+//   type          required  kind of device, e.g. "infusion pump" (used by "possible" matches)
+//   manufacturer  required  e.g. "Becton Dickinson"
+//   model         required  model / catalog number, e.g. "8015"
+//   lotOrSerial   optional  lot or serial number of this physical unit ("" if unknown)
+//   ward          optional  where it is, e.g. "ICU"
+//   source        optional  where the record came from: see DEVICE_SOURCES
+//
+// This file has no Forge imports so it can be unit tested with plain Node.
+
+// Every device is stored under its own key so the list can grow past one storage value's size limit.
+export const DEVICE_KEY_PREFIX = 'device:';
+
+export const DEVICE_SOURCES = Object.freeze({
+  DEMO: 'demo', // created by "Load demo hospital"
+  MANUAL: 'manual', // entered by a user
+  ASSETS: 'assets', // imported from JSM Assets (future)
+});
+
+// Forge storage accepts at most 25 items per batch call; we write in groups of the same size
+// so one big import cannot flood storage with hundreds of parallel requests.
+export const WRITE_BATCH_SIZE = 25;
+
+const REQUIRED_FIELDS = ['id', 'name', 'type', 'manufacturer', 'model'];
+const OPTIONAL_FIELDS = ['lotOrSerial', 'ward'];
+
+export function deviceKey(id) {
+  return `${DEVICE_KEY_PREFIX}${id}`;
+}
+
+function asTrimmedString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+// Validate and tidy one device. Throws an Error naming the problem, so bad data is rejected
+// before anything is written.
+export function normalizeDevice(input) {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Device must be an object');
+  }
+  const device = {};
+  for (const field of REQUIRED_FIELDS) {
+    const value = asTrimmedString(input[field]);
+    if (!value) {
+      throw new Error(`Device is missing required field "${field}"`);
+    }
+    device[field] = value;
+  }
+  for (const field of OPTIONAL_FIELDS) {
+    device[field] = asTrimmedString(input[field]);
+  }
+  const source = asTrimmedString(input.source);
+  device.source = Object.values(DEVICE_SOURCES).includes(source) ? source : DEVICE_SOURCES.MANUAL;
+  return device;
+}
+
+// Normalize a whole list and make sure ids are unique. All-or-nothing: throws before any write.
+export function normalizeDevices(inputs) {
+  if (!Array.isArray(inputs)) {
+    throw new Error('Devices must be an array');
+  }
+  const devices = inputs.map(normalizeDevice);
+  const seen = new Set();
+  for (const { id } of devices) {
+    if (seen.has(id)) {
+      throw new Error(`Duplicate device id "${id}"`);
+    }
+    seen.add(id);
+  }
+  return devices;
+}
+
+async function inBatches(items, size, worker) {
+  for (let i = 0; i < items.length; i += size) {
+    await Promise.all(items.slice(i, i + size).map(worker));
+  }
+}
+
+// `kv` is any object with:
+//   set(key, value)            -> Promise
+//   delete(key)                -> Promise
+//   listByPrefix(prefix)       -> Promise<Array<{ key, value }>>
+export function createDeviceStore(kv) {
+  async function listDevices() {
+    const items = await kv.listByPrefix(DEVICE_KEY_PREFIX);
+    return items.map((item) => item.value).sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  async function saveDevices(inputs) {
+    const devices = normalizeDevices(inputs);
+    await inBatches(devices, WRITE_BATCH_SIZE, (device) => kv.set(deviceKey(device.id), device));
+    return devices.length;
+  }
+
+  async function clear() {
+    const items = await kv.listByPrefix(DEVICE_KEY_PREFIX);
+    await inBatches(items, WRITE_BATCH_SIZE, (item) => kv.delete(item.key));
+    return items.length;
+  }
+
+  // Replace the whole device list. Input is validated first, so invalid data never wipes
+  // the existing list.
+  async function replaceAll(inputs) {
+    const devices = normalizeDevices(inputs);
+    await clear();
+    await saveDevices(devices);
+    return devices.length;
+  }
+
+  return { listDevices, saveDevices, clear, replaceAll };
+}
