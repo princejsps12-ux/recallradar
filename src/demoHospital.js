@@ -10,11 +10,14 @@
 //   demo-001..012  serial/lot is listed in a real recall            -> expect "exact"
 //   demo-013..021  model is in a real recall, serial/lot is not     -> expect "likely"
 //   demo-022..024  same manufacturer + type, or same model number   -> expect "possible"
-//   demo-025..030  real devices whose recalls are old/unrelated     -> expect no match
+//   demo-025..030  real devices whose own recalls are old        -> expect no match, or at
+//                  (outside the look-back window)                   most a weak "possible"
 //
-// Recalls older than the matching look-back window are not fetched, so the last group stays
-// clean, and the other groups use recalls from mid/late 2026 that stay inside the window for
-// the following year. Expected results can drift as FDA publishes new recalls.
+// Checked live on 2026-11-14 (scripts/check-demo-matches.mjs): 12 exact, 9 likely, 4 possible,
+// 5 with no match. Serial numbers of the "likely" group were chosen so they do NOT appear in
+// the real recall (an invented number can collide with a real one: the Plum Duo recall lists
+// thousands). Recalls from mid/late 2026 stay inside the one-year look-back window for a year;
+// expected results can drift as FDA publishes new recalls.
 import { DEVICE_SOURCES } from './deviceStore.js';
 
 const DEMO_ID_PREFIX = 'demo-';
@@ -37,7 +40,7 @@ const DEMO_ROWS = [
 
   // --- model in a real recall, serial/lot not listed -> likely ---------------------------
   ['MiniMed 780G insulin pump', 'insulin pump', 'Medtronic MiniMed', 'MMT-1885CLW', 'NG9999999X', 'Endocrinology'],
-  ['Plum Duo infusion pump', 'infusion pump', 'ICU Medical', '400020401', '50009999', 'Pediatrics'],
+  ['Plum Duo infusion pump', 'infusion pump', 'ICU Medical', '400020401', 'ICU-PD-7731', 'Pediatrics'],
   ['BeneVision N15 patient monitor', 'patient monitor', 'Mindray', 'N15', 'BV-N15-0457', 'Cardiology'],
   ['Astral 100 ventilator', 'ventilator', 'ResMed', 'Astral 100', '22241800001', 'Respiratory'],
   ['IQvitals Zone vital signs monitor', 'vital signs monitor', 'Midmark', '1-200-0330', 'V9999999', 'ER'],

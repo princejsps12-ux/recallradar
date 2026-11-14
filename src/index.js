@@ -4,6 +4,8 @@ import { buildRecallsUrl, parseRecalls, DEFAULT_LIMIT } from './openfda';
 import { createDeviceStore } from './deviceStore';
 import { forgeKv } from './kvAdapter';
 import { loadDemoHospital } from './demoHospital';
+import { findRecallsForDevices } from './recallSearch';
+import { matchDevicesToRecalls } from './matching';
 
 const resolver = new Resolver();
 const deviceStore = createDeviceStore(forgeKv);
@@ -46,6 +48,38 @@ resolver.define('loadDemoHospital', async () => {
   } catch (error) {
     console.error('Failed to load demo hospital', error);
     return { ok: false, error: 'Could not load the demo hospital.' };
+  }
+});
+
+// Fetch one openFDA URL as JSON. openFDA answers 404 when a search has no hits: that is
+// "no results", not an error.
+async function fetchOpenFdaJson(url) {
+  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (response.status === 404) return { results: [] };
+  if (!response.ok) throw new Error(`openFDA request failed with status ${response.status}`);
+  return response.json();
+}
+
+// "Check devices for recalls": find recent recalls for the hospital's manufacturers and models,
+// then match them to the devices. Runs on request (a button), not on every panel view, because
+// one check makes about two dozen openFDA requests and openFDA limits anonymous use.
+resolver.define('findMatches', async () => {
+  try {
+    const devices = await deviceStore.listDevices();
+    if (devices.length === 0) {
+      return { ok: true, deviceCount: 0, recallCount: 0, matches: [], failedQueries: 0 };
+    }
+    const { recalls, failedQueries } = await findRecallsForDevices(devices, fetchOpenFdaJson);
+    return {
+      ok: true,
+      deviceCount: devices.length,
+      recallCount: recalls.length,
+      matches: matchDevicesToRecalls(devices, recalls),
+      failedQueries,
+    };
+  } catch (error) {
+    console.error('Failed to find matches', error);
+    return { ok: false, error: 'Could not check devices against FDA recalls.' };
   }
 });
 

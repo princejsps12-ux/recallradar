@@ -1,47 +1,147 @@
-# Forge Hello World
+# RecallRadar
 
-This project contains a Forge app written in Javascript that displays `Hello World!` in a Jira issue panel. 
+A Forge app for hospital teams. It compares **FDA medical device recalls** ([openFDA](https://open.fda.gov/apis/device/enforcement/)) with the devices a hospital owns, and tells you which devices a recall may affect, **how sure it is, and why**.
 
-See [developer.atlassian.com/platform/forge/](https://developer.atlassian.com/platform/forge) for documentation and tutorials explaining Forge.
+It runs as a panel on every Jira issue, and as a Rovo agent (currently a small test agent).
 
-## Requirements
+## What it does today
 
-See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/) for instructions to get set up.
+| Part | What it does |
+| --- | --- |
+| **Latest recalls** | Lists the 20 newest FDA device recalls: recall number, firm, product, model/lot info, class, date. |
+| **Hospital devices** | Stores the hospital's devices in Forge storage. **Load demo hospital** adds 30 sample devices. |
+| **Check devices for recalls** | Finds recent recalls for the hospital's manufacturers and models and matches them to devices with a confidence level and a reason. |
+| **RecallRadar Assistant** | A minimal Rovo agent that replies "Hello from RecallRadar". |
 
-## Quick start
+## Try it
 
-- Install top-level dependencies:
+1. Open any Jira issue on a site where the app is installed and find the **RecallRadar** panel.
+2. Click **Load demo hospital**. It adds 30 devices. Running it again replaces only the demo devices and leaves any other devices in storage alone.
+3. Click **Check devices for recalls**. Results are grouped by device, strongest match first.
+
+## How matching works
+
+A match is built from three facts, each checked on its own:
+
+1. **Manufacturer**: the device's maker equals the recall's *recalling firm*.
+2. **Model**: the device's model number is written in the recall's product description or code info.
+3. **Lot/serial**: this unit's lot or serial number is listed in the recall's code info, or the recall says it covers *all* units.
+
+Each (device, recall) pair gets **at most one result: the strongest rule that applies**. The code is in [`src/matching.js`](src/matching.js); each rule is explained next to the code that implements it.
+
+| Confidence | Rule | Needs | Why we trust it this much |
+| --- | --- | --- | --- |
+| **Exact** | `exact-manufacturer-model-lot` | Manufacturer + model + this unit's lot/serial all listed | All three identifiers agree. |
+| **Exact** | `exact-manufacturer-model-all` | Manufacturer + model, and the recall covers all serial/lot numbers | Every unit of that model is affected, so the unit's own number does not matter. |
+| **Likely** | `likely-manufacturer-model` | Manufacturer + model, but the unit's lot/serial is not listed (or not recorded) | The model is recalled, but we cannot confirm this unit is in the affected batch. A person should check. |
+| **Likely** | `likely-manufacturer-lot` | Manufacturer + lot/serial, but the model is not mentioned | Some recalls only list serial numbers. The serial and maker agreeing is strong, but not conclusive. |
+| **Possible** | `possible-model-other-maker` | A distinctive model number, but a *different* recalling firm | Parent companies, distributors and relabelled products are recalled under another name. Worth a look. |
+| **Possible** | `possible-manufacturer-type` | Same manufacturer + same kind of device, model not mentioned | The weakest signal: the maker has a recall for this kind of device. |
+
+If no rule applies, nothing is reported.
+
+### How each fact is checked
+
+- **Normalising text.** Everything is lower-cased and split into words at any character that is not a letter or digit. `MMT-1885CLW/00763` and `mmt 1885clw 00763` are the same. Phrases must match **as whole words, in order**, so model `N15` matches `N12/N15/N17` but never `N150`.
+- **Manufacturer.** Legal words (`Inc`, `Corporation`, `Ltd`, `GmbH`, `AB`...) are ignored. Two makers match when **all** words of the shorter name appear in the longer one (`Philips` matches `Philips North America Llc`), and at least one shared word is specific. Generic words (`Medical`, `Healthcare`, `Systems`...) alone never match: `Medical Systems` does not match `GE Medical Systems Information Technologies`.
+- **Model.** Looked for in both the product description and the code info.
+- **Lot/serial.** Looked for in the code info only, since that is where FDA lists them.
+- **All units.** The recall's code info contains `all serial`, `all lot`, `all unexpired` or `all units`.
+- **Device type** (weakest rule only). Every word of the device's type (`infusion pump`) appears in the recall's product text.
+
+### The numbers, and why
+
+There are no unexplained constants. All are named exports in [`src/matching.js`](src/matching.js) or [`src/recallSearch.js`](src/recallSearch.js):
+
+| Constant | Value | Reason |
+| --- | --- | --- |
+| `MIN_MODEL_LENGTH` | 3 characters | A model like `A1` or `10` would "appear" in almost every recall by chance. |
+| `MIN_LOT_LENGTH` | 4 characters | Same reason for lot/serial numbers. |
+| `MIN_MODEL_LENGTH_OTHER_MAKER` | 5 characters | The `possible-model-other-maker` rule ignores the manufacturer, so the model alone must be distinctive. |
+| `LOOKBACK_DAYS` | 365 | Looks at the last year of recalls: recent enough to matter, without old closed-out recalls. |
+| `MODELS_PER_QUERY` | 5 | Keeps search URLs short and stops one very common model crowding out others. |
+| `MAX_RECALLS_PER_QUERY` | 100 | openFDA's per-request maximum without paging. |
+
+### Ordering
+
+Results are sorted by confidence (exact, likely, possible), then recall class (I is the most serious), then newest recall first, then device id, so the order is always the same.
+
+### Known limits
+
+- **Serial ranges are not understood.** A recall that says `serial number < 2224` lists no individual numbers, so a device inside the range shows as **likely** and needs a person to check.
+- **No spelling variants.** `monitor` and `monitors` are different words, and `MMT1885CLW` does not match `MMT-1885CLW`.
+- **Newest 100 recalls per query.** A manufacturer with more than 100 recalls in the window may have older ones missed by the firm search. The model search catches those that mention a hospital model.
+- **openFDA rate limit.** Anonymous use is limited (about 1,000 requests a day per IP address, 240 a minute). One check makes about two dozen requests, which is why it runs on a button click instead of every time the panel opens. Results are not cached yet.
+- **The FDA is not the only source.** Recalls from other regulators are not included.
+
+## How the demo hospital is built
+
+[`src/demoHospital.js`](src/demoHospital.js) holds 30 devices with **real manufacturer and model names taken from actual openFDA recalls**. Devices meant to match have serial/lot numbers that the real recall lists. Wards and the serial numbers of unaffected devices are invented. The file's header explains the groups (exact, likely, possible, none) and how it was checked.
+
+Check what the demo matches against the live API at any time:
+
+```bash
+node scripts/check-demo-matches.mjs
 ```
+
+Results can drift as the FDA publishes new recalls, and recalls fall out of the one-year window.
+
+## Where devices live
+
+Devices sit behind one small interface in [`src/deviceStore.js`](src/deviceStore.js) (`listDevices`, `saveDevices`, `clear`, `removeBySource`, `replaceAll`). Today they are stored in **Forge storage** ([`src/kvAdapter.js`](src/kvAdapter.js)), one key per device, so the app works on any site with no setup.
+
+**JSM Assets** is a possible extra source. Forge can *read* Assets objects (`read:cmdb-object:jira`, `read:cmdb-schema:jira` are already declared), but in testing it could not *create* a schema as the app (403: Assets administrator rights are required). A read-only import that maps Assets objects to the device shape and calls `saveDevices` is the planned route. It is not built yet.
+
+## Project layout
+
+```
+manifest.yml              Forge modules, scopes, external fetch permission
+src/index.js              Resolvers: recalls, devices, demo hospital, matching; Rovo action
+src/openfda.js            openFDA URLs and parsing (display and full-text)
+src/recallSearch.js       Which recalls to fetch for a device list (firm + model queries)
+src/matching.js           The matching rules
+src/text.js               Shared text helpers (tokenize, whole-word phrase search)
+src/deviceStore.js        Device list interface
+src/kvAdapter.js          Forge storage behind that interface
+src/demoHospital.js       The 30 demo devices and "Load demo hospital"
+src/*.test.mjs            Unit tests (Node's built-in runner)
+scripts/                  Developer checks that use the network
+static/hello-world/       Custom UI (React) for the issue panel
+```
+
+## Develop
+
+Requirements: Node 22+ and the Forge CLI (`npm install -g @forge/cli`, then `forge login`).
+
+```bash
 npm install
+npm test                                   # unit tests, no network needed
+
+cd static/hello-world
+npm install --legacy-peer-deps             # the template pins React 16
+npm run build                              # rebuild after any front-end change
+cd ../..
+
+forge lint
+forge deploy -e development
+forge install --upgrade -e development     # only when scopes or permissions change
 ```
 
-- Install dependencies inside of the `static/hello-world` directory:
-```
-npm install
-```
+`forge deploy` prints an approval prompt when a change makes a major version (new scopes or external domains); re-run with `--approve MAJOR_VERSION_RULE` if that is what you intended.
 
-- Modify your app by editing the files in `static/hello-world/src/`.
+### Tests
 
-- Build your app (inside of the `static/hello-world` directory):
-```
-npm run build
-```
+`npm test` runs every `src/*.test.mjs` file with Node's built-in test runner: no extra packages. The matching tests cover each rule, each fact check, the boundaries of every threshold, ordering, and cases that must **not** match.
 
-- Deploy your app by running:
-```
-forge deploy
-```
+### Permissions
 
-- Install your app in an Atlassian site by running:
-```
-forge install
-```
-
-### Notes
-- Use the `forge deploy` command when you want to persist code changes.
-- Use the `forge install` command when you want to install the app on a new site.
-- Once the app is installed on a site, the site picks up the new app changes you deploy without needing to rerun the install command.
+| Scope / permission | Why |
+| --- | --- |
+| `read:jira-work` | Jira issue panel. |
+| `storage:app` | The device list in Forge storage. |
+| `read:servicedesk-request`, `read:cmdb-object:jira`, `read:cmdb-schema:jira` | Reserved for the read-only Assets import. Not used yet. |
+| External fetch: `api.fda.gov` | Recall data from openFDA. |
 
 ## Support
 
-See [Get help](https://developer.atlassian.com/platform/forge/get-help/) for how to get help and provide feedback.
+See [Get help](https://developer.atlassian.com/platform/forge/get-help/) for Forge help and feedback.

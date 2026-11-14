@@ -66,3 +66,80 @@ export function parseRecalls(body) {
   const results = body && Array.isArray(body.results) ? body.results : [];
   return results.map(parseRecall).filter(Boolean);
 }
+
+// ---------------------------------------------------------------------------------------
+// Matching support: full-text parsing and targeted searches
+// ---------------------------------------------------------------------------------------
+
+// Same as parseRecall, plus the FULL product and code_info text (the display fields above
+// are shortened). Matching needs the full text because a serial number can sit anywhere in a
+// list of thousands. Keep these two fields on the server; do not send them to the panel.
+export function parseRecallForMatching(raw) {
+  const recall = parseRecall(raw);
+  if (!recall) return null;
+  return {
+    ...recall,
+    productText: cleanText(raw.product_description),
+    codeText: cleanText(raw.code_info),
+  };
+}
+
+// openFDA returns at most this many records per request without paging. Enough for one
+// manufacturer's recalls inside our date window in nearly all cases.
+export const MAX_RECALLS_PER_QUERY = 100;
+
+// openFDA's search syntax is "field:term", joined with +AND+ / +OR+, with + standing in
+// for a space inside quoted phrases and +TO+ inside ranges.
+
+// Today as an openFDA date: 20261114.
+export function formatYmd(date) {
+  const y = String(date.getUTCFullYear()).padStart(4, '0');
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  return `${y}${m}${d}`;
+}
+
+// The date `days` before `now`, as an openFDA date.
+export function daysAgoYmd(now, days) {
+  return formatYmd(new Date(now.getTime() - days * 24 * 60 * 60 * 1000));
+}
+
+// Keep only letters and digits so a user-supplied name can never inject search syntax.
+function safeWords(words) {
+  return words.map((w) => String(w).toLowerCase().replace(/[^a-z0-9]/g, '')).filter(Boolean);
+}
+
+// field:"word1+word2" -- an exact phrase on one field. Returns '' if there are no usable words.
+export function phraseClause(field, words) {
+  const safe = safeWords(words);
+  return safe.length ? `${field}:"${safe.join('+')}"` : '';
+}
+
+function reportDateRange(fromYmd, toYmd) {
+  return `report_date:[${fromYmd}+TO+${toYmd}]`;
+}
+
+function searchUrl(expression, limit) {
+  const n = Math.min(Math.max(Math.trunc(Number(limit)) || MAX_RECALLS_PER_QUERY, 1), MAX_RECALLS_PER_QUERY);
+  return `${OPENFDA_BASE_URL}?search=${expression}&sort=report_date:desc&limit=${n}`;
+}
+
+// Recalls whose recalling_firm contains these words, inside the date window.
+// Returns null if there are no usable words.
+export function buildFirmRecallsUrl(firmWords, fromYmd, toYmd, limit = MAX_RECALLS_PER_QUERY) {
+  const firm = phraseClause('recalling_firm', firmWords);
+  if (!firm) return null;
+  return searchUrl(`${firm}+AND+${reportDateRange(fromYmd, toYmd)}`, limit);
+}
+
+// Recalls that mention any of these models in the product description or code info, inside
+// the date window. `modelWordLists` is a list of word lists, one per model.
+// Returns null if there are no usable models.
+export function buildModelRecallsUrl(modelWordLists, fromYmd, toYmd, limit = MAX_RECALLS_PER_QUERY) {
+  const clauses = modelWordLists
+    .map((words) => [phraseClause('product_description', words), phraseClause('code_info', words)])
+    .map(([product, code]) => (product && code ? `${product}+OR+${code}` : ''))
+    .filter(Boolean);
+  if (clauses.length === 0) return null;
+  return searchUrl(`(${clauses.join('+OR+')})+AND+${reportDateRange(fromYmd, toYmd)}`, limit);
+}
