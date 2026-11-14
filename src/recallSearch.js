@@ -29,16 +29,39 @@ export const LOOKBACK_DAYS = 365;
 // small groups keep URLs short and stop one very common model from crowding out the others.
 export const MODELS_PER_QUERY = 5;
 
+// How many recalls to ask for in each query (newest first). Smaller answers are faster:
+// measured against the demo hospital, 100 -> 25 cut a check from about 6.5 s to about 1.7 s on
+// a laptop while keeping every match (10 was faster still but lost 35 of 101 secondary matches).
+// The cost of a small cap is that older recalls inside the window may be left out; queries that
+// hit the cap are counted in `cappedQueries` so the panel can say so. See README, "Speed".
+export const SEARCH_LIMIT_PER_QUERY = 25;
+
+// How long to wait for openFDA before giving up on the searches still running. Forge cuts a UI
+// function off at 25 s with no way to raise that limit (custom timeouts exist only for queue
+// consumers and scheduled triggers), so we stop earlier: 20 s leaves 5 s to match, save and
+// reply. Searches abandoned at the deadline count as failed, so the panel shows what arrived
+// with a warning, instead of an error, and the partial result is not saved.
+export const SEARCH_DEADLINE_MS = 20 * 1000;
+
 // Models shorter than this are too common to search for (same reason as MIN_MODEL_LENGTH in
 // matching.js). Kept separate so the search layer does not depend on matching thresholds.
 export const MIN_SEARCHABLE_MODEL_LENGTH = 3;
+
+// Reject if `promise` has not settled after `ms`. The timer is always cleared.
+function withDeadline(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Search timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 function unique(list) {
   return [...new Set(list)];
 }
 
 // The list of openFDA URLs to run for these devices.
-export function planRecallQueries(devices, now = new Date()) {
+export function planRecallQueries(devices, now = new Date(), limit = SEARCH_LIMIT_PER_QUERY) {
   const from = daysAgoYmd(now, LOOKBACK_DAYS);
   const to = formatYmd(now);
 
@@ -48,7 +71,7 @@ export function planRecallQueries(devices, now = new Date()) {
     const words = makerWords(device.manufacturer);
     if (words.length) firmKeys.set(words.join(' '), words);
   }
-  const firmUrls = [...firmKeys.values()].map((words) => buildFirmRecallsUrl(words, from, to));
+  const firmUrls = [...firmKeys.values()].map((words) => buildFirmRecallsUrl(words, from, to, limit));
 
   // Model queries in small groups, one list of words per distinct model.
   const modelKeys = new Map();
@@ -60,7 +83,7 @@ export function planRecallQueries(devices, now = new Date()) {
   const models = [...modelKeys.values()];
   const modelUrls = [];
   for (let i = 0; i < models.length; i += MODELS_PER_QUERY) {
-    modelUrls.push(buildModelRecallsUrl(models.slice(i, i + MODELS_PER_QUERY), from, to));
+    modelUrls.push(buildModelRecallsUrl(models.slice(i, i + MODELS_PER_QUERY), from, to, limit));
   }
 
   return unique([...firmUrls, ...modelUrls].filter(Boolean));
@@ -68,19 +91,31 @@ export function planRecallQueries(devices, now = new Date()) {
 
 // Run the planned queries and merge the answers into one list of recalls (no duplicates,
 // full text kept for matching). A failed query never loses the others: it is counted in
-// `failedQueries` so the caller can warn the user.
-export async function findRecallsForDevices(devices, fetchJson, now = new Date()) {
-  const urls = planRecallQueries(devices, now);
-  const settled = await Promise.allSettled(urls.map((url) => fetchJson(url)));
+// `failedQueries` so the caller can warn the user; so is one still running after the deadline. A query that matched more recalls than it
+// returned (openFDA reports the real total in meta.results.total) is counted in `cappedQueries`.
+export async function findRecallsForDevices(
+  devices,
+  fetchJson,
+  now = new Date(),
+  limit = SEARCH_LIMIT_PER_QUERY,
+  deadlineMs = SEARCH_DEADLINE_MS,
+) {
+  const urls = planRecallQueries(devices, now, limit);
+  const settled = await Promise.allSettled(urls.map((url) => withDeadline(fetchJson(url), deadlineMs)));
 
   const byNumber = new Map();
   let failedQueries = 0;
+  let cappedQueries = 0;
   for (const outcome of settled) {
     if (outcome.status !== 'fulfilled') {
       failedQueries += 1;
       continue;
     }
     const results = outcome.value && Array.isArray(outcome.value.results) ? outcome.value.results : [];
+    const total = outcome.value && outcome.value.meta && outcome.value.meta.results
+      ? outcome.value.meta.results.total
+      : 0;
+    if (Number.isFinite(total) && total > results.length) cappedQueries += 1;
     for (const raw of results) {
       const recall = parseRecallForMatching(raw);
       if (recall && !byNumber.has(recall.recallNumber)) {
@@ -88,5 +123,5 @@ export async function findRecallsForDevices(devices, fetchJson, now = new Date()
       }
     }
   }
-  return { recalls: [...byNumber.values()], queryCount: urls.length, failedQueries };
+  return { recalls: [...byNumber.values()], queryCount: urls.length, failedQueries, cappedQueries };
 }

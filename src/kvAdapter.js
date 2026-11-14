@@ -6,6 +6,7 @@ import { kvs, WhereConditions } from '@forge/kvs';
 const LIST_PAGE_SIZE = 100;
 
 export const forgeKv = {
+  get: (key) => kvs.get(key),
   set: (key, value) => kvs.set(key, value),
   delete: (key) => kvs.delete(key),
 

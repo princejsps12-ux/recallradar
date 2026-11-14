@@ -106,39 +106,85 @@ function groupByDevice(matches) {
   return [...groups.values()];
 }
 
-function MatchesSection() {
-  const [state, setState] = useState({ status: 'idle', result: null, error: '' });
+// How long (in hours) a saved check stays valid. Keep in step with CACHE_TTL_HOURS in src/matchCache.js.
+const SAVED_FOR_HOURS = 6;
 
-  const check = async () => {
-    setState({ status: 'loading', result: null, error: '' });
+function formatChecked(result) {
+  const when = new Date(result.checkedAt).toLocaleString();
+  if (result.fromCache) return `Last checked ${when} (saved result, refreshes after ${SAVED_FOR_HOURS} hours)`;
+  const seconds = (result.elapsedMs / 1000).toFixed(1);
+  return `Last checked ${when} (just now, took ${seconds} s)`;
+}
+
+function MatchesSection() {
+  // status: 'starting' (looking for a saved result), 'idle', 'loading', 'done' or 'error'
+  const [state, setState] = useState({ status: 'starting', result: null, error: '' });
+
+  // When the panel opens, show the saved result if there is one. This never starts a check.
+  useEffect(() => {
+    let cancelled = false;
+    invoke('findMatches', { cachedOnly: true })
+      .then((response) => {
+        if (cancelled) return;
+        if (response && response.ok && response.result) {
+          setState({ status: 'done', result: response.result, error: '' });
+        } else {
+          setState({ status: 'idle', result: null, error: '' });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: 'idle', result: null, error: '' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const check = async (refresh) => {
+    setState((previous) => ({ status: 'loading', result: previous.result, error: '' }));
     try {
-      const result = await invoke('findMatches');
-      if (result && result.ok) {
-        setState({ status: 'done', result, error: '' });
+      const response = await invoke('findMatches', { refresh });
+      if (response && response.ok) {
+        setState({ status: 'done', result: response.result, error: '' });
       } else {
-        setState({ status: 'error', result: null, error: (result && result.error) || 'Unknown error' });
+        setState({ status: 'error', result: null, error: (response && response.error) || 'Unknown error' });
       }
     } catch (e) {
       setState({ status: 'error', result: null, error: 'Could not reach RecallRadar.' });
     }
   };
 
-  const groups = state.result ? groupByDevice(state.result.matches) : [];
+  const loading = state.status === 'loading';
+  const result = state.result;
+  const groups = result ? groupByDevice(result.matches) : [];
 
   return (
     <div style={styles.section}>
-      <button style={styles.button} onClick={check} disabled={state.status === 'loading'}>
-        {state.status === 'loading' ? 'Checking…' : 'Check devices for recalls'}
+      <button style={styles.button} onClick={() => check(Boolean(result))} disabled={loading || state.status === 'starting'}>
+        {loading ? 'Checking…' : result ? 'Refresh' : 'Check devices for recalls'}
       </button>
+      {loading && (
+        <div style={styles.meta}>
+          Checking your devices against FDA recalls… The first check can take up to a minute. The result
+          is saved for {SAVED_FOR_HOURS} hours, so the next one is instant.
+        </div>
+      )}
       {state.status === 'error' && <div>{state.error}</div>}
-      {state.status === 'done' && (
+      {result && (
         <div>
-          <div style={styles.meta}>
-            Checked {state.result.deviceCount} devices against {state.result.recallCount} recalls from the last
-            year: {groups.length} device{groups.length === 1 ? '' : 's'} with a possible match.
-            {state.result.failedQueries > 0 &&
-              ` ${state.result.failedQueries} FDA lookups failed, so results may be incomplete.`}
-          </div>
+          <div style={styles.meta}>{formatChecked(result)}</div>
+          {result.deviceCount === 0 ? (
+            <div>No devices yet. Click “Load demo hospital” above.</div>
+          ) : (
+            <div style={styles.meta}>
+              Checked {result.deviceCount} devices against {result.recallCount} recalls from the last
+              year: {groups.length} device{groups.length === 1 ? '' : 's'} with a possible match.
+              {result.cappedQueries > 0 &&
+                ' Each search looks at the newest 25 recalls, so older ones in the last year may be missing.'}
+              {result.failedQueries > 0 &&
+                ` ${result.failedQueries} FDA lookups failed or timed out, so results may be incomplete (not saved). Try Refresh.`}
+            </div>
+          )}
           <ul style={styles.list}>
             {groups.map((matches) => {
               const best = matches[0];

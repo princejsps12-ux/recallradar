@@ -13,6 +13,8 @@ import {
 import {
   LOOKBACK_DAYS,
   MODELS_PER_QUERY,
+  SEARCH_LIMIT_PER_QUERY,
+  SEARCH_DEADLINE_MS,
   planRecallQueries,
   findRecallsForDevices,
 } from './recallSearch.js';
@@ -203,5 +205,76 @@ test('findRecallsForDevices does no work for an empty hospital', async () => {
   let called = false;
   const out = await findRecallsForDevices([], async () => { called = true; return { results: [] }; }, NOW);
   assert.equal(called, false);
-  assert.deepEqual(out, { recalls: [], queryCount: 0, failedQueries: 0 });
+  assert.deepEqual(out, { recalls: [], queryCount: 0, failedQueries: 0, cappedQueries: 0 });
+});
+
+// --- Query size and the cap ----------------------------------------------------------------------------
+
+test('queries ask for the newest SEARCH_LIMIT_PER_QUERY recalls by default', () => {
+  assert.equal(SEARCH_LIMIT_PER_QUERY, 25);
+  const urls = planRecallQueries([device('a', 'Masimo', 'M-1000')], NOW);
+  assert.ok(urls.length >= 2);
+  for (const url of urls) assert.ok(url.endsWith(`limit=${SEARCH_LIMIT_PER_QUERY}`), url);
+});
+
+test('planRecallQueries accepts a different limit', () => {
+  for (const url of planRecallQueries([device('a', 'Masimo', 'M-1000')], NOW, 10)) {
+    assert.ok(url.endsWith('limit=10'), url);
+  }
+});
+
+test('findRecallsForDevices counts queries whose real total is larger than what came back', async () => {
+  const answers = [
+    { meta: { results: { total: 80 } }, results: [rawRecall('Z-1')] }, // capped
+    { meta: { results: { total: 1 } }, results: [rawRecall('Z-2')] }, // complete
+  ];
+  let i = 0;
+  const { cappedQueries } = await findRecallsForDevices(
+    [device('a', 'Masimo', 'M-1000')],
+    async () => answers[i++ % answers.length],
+    NOW,
+  );
+  assert.equal(cappedQueries, 1);
+});
+
+test('a query with no meta, or an empty answer, is not counted as capped', async () => {
+  const answers = [{ results: [rawRecall('Z-1')] }, { results: [] }, { meta: {}, results: [] }];
+  let i = 0;
+  const { cappedQueries } = await findRecallsForDevices(
+    [device('a', 'Masimo', 'M-1000')],
+    async () => answers[i++ % answers.length],
+    NOW,
+  );
+  assert.equal(cappedQueries, 0);
+});
+
+// --- Deadline ----------------------------------------------------------------------------------------------
+
+const sleep = (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
+
+test('the deadline is 20 seconds, 5 s inside the 25 s limit Forge sets for UI functions', () => {
+  assert.equal(SEARCH_DEADLINE_MS, 20000);
+});
+
+test('a search still running at the deadline counts as failed; the others are kept', async () => {
+  const devices = [device('a', 'Masimo', 'M-1000'), device('b', 'Philips', 'P-2000')];
+  const fetchJson = (url) =>
+    url.includes('philips') ? sleep(300, { results: [rawRecall('Z-SLOW')] }) : Promise.resolve({ results: [rawRecall('Z-FAST')] });
+  const { recalls, failedQueries } = await findRecallsForDevices(devices, fetchJson, NOW, 25, 50);
+  assert.deepEqual(recalls.map((r) => r.recallNumber), ['Z-FAST']);
+  assert.ok(failedQueries >= 1);
+});
+
+test('searches that finish before the deadline are unaffected by it', async () => {
+  const fetchJson = () => sleep(10, { results: [rawRecall('Z-1')] });
+  const { recalls, failedQueries } = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], fetchJson, NOW, 25, 1000);
+  assert.equal(failedQueries, 0);
+  assert.deepEqual(recalls.map((r) => r.recallNumber), ['Z-1']);
+});
+
+test('when every search is too slow the result is empty and all are counted as failed', async () => {
+  const fetchJson = () => sleep(300, { results: [rawRecall('Z-1')] });
+  const out = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], fetchJson, NOW, 25, 30);
+  assert.deepEqual(out.recalls, []);
+  assert.equal(out.failedQueries, out.queryCount);
 });

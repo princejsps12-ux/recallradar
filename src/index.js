@@ -6,9 +6,12 @@ import { forgeKv } from './kvAdapter';
 import { loadDemoHospital } from './demoHospital';
 import { findRecallsForDevices } from './recallSearch';
 import { matchDevicesToRecalls } from './matching';
+import { createMatchCache } from './matchCache';
+import { getMatches, getCachedMatches } from './matchService';
 
 const resolver = new Resolver();
 const deviceStore = createDeviceStore(forgeKv);
+const matchCache = createMatchCache(forgeKv);
 
 // Fetch the latest device recalls from openFDA and return them in a small, UI-friendly shape.
 export async function getLatestRecalls(limit = DEFAULT_LIMIT) {
@@ -60,23 +63,38 @@ async function fetchOpenFdaJson(url) {
   return response.json();
 }
 
-// "Check devices for recalls": find recent recalls for the hospital's manufacturers and models,
-// then match them to the devices. Runs on request (a button), not on every panel view, because
-// one check makes about two dozen openFDA requests and openFDA limits anonymous use.
-resolver.define('findMatches', async () => {
+// The real check: find recent recalls for the hospital's manufacturers and models, then match
+// them to the devices.
+async function computeMatches(devices) {
+  const { recalls, failedQueries, cappedQueries } = await findRecallsForDevices(devices, fetchOpenFdaJson);
+  return {
+    deviceCount: devices.length,
+    recallCount: recalls.length,
+    matches: matchDevicesToRecalls(devices, recalls),
+    failedQueries,
+    cappedQueries,
+  };
+}
+
+// "Check devices for recalls". One check makes about two dozen openFDA requests and can take a
+// while, so the result is saved in Forge storage (see matchCache.js).
+//   payload.cachedOnly  return the saved result if there is one, never start a check
+//   payload.refresh     ignore the saved result and check again
+resolver.define('findMatches', async ({ payload }) => {
   try {
+    const options = payload || {};
     const devices = await deviceStore.listDevices();
-    if (devices.length === 0) {
-      return { ok: true, deviceCount: 0, recallCount: 0, matches: [], failedQueries: 0 };
+    if (options.cachedOnly) {
+      const saved = await getCachedMatches({ devices, cache: matchCache });
+      return saved ? { ok: true, result: saved } : { ok: true, result: null };
     }
-    const { recalls, failedQueries } = await findRecallsForDevices(devices, fetchOpenFdaJson);
-    return {
-      ok: true,
-      deviceCount: devices.length,
-      recallCount: recalls.length,
-      matches: matchDevicesToRecalls(devices, recalls),
-      failedQueries,
-    };
+    const result = await getMatches({
+      devices,
+      cache: matchCache,
+      compute: computeMatches,
+      refresh: Boolean(options.refresh),
+    });
+    return { ok: true, result };
   } catch (error) {
     console.error('Failed to find matches', error);
     return { ok: false, error: 'Could not check devices against FDA recalls.' };

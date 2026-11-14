@@ -6,6 +6,9 @@ export function fakeKv(initial = {}) {
   const kv = {
     data,
     maxInFlight: 0,
+    async get(key) {
+      return data.get(key);
+    },
     async set(key, value) {
       inFlight += 1;
       kv.maxInFlight = Math.max(kv.maxInFlight, inFlight);

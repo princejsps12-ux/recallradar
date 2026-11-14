@@ -61,6 +61,9 @@ There are no unexplained constants. All are named exports in [`src/matching.js`]
 | `LOOKBACK_DAYS` | 365 | Looks at the last year of recalls: recent enough to matter, without old closed-out recalls. |
 | `MODELS_PER_QUERY` | 5 | Keeps search URLs short and stops one very common model crowding out others. |
 | `MAX_RECALLS_PER_QUERY` | 100 | openFDA's per-request maximum without paging. |
+| `SEARCH_LIMIT_PER_QUERY` | 25 | Newest recalls requested per search. Smaller is faster; 25 kept every match in the demo (see "Speed" below). |
+| `CACHE_TTL_HOURS` | 6 | How long a saved check stays valid. FDA publishes about weekly, so a few hours old is fine, and it spares openFDA's request limit. |
+| `MAX_CACHE_BYTES` | 200 KiB | Forge storage rejects values over 240 KiB; larger results are skipped (recomputed) instead of failing. |
 
 ### Ordering
 
@@ -70,9 +73,33 @@ Results are sorted by confidence (exact, likely, possible), then recall class (I
 
 - **Serial ranges are not understood.** A recall that says `serial number < 2224` lists no individual numbers, so a device inside the range shows as **likely** and needs a person to check.
 - **No spelling variants.** `monitor` and `monitors` are different words, and `MMT1885CLW` does not match `MMT-1885CLW`.
-- **Newest 100 recalls per query.** A manufacturer with more than 100 recalls in the window may have older ones missed by the firm search. The model search catches those that mention a hospital model.
-- **openFDA rate limit.** Anonymous use is limited (about 1,000 requests a day per IP address, 240 a minute). One check makes about two dozen requests, which is why it runs on a button click instead of every time the panel opens. Results are not cached yet.
+- **Newest 25 recalls per search.** A manufacturer or model group with more than 25 recalls in the window may have older ones missed. The panel says so when any search hit this cap (openFDA reports the real total, so it is exact, not a guess). The model searches still catch recalls that mention a hospital model.
+- **openFDA rate limit.** Anonymous use is limited (about 1,000 requests a day per IP address, 240 a minute). One check makes about two dozen requests, which is why it runs on a button click, and why results are saved (see below).
 - **The FDA is not the only source.** Recalls from other regulators are not included.
+
+## Speed and saving results
+
+A check makes about two dozen openFDA requests. Three things keep it usable:
+
+1. **Smaller searches.** Each asks for the newest 25 recalls (`SEARCH_LIMIT_PER_QUERY`), not 100.
+2. **Saved results.** The result is stored in Forge storage ([`src/matchCache.js`](src/matchCache.js), [`src/matchService.js`](src/matchService.js)). The panel shows the saved result as soon as it opens, with a "last checked" time and a **Refresh** button. A saved result is used only while it is under 6 hours old, not dated in the future, and the device list is unchanged (a fingerprint of the devices). A check with failed lookups is shown but **not** saved. Results too big for storage are skipped, and storage errors never fail a check.
+3. **A 20-second deadline instead of a longer timeout.** Forge cuts a UI function off at 25 seconds and does not let you raise that (custom `timeoutSeconds` works only for queue consumers and scheduled triggers; the linter rejects it on a resolver). So searches still running after 20 s are abandoned and counted as failed: the panel shows what arrived, with a warning, and does not save the partial result. A queue-based design (start the check in the background, poll for the result) would remove the limit; it is not built.
+
+### Measurements (demo hospital: 30 devices, 24 searches)
+
+| | Before | After |
+| --- | --- | --- |
+| Search size | 100 recalls | 25 recalls |
+| Cold check, on a laptop | 5 to 15 s (about 10 s on average, 4 runs) | 5 to 12 s (about 7 s on average, 6 runs) |
+| Cold check, on the demo Jira site | about 30 s (read off the screen, so rough) | 13.4 s and 10.7 s (reported by the app, 2 runs) |
+| Downloaded | 21.4 MB | 19.5 MB |
+| Recalls fetched / matches found | 280 / 101 | 200 / 101 |
+| Best match per device | 12 exact, 9 likely, 4 possible | unchanged |
+| **Repeat check (saved result)** | same as a cold check | **0 ms, 0 MB** |
+
+The honest picture: smaller searches help a little and cold timings are noisy (openFDA's response time varies a lot), but they do not fix the real cost. **One recall record (Z-1645-2026, BD Alaris) is 8.7 MB**, almost all of it a sub-object we never use, and openFDA cannot leave fields out. It is downloaded twice (by a manufacturer search and by a model search), which is about 17 of the 19.5 MB. Saving the result is what makes the panel feel instant: the cost is paid once per 6 hours instead of on every click.
+
+Ideas not built: skip the duplicate download, or fetch per-device in the background.
 
 ## How the demo hospital is built
 
@@ -99,6 +126,8 @@ manifest.yml              Forge modules, scopes, external fetch permission
 src/index.js              Resolvers: recalls, devices, demo hospital, matching; Rovo action
 src/openfda.js            openFDA URLs and parsing (display and full-text)
 src/recallSearch.js       Which recalls to fetch for a device list (firm + model queries)
+src/matchCache.js         Saved check results in Forge storage (6-hour expiry)
+src/matchService.js       Saved result or fresh check, "last checked", refresh
 src/matching.js           The matching rules
 src/text.js               Shared text helpers (tokenize, whole-word phrase search)
 src/deviceStore.js        Device list interface
