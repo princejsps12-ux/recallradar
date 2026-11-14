@@ -36,6 +36,9 @@ resources:
 permissions:
   scopes:
     - read:jira-work
+    - read:servicedesk-request
+    - read:cmdb-object:jira
+    - read:cmdb-schema:jira
   external:
     fetch:
       backend:
