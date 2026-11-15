@@ -1,17 +1,13 @@
 import Resolver from '@forge/resolver';
 import { fetch } from '@forge/api';
 import { buildRecallsUrl, parseRecalls, DEFAULT_LIMIT } from './openfda';
-import { createDeviceStore } from './deviceStore';
-import { forgeKv } from './kvAdapter';
+import { Queue } from '@forge/events';
 import { loadDemoHospital } from './demoHospital';
-import { findRecallsForDevices } from './recallSearch';
-import { matchDevicesToRecalls } from './matching';
-import { createMatchCache } from './matchCache';
-import { getMatches, getCachedMatches } from './matchService';
+import { getSavedMatches, requestCheck, getCheckStatus } from './matchService';
+import { deviceStore, matchCache, checkJobs, CHECK_QUEUE_KEY } from './runtime';
 
 const resolver = new Resolver();
-const deviceStore = createDeviceStore(forgeKv);
-const matchCache = createMatchCache(forgeKv);
+const checkQueue = new Queue({ key: CHECK_QUEUE_KEY });
 
 // Fetch the latest device recalls from openFDA and return them in a small, UI-friendly shape.
 export async function getLatestRecalls(limit = DEFAULT_LIMIT) {
@@ -54,50 +50,46 @@ resolver.define('loadDemoHospital', async () => {
   }
 });
 
-// Fetch one openFDA URL as JSON. openFDA answers 404 when a search has no hits: that is
-// "no results", not an error.
-async function fetchOpenFdaJson(url) {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (response.status === 404) return { results: [] };
-  if (!response.ok) throw new Error(`openFDA request failed with status ${response.status}`);
-  return response.json();
-}
+// --- The recall check (runs in the background; see matchService.js) ---------------------------------
 
-// The real check: find recent recalls for the hospital's manufacturers and models, then match
-// them to the devices.
-async function computeMatches(devices) {
-  const { recalls, failedQueries, cappedQueries } = await findRecallsForDevices(devices, fetchOpenFdaJson);
-  return {
-    deviceCount: devices.length,
-    recallCount: recalls.length,
-    matches: matchDevicesToRecalls(devices, recalls),
-    failedQueries,
-    cappedQueries,
-  };
-}
-
-// "Check devices for recalls". One check makes about two dozen openFDA requests and can take a
-// while, so the result is saved in Forge storage (see matchCache.js).
-//   payload.cachedOnly  return the saved result if there is one, never start a check
-//   payload.refresh     ignore the saved result and check again
-resolver.define('findMatches', async ({ payload }) => {
+// What the panel shows when it opens: the saved result (fresh or expired), if any.
+resolver.define('getSavedMatches', async () => {
   try {
-    const options = payload || {};
     const devices = await deviceStore.listDevices();
-    if (options.cachedOnly) {
-      const saved = await getCachedMatches({ devices, cache: matchCache });
-      return saved ? { ok: true, result: saved } : { ok: true, result: null };
-    }
-    const result = await getMatches({
+    return { ok: true, result: await getSavedMatches({ devices, cache: matchCache }) };
+  } catch (error) {
+    console.error('Failed to read the saved result', error);
+    return { ok: false, error: 'Could not load the saved result.' };
+  }
+});
+
+// "Check devices" / "Refresh". Returns at once: either a saved result, or the news that a
+// background check is running (the panel then polls getCheckStatus).
+//   payload.refresh  check again even if a fresh saved result exists
+resolver.define('startCheck', async ({ payload }) => {
+  try {
+    const devices = await deviceStore.listDevices();
+    const outcome = await requestCheck({
       devices,
       cache: matchCache,
-      compute: computeMatches,
-      refresh: Boolean(options.refresh),
+      jobs: checkJobs,
+      enqueue: (message) => checkQueue.push({ body: message }),
+      refresh: Boolean(payload && payload.refresh),
     });
-    return { ok: true, result };
+    return { ok: true, ...outcome };
   } catch (error) {
-    console.error('Failed to find matches', error);
-    return { ok: false, error: 'Could not check devices against FDA recalls.' };
+    console.error('Failed to start the check', error);
+    return { ok: false, error: 'Could not start the check. Please try again.' };
+  }
+});
+
+// The panel's polling call: progress, and the result once the background check has finished.
+resolver.define('getCheckStatus', async () => {
+  try {
+    return { ok: true, ...(await getCheckStatus({ jobs: checkJobs })) };
+  } catch (error) {
+    console.error('Failed to read the check status', error);
+    return { ok: false, error: 'Could not read the check status.' };
   }
 });
 

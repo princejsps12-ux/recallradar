@@ -36,12 +36,11 @@ export const MODELS_PER_QUERY = 5;
 // hit the cap are counted in `cappedQueries` so the panel can say so. See README, "Speed".
 export const SEARCH_LIMIT_PER_QUERY = 25;
 
-// How long to wait for openFDA before giving up on the searches still running. Forge cuts a UI
-// function off at 25 s with no way to raise that limit (custom timeouts exist only for queue
-// consumers and scheduled triggers), so we stop earlier: 20 s leaves 5 s to match, save and
-// reply. Searches abandoned at the deadline count as failed, so the panel shows what arrived
-// with a warning, instead of an error, and the partial result is not saved.
-export const SEARCH_DEADLINE_MS = 20 * 1000;
+// How long to wait for openFDA before giving up on the searches still running. The check runs
+// in the background (a Forge queue consumer with timeoutSeconds: 300), so this sits 60 s inside
+// that limit, leaving time to match, save and report. Searches abandoned at the deadline count
+// as failed, so the result is shown with a warning and is not saved.
+export const SEARCH_DEADLINE_MS = 240 * 1000;
 
 // Models shorter than this are too common to search for (same reason as MIN_MODEL_LENGTH in
 // matching.js). Kept separate so the search layer does not depend on matching thresholds.
@@ -93,16 +92,35 @@ export function planRecallQueries(devices, now = new Date(), limit = SEARCH_LIMI
 // full text kept for matching). A failed query never loses the others: it is counted in
 // `failedQueries` so the caller can warn the user; so is one still running after the deadline. A query that matched more recalls than it
 // returned (openFDA reports the real total in meta.results.total) is counted in `cappedQueries`.
-export async function findRecallsForDevices(
-  devices,
-  fetchJson,
-  now = new Date(),
-  limit = SEARCH_LIMIT_PER_QUERY,
-  deadlineMs = SEARCH_DEADLINE_MS,
-) {
+export async function findRecallsForDevices(devices, fetchJson, options = {}) {
+  const {
+    now = new Date(),
+    limit = SEARCH_LIMIT_PER_QUERY,
+    deadlineMs = SEARCH_DEADLINE_MS,
+    onProgress = null,
+  } = options;
   const urls = planRecallQueries(devices, now, limit);
-  const settled = await Promise.allSettled(urls.map((url) => withDeadline(fetchJson(url), deadlineMs)));
 
+  // Tell the caller how far along we are (searches finished, searches in total). A broken
+  // progress callback must never break the check itself.
+  let finished = 0;
+  const report = () => {
+    if (!onProgress) return;
+    try {
+      onProgress(finished, urls.length);
+    } catch (error) {
+      // progress is best effort
+    }
+  };
+  report();
+  const settled = await Promise.allSettled(
+    urls.map((url) =>
+      withDeadline(fetchJson(url), deadlineMs).finally(() => {
+        finished += 1;
+        report();
+      }),
+    ),
+  );
   const byNumber = new Map();
   let failedQueries = 0;
   let cappedQueries = 0;

@@ -166,14 +166,14 @@ test('findRecallsForDevices merges results from every query without duplicates',
     calls.push(url);
     return { results: [rawRecall('Z-1'), rawRecall(url.includes('philips') ? 'Z-2' : 'Z-3')] };
   };
-  const { recalls, queryCount, failedQueries } = await findRecallsForDevices(devices, fetchJson, NOW);
+  const { recalls, queryCount, failedQueries } = await findRecallsForDevices(devices, fetchJson, { now: NOW });
   assert.equal(queryCount, calls.length);
   assert.equal(failedQueries, 0);
   assert.deepEqual(recalls.map((r) => r.recallNumber).sort(), ['Z-1', 'Z-2', 'Z-3']);
 });
 
 test('findRecallsForDevices keeps full text for matching', async () => {
-  const { recalls } = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], async () => ({ results: [rawRecall('Z-1')] }), NOW);
+  const { recalls } = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], async () => ({ results: [rawRecall('Z-1')] }), { now: NOW });
   assert.equal(recalls[0].codeText, 'Serial 123456');
   assert.equal(recalls[0].productText, 'Masimo pulse oximeter');
 });
@@ -184,7 +184,7 @@ test('findRecallsForDevices survives a failed query and counts it', async () => 
     if (url.includes('philips')) throw new Error('boom');
     return { results: [rawRecall('Z-1')] };
   };
-  const { recalls, failedQueries } = await findRecallsForDevices(devices, fetchJson, NOW);
+  const { recalls, failedQueries } = await findRecallsForDevices(devices, fetchJson, { now: NOW });
   assert.ok(failedQueries >= 1);
   assert.deepEqual(recalls.map((r) => r.recallNumber), ['Z-1']);
 });
@@ -195,7 +195,7 @@ test('findRecallsForDevices skips malformed answers and unidentifiable records',
   const { recalls, failedQueries } = await findRecallsForDevices(
     [device('a', 'Masimo', 'M-1000')],
     async () => answers[i++ % answers.length],
-    NOW,
+    { now: NOW },
   );
   assert.deepEqual(recalls.map((r) => r.recallNumber), ['Z-1']);
   assert.equal(failedQueries, 0);
@@ -203,7 +203,7 @@ test('findRecallsForDevices skips malformed answers and unidentifiable records',
 
 test('findRecallsForDevices does no work for an empty hospital', async () => {
   let called = false;
-  const out = await findRecallsForDevices([], async () => { called = true; return { results: [] }; }, NOW);
+  const out = await findRecallsForDevices([], async () => { called = true; return { results: [] }; }, { now: NOW });
   assert.equal(called, false);
   assert.deepEqual(out, { recalls: [], queryCount: 0, failedQueries: 0, cappedQueries: 0 });
 });
@@ -232,7 +232,7 @@ test('findRecallsForDevices counts queries whose real total is larger than what 
   const { cappedQueries } = await findRecallsForDevices(
     [device('a', 'Masimo', 'M-1000')],
     async () => answers[i++ % answers.length],
-    NOW,
+    { now: NOW },
   );
   assert.equal(cappedQueries, 1);
 });
@@ -243,7 +243,7 @@ test('a query with no meta, or an empty answer, is not counted as capped', async
   const { cappedQueries } = await findRecallsForDevices(
     [device('a', 'Masimo', 'M-1000')],
     async () => answers[i++ % answers.length],
-    NOW,
+    { now: NOW },
   );
   assert.equal(cappedQueries, 0);
 });
@@ -252,29 +252,62 @@ test('a query with no meta, or an empty answer, is not counted as capped', async
 
 const sleep = (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
 
-test('the deadline is 20 seconds, 5 s inside the 25 s limit Forge sets for UI functions', () => {
-  assert.equal(SEARCH_DEADLINE_MS, 20000);
+test('the deadline is 240 seconds, 60 s inside the 300 s limit of the background function', () => {
+  assert.equal(SEARCH_DEADLINE_MS, 240000);
 });
 
 test('a search still running at the deadline counts as failed; the others are kept', async () => {
   const devices = [device('a', 'Masimo', 'M-1000'), device('b', 'Philips', 'P-2000')];
   const fetchJson = (url) =>
     url.includes('philips') ? sleep(300, { results: [rawRecall('Z-SLOW')] }) : Promise.resolve({ results: [rawRecall('Z-FAST')] });
-  const { recalls, failedQueries } = await findRecallsForDevices(devices, fetchJson, NOW, 25, 50);
+  const { recalls, failedQueries } = await findRecallsForDevices(devices, fetchJson, { now: NOW, limit: 25, deadlineMs: 50 });
   assert.deepEqual(recalls.map((r) => r.recallNumber), ['Z-FAST']);
   assert.ok(failedQueries >= 1);
 });
 
 test('searches that finish before the deadline are unaffected by it', async () => {
   const fetchJson = () => sleep(10, { results: [rawRecall('Z-1')] });
-  const { recalls, failedQueries } = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], fetchJson, NOW, 25, 1000);
+  const { recalls, failedQueries } = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], fetchJson, { now: NOW, limit: 25, deadlineMs: 1000 });
   assert.equal(failedQueries, 0);
   assert.deepEqual(recalls.map((r) => r.recallNumber), ['Z-1']);
 });
 
 test('when every search is too slow the result is empty and all are counted as failed', async () => {
   const fetchJson = () => sleep(300, { results: [rawRecall('Z-1')] });
-  const out = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], fetchJson, NOW, 25, 30);
+  const out = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], fetchJson, { now: NOW, limit: 25, deadlineMs: 30 });
   assert.deepEqual(out.recalls, []);
   assert.equal(out.failedQueries, out.queryCount);
+});
+
+// --- Progress ---------------------------------------------------------------------------------------------
+
+test('onProgress reports 0 of N first, then one step per finished search, ending at N of N', async () => {
+  const devices = [device('a', 'Masimo', 'M-1000'), device('b', 'Philips', 'P-2000')];
+  const calls = [];
+  const out = await findRecallsForDevices(devices, async () => ({ results: [] }), {
+    now: NOW,
+    onProgress: (done, total) => calls.push([done, total]),
+  });
+  const total = out.queryCount;
+  assert.deepEqual(calls[0], [0, total]);
+  assert.deepEqual(calls[calls.length - 1], [total, total]);
+  assert.equal(calls.length, total + 1);
+  assert.deepEqual(calls.map(([done]) => done), calls.map(([done]) => done).sort((a, b) => a - b));
+});
+
+test('failed and timed-out searches still count as finished for progress', async () => {
+  const calls = [];
+  const out = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], async () => { throw new Error('x'); }, {
+    now: NOW,
+    onProgress: (done, total) => calls.push([done, total]),
+  });
+  assert.deepEqual(calls[calls.length - 1], [out.queryCount, out.queryCount]);
+});
+
+test('a throwing progress callback does not break the check', async () => {
+  const out = await findRecallsForDevices([device('a', 'Masimo', 'M-1000')], async () => ({ results: [rawRecall('Z-1')] }), {
+    now: NOW,
+    onProgress: () => { throw new Error('ui exploded'); },
+  });
+  assert.deepEqual(out.recalls.map((r) => r.recallNumber), ['Z-1']);
 });

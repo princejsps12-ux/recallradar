@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@forge/bridge';
 
 const styles = {
@@ -106,73 +106,153 @@ function groupByDevice(matches) {
   return [...groups.values()];
 }
 
-// How long (in hours) a saved check stays valid. Keep in step with CACHE_TTL_HOURS in src/matchCache.js.
+// How long (in hours) a saved check stays fresh. Keep in step with CACHE_TTL_HOURS in src/matchCache.js.
 const SAVED_FOR_HOURS = 6;
+// How often to ask the background check how far it has got, and when to give up asking.
+const POLL_EVERY_MS = 2000;
+const POLL_GIVE_UP_MS = 8 * 60 * 1000;
 
-function formatChecked(result) {
+function formatChecked(result, refreshing) {
   const when = new Date(result.checkedAt).toLocaleString();
+  if (result.stale) {
+    return `Last checked ${when} (older than ${SAVED_FOR_HOURS} hours${refreshing ? ', refreshing now…' : ''})`;
+  }
   if (result.fromCache) return `Last checked ${when} (saved result, refreshes after ${SAVED_FOR_HOURS} hours)`;
   const seconds = (result.elapsedMs / 1000).toFixed(1);
   return `Last checked ${when} (just now, took ${seconds} s)`;
 }
 
-function MatchesSection() {
-  // status: 'starting' (looking for a saved result), 'idle', 'loading', 'done' or 'error'
-  const [state, setState] = useState({ status: 'starting', result: null, error: '' });
+function progressText(progress) {
+  if (!progress || !progress.total) return 'Starting the background check…';
+  return `Checked ${progress.done} of ${progress.total} FDA searches…`;
+}
 
-  // When the panel opens, show the saved result if there is one. This never starts a check.
+function MatchesSection() {
+  // phase: 'starting' (reading what is saved), 'idle', 'running' (a background check) or 'error'
+  const [state, setState] = useState({ phase: 'starting', result: null, progress: null, error: '' });
+  const timer = useRef(null);
+  const started = useRef(0);
+
+
+  const stopPolling = useCallback(() => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = null;
+  }, []);
+
+  // Ask the background check how far it has got, until it finishes. Keeps showing the previous
+  // result in the meantime.
+  const poll = useCallback(() => {
+    stopPolling();
+    started.current = Date.now();
+    timer.current = setInterval(async () => {
+      if (Date.now() - started.current > POLL_GIVE_UP_MS) {
+        stopPolling();
+        setState((s) => ({ ...s, phase: 'error', error: 'The check is taking longer than expected. Reopen this panel in a minute.' }));
+        return;
+      }
+      try {
+        const response = await invoke('getCheckStatus');
+        if (!response || !response.ok) return; // try again on the next tick
+        const job = response.job;
+        if (!job) {
+          stopPolling();
+          setState((s) => ({ ...s, phase: 'idle' }));
+        } else if (job.status === 'running') {
+          setState((s) => ({ ...s, phase: 'running', progress: job.progress }));
+        } else if (job.status === 'done' && response.result) {
+          stopPolling();
+          setState({ phase: 'idle', result: response.result, progress: null, error: '' });
+        } else {
+          stopPolling();
+          setState((s) => ({ ...s, phase: 'error', progress: null, error: job.error || 'The check failed.' }));
+        }
+      } catch (e) {
+        // a dropped request is not fatal: the next tick asks again
+      }
+    }, POLL_EVERY_MS);
+  }, [stopPolling]);
+
+  // Start (or join) a background check, and follow it.
+  const begin = useCallback(
+    async (refresh) => {
+      setState((s) => ({ ...s, phase: 'running', progress: null, error: '' }));
+      try {
+        const response = await invoke('startCheck', { refresh });
+        if (!response || !response.ok) {
+          setState((s) => ({ ...s, phase: 'error', error: (response && response.error) || 'Could not start the check.' }));
+        } else if (response.state === 'saved') {
+          setState({ phase: 'idle', result: response.result, progress: null, error: '' });
+        } else if (response.state === 'no-devices') {
+          setState({ phase: 'idle', result: { deviceCount: 0, matches: [], checkedAt: new Date().toISOString(), fromCache: true }, progress: null, error: '' });
+        } else {
+          setState((s) => ({ ...s, phase: 'running', progress: response.job ? response.job.progress : null }));
+          poll();
+        }
+      } catch (e) {
+        setState((s) => ({ ...s, phase: 'error', error: 'Could not reach RecallRadar.' }));
+      }
+    },
+    [poll],
+  );
+
+  // When the panel opens: show what is saved, pick up a check that is still running (the page
+  // may have been reloaded), and if the saved result has expired, refresh it in the background.
   useEffect(() => {
     let cancelled = false;
-    invoke('findMatches', { cachedOnly: true })
-      .then((response) => {
+    Promise.all([invoke('getSavedMatches'), invoke('getCheckStatus')])
+      .then(([saved, status]) => {
         if (cancelled) return;
-        if (response && response.ok && response.result) {
-          setState({ status: 'done', result: response.result, error: '' });
+        const result = saved && saved.ok ? saved.result : null;
+        const job = status && status.ok ? status.job : null;
+        if (job && job.status === 'running') {
+          setState({ phase: 'running', result, progress: job.progress, error: '' });
+          poll();
+        } else if (result) {
+          setState({ phase: 'idle', result, progress: null, error: '' });
+          if (result.stale) begin(false);
+        } else if (job && job.status === 'done' && status.result) {
+          setState({ phase: 'idle', result: status.result, progress: null, error: '' }); // e.g. a result with failed lookups, never saved
         } else {
-          setState({ status: 'idle', result: null, error: '' });
+          setState({ phase: 'idle', result: null, progress: null, error: '' });
         }
       })
       .catch(() => {
-        if (!cancelled) setState({ status: 'idle', result: null, error: '' });
+        if (!cancelled) setState({ phase: 'idle', result: null, progress: null, error: '' });
       });
     return () => {
       cancelled = true;
+      stopPolling();
     };
-  }, []);
+  }, [begin, poll, stopPolling]);
 
-  const check = async (refresh) => {
-    setState((previous) => ({ status: 'loading', result: previous.result, error: '' }));
-    try {
-      const response = await invoke('findMatches', { refresh });
-      if (response && response.ok) {
-        setState({ status: 'done', result: response.result, error: '' });
-      } else {
-        setState({ status: 'error', result: null, error: (response && response.error) || 'Unknown error' });
-      }
-    } catch (e) {
-      setState({ status: 'error', result: null, error: 'Could not reach RecallRadar.' });
-    }
-  };
-
-  const loading = state.status === 'loading';
+  const running = state.phase === 'running';
   const result = state.result;
   const groups = result ? groupByDevice(result.matches) : [];
 
   return (
     <div style={styles.section}>
-      <button style={styles.button} onClick={() => check(Boolean(result))} disabled={loading || state.status === 'starting'}>
-        {loading ? 'Checking…' : result ? 'Refresh' : 'Check devices for recalls'}
+      <button
+        style={styles.button}
+        onClick={() => begin(Boolean(result))}
+        disabled={running || state.phase === 'starting'}
+      >
+        {running ? 'Checking…' : result ? 'Refresh' : 'Check devices for recalls'}
       </button>
-      {loading && (
+      {running && (
         <div style={styles.meta}>
-          Checking your devices against FDA recalls… The first check can take up to a minute. The result
-          is saved for {SAVED_FOR_HOURS} hours, so the next one is instant.
+          <progress
+            max={state.progress && state.progress.total ? state.progress.total : 1}
+            value={state.progress ? state.progress.done : 0}
+            style={{ verticalAlign: 'middle', marginRight: '6px' }}
+          />
+          {progressText(state.progress)} This runs in the background, so you can keep working. The result is
+          saved for {SAVED_FOR_HOURS} hours.
         </div>
       )}
-      {state.status === 'error' && <div>{state.error}</div>}
+      {state.phase === 'error' && <div>{state.error}</div>}
       {result && (
         <div>
-          <div style={styles.meta}>{formatChecked(result)}</div>
+          <div style={styles.meta}>{formatChecked(result, running)}</div>
           {result.deviceCount === 0 ? (
             <div>No devices yet. Click “Load demo hospital” above.</div>
           ) : (

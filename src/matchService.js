@@ -1,51 +1,101 @@
-// "Check devices for recalls", with saving. Decides between a saved result and a fresh check.
+// The recall check as a background job, from every side:
 //
-//   getMatches(...)         use the saved result if there is a valid one, otherwise run a check
-//                           (always run one when `refresh` is true)
-//   getCachedMatches(...)   only ever return a saved result; never starts a check
+//   getSavedMatches   what the panel shows when it opens: the saved result (fresh or expired)
+//   requestCheck      the "Check devices" / "Refresh" button: returns AT ONCE, either with a saved
+//                     result, or after queueing a background job (the panel then polls)
+//   performCheck      the background work itself, run by the queue consumer and the daily trigger
+//   getCheckStatus    the panel's polling call: progress, and the result once finished
 //
-// A check that had failed lookups is shown but NOT saved: saving a partial answer would keep
-// showing it for hours.
+// Why a background job: a Forge UI function is cut off after 25 s, and a first check can take
+// longer. The queue consumer may run for minutes, so a click can never time out.
 //
-// `compute(devices)` runs the real check and resolves to
-//   { deviceCount, recallCount, matches, failedQueries, cappedQueries }.
-// It is injected so this logic is unit tested without any network.
+// A check with failed lookups is shown but NOT saved to the cache, because saving a partial
+// answer would keep showing it for hours.
+//
+// Everything outside the network and Forge is injected, so every path is unit tested.
 
-function emptyResult() {
-  return {
-    deviceCount: 0,
-    recallCount: 0,
-    matches: [],
-    failedQueries: 0,
-    cappedQueries: 0,
-    checkedAt: null,
-    fromCache: false,
-    elapsedMs: 0,
-  };
-}
-
-export async function getCachedMatches({ devices, cache }) {
+// What the panel shows for a result that is not fresh: the old answer plus a flag.
+export async function getSavedMatches({ devices, cache }) {
   if (devices.length === 0) return null;
-  const entry = await cache.read(devices);
-  if (!entry) return null;
-  return { ...entry.result, checkedAt: entry.checkedAt, fromCache: true, elapsedMs: 0 };
+  const found = await cache.peek(devices);
+  if (!found) return null;
+  return { ...found.entry.result, checkedAt: found.entry.checkedAt, fromCache: true, stale: !found.fresh };
 }
 
-export async function getMatches({ devices, cache, compute, refresh = false, nowMs = () => Date.now() }) {
-  if (devices.length === 0) return emptyResult();
+// Start a check, or say why not. Never waits for the check itself.
+//   { state: 'no-devices' }
+//   { state: 'saved',   result }   a fresh saved result exists and `refresh` is false
+//   { state: 'running', job }      a check is already running, or was just queued
+// `enqueue({ jobId, trigger })` puts the work on the queue. If that fails the job is marked
+// failed (so nothing looks "running" forever) and the error is passed up.
+export async function requestCheck({ devices, cache, jobs, enqueue, refresh = false }) {
+  if (devices.length === 0) return { state: 'no-devices' };
 
   if (!refresh) {
-    const saved = await getCachedMatches({ devices, cache });
-    if (saved) return saved;
+    const saved = await cache.read(devices);
+    if (saved) {
+      return {
+        state: 'saved',
+        result: { ...saved.result, checkedAt: saved.checkedAt, fromCache: true, stale: false },
+      };
+    }
   }
 
-  const started = nowMs();
-  const result = await compute(devices);
-  const elapsedMs = nowMs() - started;
-  const checkedAt = new Date(nowMs()).toISOString();
+  const { started, job } = await jobs.start('user');
+  if (!started) return { state: 'running', job };
 
-  if (result.failedQueries === 0) {
-    await cache.write(devices, result, checkedAt);
+  try {
+    await enqueue({ jobId: job.id, trigger: 'user' });
+  } catch (error) {
+    await jobs.fail(job.id, 'Could not start the check. Please try again.');
+    throw error;
   }
-  return { ...result, checkedAt, fromCache: false, elapsedMs };
+  return { state: 'running', job };
+}
+
+// The panel's polling call. `result` is set only for a finished job.
+export async function getCheckStatus({ jobs }) {
+  const job = await jobs.current();
+  if (!job) return { job: null, result: null };
+  const { result, ...summary } = job;
+  return { job: summary, result: job.status === 'done' ? result : null };
+}
+
+// The background work. `search(devices, onProgress)` resolves to
+//   { deviceCount, recallCount, matches, failedQueries, cappedQueries }.
+// With a `jobId` it works on that job (the queue consumer); without one it starts its own (the
+// daily trigger) and does nothing if a check is already running. Delivery from a queue is "at
+// least once", so a job that is no longer running is skipped. Never throws: a failure is
+// recorded on the job. Returns 'done', 'failed' or 'skipped'.
+export async function performCheck({ devices, search, cache, jobs, trigger, jobId = null, nowMs = () => Date.now() }) {
+  let id = jobId;
+  if (id) {
+    const job = await jobs.current();
+    if (!job || job.id !== id || job.status !== 'running') return 'skipped';
+  } else {
+    const { started, job } = await jobs.start(trigger);
+    if (!started) return 'skipped';
+    id = job.id;
+  }
+
+  // Progress writes go one after another so a slow write can never land after the final result.
+  let writes = Promise.resolve();
+  const onProgress = (done, total) => {
+    writes = writes.then(() => jobs.progress(id, done, total)).catch(() => {});
+  };
+
+  try {
+    const started = nowMs();
+    const result = await search(devices, onProgress);
+    const elapsedMs = nowMs() - started;
+    const checkedAt = new Date(nowMs()).toISOString();
+    if (result.failedQueries === 0) await cache.write(devices, result, checkedAt);
+    await writes;
+    const outcome = await jobs.complete(id, { ...result, checkedAt, fromCache: false, stale: false, elapsedMs });
+    return outcome || 'skipped';
+  } catch (error) {
+    await writes;
+    await jobs.fail(id, 'Could not check devices against FDA recalls.');
+    return 'failed';
+  }
 }

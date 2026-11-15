@@ -62,7 +62,9 @@ There are no unexplained constants. All are named exports in [`src/matching.js`]
 | `MODELS_PER_QUERY` | 5 | Keeps search URLs short and stops one very common model crowding out others. |
 | `MAX_RECALLS_PER_QUERY` | 100 | openFDA's per-request maximum without paging. |
 | `SEARCH_LIMIT_PER_QUERY` | 25 | Newest recalls requested per search. Smaller is faster; 25 kept every match in the demo (see "Speed" below). |
-| `CACHE_TTL_HOURS` | 6 | How long a saved check stays valid. FDA publishes about weekly, so a few hours old is fine, and it spares openFDA's request limit. |
+| `CACHE_TTL_HOURS` | 6 | How long a saved check stays fresh. FDA publishes about weekly, so a few hours old is fine, and it spares openFDA's request limit. |
+| `SEARCH_DEADLINE_MS` | 240 s | Gives up on slow searches 60 s before the 300 s limit of the background function. |
+| `STALE_JOB_MS` | 6 min | A background job with no progress update for this long counts as failed. |
 | `MAX_CACHE_BYTES` | 200 KiB | Forge storage rejects values over 240 KiB; larger results are skipped (recomputed) instead of failing. |
 
 ### Ordering
@@ -77,13 +79,18 @@ Results are sorted by confidence (exact, likely, possible), then recall class (I
 - **openFDA rate limit.** Anonymous use is limited (about 1,000 requests a day per IP address, 240 a minute). One check makes about two dozen requests, which is why it runs on a button click, and why results are saved (see below).
 - **The FDA is not the only source.** Recalls from other regulators are not included.
 
-## Speed and saving results
+## The check runs in the background
 
-A check makes about two dozen openFDA requests. Three things keep it usable:
+A check makes about two dozen openFDA requests and a cold one takes 10 to 14 seconds on the demo site. A Forge UI function is cut off after 25 seconds and that limit cannot be raised (custom timeouts exist only for queue consumers and scheduled triggers), so a slow day could make a click fail. Instead:
 
-1. **Smaller searches.** Each asks for the newest 25 recalls (`SEARCH_LIMIT_PER_QUERY`), not 100.
-2. **Saved results.** The result is stored in Forge storage ([`src/matchCache.js`](src/matchCache.js), [`src/matchService.js`](src/matchService.js)). The panel shows the saved result as soon as it opens, with a "last checked" time and a **Refresh** button. A saved result is used only while it is under 6 hours old, not dated in the future, and the device list is unchanged (a fingerprint of the devices). A check with failed lookups is shown but **not** saved. Results too big for storage are skipped, and storage errors never fail a check.
-3. **A 20-second deadline instead of a longer timeout.** Forge cuts a UI function off at 25 seconds and does not let you raise that (custom `timeoutSeconds` works only for queue consumers and scheduled triggers; the linter rejects it on a resolver). So searches still running after 20 s are abandoned and counted as failed: the panel shows what arrived, with a warning, and does not save the partial result. A queue-based design (start the check in the background, poll for the result) would remove the limit; it is not built.
+1. **Clicking "Check devices" starts a background job and returns at once.** The resolver records a job and puts a message on a Forge queue (async events). A queue consumer ([`src/consumer.js`](src/consumer.js), allowed to run for up to 300 seconds) does the work.
+2. **The panel shows progress.** It asks for the job's status every 2 seconds and shows "Checked 14 of 24 FDA searches". If you reload the page mid-check, it picks the running job back up.
+3. **Results are saved for 6 hours** in Forge storage, with a "last checked" time and a **Refresh** button. A saved result is used only while it is under 6 hours old and the device list is unchanged (a fingerprint of the devices). When the panel opens on an **expired** result, it shows that result flagged "older than 6 hours" and refreshes it in the background, so the panel is never empty.
+4. **A daily trigger refreshes the saved result** ([`src/scheduled.js`](src/scheduled.js)), so it is usually already there before anyone clicks.
+
+The rules that keep it correct (each has unit tests): a check with failed lookups is shown but **not** saved; only the running job with the right id may be updated, so late or duplicate queue deliveries are skipped; a job that stops reporting for 6 minutes counts as failed; a result too large for storage is reported as a failure, not lost; the search has its own 240-second deadline inside the 300-second limit. The pieces are [`src/checkJob.js`](src/checkJob.js) (job record), [`src/matchService.js`](src/matchService.js) (start / run / status) and [`src/matchCache.js`](src/matchCache.js) (saved result).
+
+Searches are also kept small: each asks for the newest 25 recalls (`SEARCH_LIMIT_PER_QUERY`), not 100.
 
 ### Measurements (demo hospital: 30 devices, 24 searches)
 
@@ -123,11 +130,15 @@ Devices sit behind one small interface in [`src/deviceStore.js`](src/deviceStore
 
 ```
 manifest.yml              Forge modules, scopes, external fetch permission
-src/index.js              Resolvers: recalls, devices, demo hospital, matching; Rovo action
+src/index.js              Resolvers: recalls, devices, demo hospital, check start/status; Rovo action
 src/openfda.js            openFDA URLs and parsing (display and full-text)
 src/recallSearch.js       Which recalls to fetch for a device list (firm + model queries)
-src/matchCache.js         Saved check results in Forge storage (6-hour expiry)
-src/matchService.js       Saved result or fresh check, "last checked", refresh
+src/matchCache.js         Saved check results in Forge storage (6-hour freshness)
+src/checkJob.js           The background job record: status, progress, stale detection
+src/matchService.js       Start / run / status of the background check, saved result
+src/runtime.js            Forge wiring shared by the consumer and the daily trigger
+src/consumer.js           Queue consumer: runs the check in the background (300 s)
+src/scheduled.js          Daily trigger: refreshes the saved result
 src/matching.js           The matching rules
 src/text.js               Shared text helpers (tokenize, whole-word phrase search)
 src/deviceStore.js        Device list interface

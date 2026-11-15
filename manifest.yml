@@ -25,11 +25,29 @@ modules:
       actionVerb: GET
       description: Returns a greeting from RecallRadar. Use it when the user says
         hello or asks to test the agent.
+  # The recall check runs in the background: the button queues it, this consumer does it.
+  # Only queue consumers and scheduled triggers may set timeoutSeconds (UI functions are fixed
+  # at 25 s), which is exactly why the check lives here.
+  consumer:
+    - key: check-consumer
+      queue: recall-check
+      function: check-consumer-fn
+  # Refreshes the saved result once a day so it is usually ready before anyone clicks.
+  scheduledTrigger:
+    - key: daily-refresh
+      function: daily-refresh-fn
+      interval: day
   function:
     - key: resolver
       handler: index.handler
     - key: hello-fn
       handler: index.hello
+    - key: check-consumer-fn
+      handler: consumer.handler
+      timeoutSeconds: 300
+    - key: daily-refresh-fn
+      handler: scheduled.handler
+      timeoutSeconds: 300
 resources:
   - key: main
     path: static/hello-world/build

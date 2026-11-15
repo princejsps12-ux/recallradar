@@ -1,0 +1,171 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { JOB_KEY, JOB_STATUS, STALE_JOB_MS, createCheckJobs } from './checkJob.js';
+import { MAX_CACHE_BYTES } from './matchCache.js';
+import { fakeKv } from './fakeKv.mjs';
+
+const T0 = Date.UTC(2026, 10, 14, 12, 0, 0);
+
+// A job tracker with a controllable clock and predictable ids.
+function setup(kv = fakeKv()) {
+  const clock = { now: T0 };
+  let n = 0;
+  const jobs = createCheckJobs(kv, () => clock.now, () => `job-${++n}`);
+  return { clock, jobs, kv };
+}
+
+test('there is no job at first', async () => {
+  assert.equal(await setup().jobs.current(), null);
+});
+
+test('start creates a running job with empty progress', async () => {
+  const { jobs, kv } = setup();
+  const { started, job } = await jobs.start('user');
+  assert.equal(started, true);
+  assert.equal(job.id, 'job-1');
+  assert.equal(job.status, JOB_STATUS.RUNNING);
+  assert.equal(job.trigger, 'user');
+  assert.deepEqual(job.progress, { done: 0, total: 0 });
+  assert.equal(job.startedAt, T0);
+  assert.deepEqual(await kv.get(JOB_KEY), job);
+});
+
+test('start does not begin a second job while one is running', async () => {
+  const { jobs } = setup();
+  const first = await jobs.start('user');
+  const second = await jobs.start('schedule');
+  assert.equal(second.started, false);
+  assert.equal(second.job.id, first.job.id);
+});
+
+test('progress updates the running job and bumps its last-update time', async () => {
+  const { clock, jobs } = setup();
+  const { job } = await jobs.start('user');
+  clock.now = T0 + 5000;
+  assert.equal(await jobs.progress(job.id, 7, 24), true);
+  const now = await jobs.current();
+  assert.deepEqual(now.progress, { done: 7, total: 24 });
+  assert.equal(now.updatedAt, T0 + 5000);
+  assert.equal(now.startedAt, T0);
+});
+
+test('complete stores the result, finishes the job and fills the progress bar', async () => {
+  const { jobs } = setup();
+  const { job } = await jobs.start('user');
+  await jobs.progress(job.id, 20, 24);
+  assert.equal(await jobs.complete(job.id, { recallCount: 5 }), 'done');
+  const done = await jobs.current();
+  assert.equal(done.status, JOB_STATUS.DONE);
+  assert.deepEqual(done.result, { recallCount: 5 });
+  assert.deepEqual(done.progress, { done: 24, total: 24 });
+  assert.equal(done.error, null);
+  assert.ok(done.finishedAt);
+});
+
+test('fail records the message and finishes the job', async () => {
+  const { jobs } = setup();
+  const { job } = await jobs.start('user');
+  assert.equal(await jobs.fail(job.id, 'boom'), true);
+  const failed = await jobs.current();
+  assert.equal(failed.status, JOB_STATUS.FAILED);
+  assert.equal(failed.error, 'boom');
+});
+
+test('a finished job lets a new one start', async () => {
+  const { jobs } = setup();
+  const first = await jobs.start('user');
+  await jobs.complete(first.job.id, {});
+  const second = await jobs.start('user');
+  assert.equal(second.started, true);
+  assert.equal(second.job.id, 'job-2');
+});
+
+test('a failed job lets a new one start', async () => {
+  const { jobs } = setup();
+  const first = await jobs.start('user');
+  await jobs.fail(first.job.id, 'x');
+  assert.equal((await jobs.start('user')).started, true);
+});
+
+test('a finished job cannot be changed by a late or duplicate message', async () => {
+  const { jobs } = setup();
+  const { job } = await jobs.start('user');
+  await jobs.complete(job.id, { recallCount: 1 });
+  assert.equal(await jobs.progress(job.id, 3, 24), false);
+  assert.equal(await jobs.fail(job.id, 'late'), false);
+  assert.equal(await jobs.complete(job.id, { recallCount: 2 }), null);
+  const now = await jobs.current();
+  assert.equal(now.status, JOB_STATUS.DONE);
+  assert.deepEqual(now.result, { recallCount: 1 });
+});
+
+test('a message for an older job never touches a newer one', async () => {
+  const { jobs } = setup();
+  const first = await jobs.start('user');
+  await jobs.fail(first.job.id, 'x');
+  const second = await jobs.start('user');
+  assert.equal(await jobs.progress(first.job.id, 9, 24), false);
+  assert.equal(await jobs.complete(first.job.id, {}), null);
+  const now = await jobs.current();
+  assert.equal(now.id, second.job.id);
+  assert.equal(now.status, JOB_STATUS.RUNNING);
+  assert.deepEqual(now.progress, { done: 0, total: 0 });
+});
+
+test('a job that has stopped reporting counts as failed once it is stale', async () => {
+  const { clock, jobs } = setup();
+  await jobs.start('user');
+  clock.now = T0 + STALE_JOB_MS - 1;
+  assert.equal((await jobs.current()).status, JOB_STATUS.RUNNING);
+  clock.now = T0 + STALE_JOB_MS;
+  const stale = await jobs.current();
+  assert.equal(stale.status, JOB_STATUS.FAILED);
+  assert.match(stale.error, /stopped unexpectedly/);
+});
+
+test('progress keeps a long job from going stale', async () => {
+  const { clock, jobs } = setup();
+  const { job } = await jobs.start('user');
+  clock.now = T0 + STALE_JOB_MS - 1000;
+  await jobs.progress(job.id, 5, 24);
+  clock.now = T0 + STALE_JOB_MS + 5000; // past the original deadline, but updated 6 s ago
+  assert.equal((await jobs.current()).status, JOB_STATUS.RUNNING);
+});
+
+test('a stale job lets a new one start, and the new job replaces it', async () => {
+  const { clock, jobs } = setup();
+  await jobs.start('user');
+  clock.now = T0 + STALE_JOB_MS;
+  const second = await jobs.start('user');
+  assert.equal(second.started, true);
+  assert.equal((await jobs.current()).id, second.job.id);
+});
+
+test('the stale time is six minutes, one minute beyond the 300 s background limit', () => {
+  assert.equal(STALE_JOB_MS, 6 * 60 * 1000);
+});
+
+test('a result too large to store is recorded as a failure, not lost silently', async () => {
+  const { jobs } = setup();
+  const { job } = await jobs.start('user');
+  const huge = { matches: ['x'.repeat(MAX_CACHE_BYTES)] };
+  assert.equal(await jobs.complete(job.id, huge), 'failed');
+  const now = await jobs.current();
+  assert.equal(now.status, JOB_STATUS.FAILED);
+  assert.match(now.error, /too large/);
+});
+
+test('damaged stored data is treated as no job', async () => {
+  for (const bad of ['text', 42, {}, { status: 'running' }]) {
+    const { jobs } = setup(fakeKv({ [JOB_KEY]: bad }));
+    assert.equal(await jobs.current(), null, JSON.stringify(bad));
+  }
+});
+
+test('a storage error while reading is treated as no job', async () => {
+  const kv = fakeKv();
+  kv.get = async () => {
+    throw new Error('storage down');
+  };
+  assert.equal(await setup(kv).jobs.current(), null);
+});

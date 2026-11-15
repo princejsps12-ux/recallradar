@@ -53,8 +53,11 @@ function byteLength(text) {
 }
 
 export function createMatchCache(kv, nowMs = () => Date.now()) {
-  // The saved entry for this device list, or null if there is none or it cannot be used.
-  async function read(devices) {
+  // The saved entry for this device list plus whether it is still fresh, or null if there is
+  // none or it cannot be used at all. An EXPIRED entry for the same devices is returned as
+  // { fresh: false } so the panel can show it while a new check runs ("stale while revalidate").
+  // Damaged data, a different device list, or a date in the future still give null.
+  async function peek(devices) {
     let entry;
     try {
       entry = await kv.get(MATCH_CACHE_KEY);
@@ -66,8 +69,14 @@ export function createMatchCache(kv, nowMs = () => Date.now()) {
     }
     if (entry.fingerprint !== fingerprintDevices(devices)) return null;
     const age = nowMs() - Date.parse(entry.checkedAt);
-    if (!Number.isFinite(age) || age < 0 || age >= CACHE_TTL_MS) return null;
-    return entry;
+    if (!Number.isFinite(age) || age < 0) return null;
+    return { entry, fresh: age < CACHE_TTL_MS };
+  }
+
+  // The saved entry only while it is still fresh, otherwise null.
+  async function read(devices) {
+    const found = await peek(devices);
+    return found && found.fresh ? found.entry : null;
   }
 
   // Save a result. Returns true if saved, false if it was too large or storage failed.
@@ -86,5 +95,5 @@ export function createMatchCache(kv, nowMs = () => Date.now()) {
     await kv.delete(MATCH_CACHE_KEY);
   }
 
-  return { read, write, clear };
+  return { peek, read, write, clear };
 }
