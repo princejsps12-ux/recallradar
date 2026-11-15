@@ -46,6 +46,7 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 | `src/runtime.js` | **Forge wiring**: storage adapter, `fetch`, `runCheck()` shared by the consumer and the daily trigger, `jiraAsUser`, `taskGuard` |
 | `src/index.js`, `src/consumer.js`, `src/scheduled.js`, `src/kvAdapter.js` | **Forge entry points** (resolvers, queue consumer, daily trigger, storage adapter) |
 | `static/hello-world/src/App.js` | The panel |
+| `src/deviceCsv.js` | Paste-in import of the hospital's own devices (all-or-nothing, line-numbered errors); resolver `importDevices`, UI in `Dashboard.js` |
 
 ### The recall check is a background job
 
@@ -114,7 +115,7 @@ Only **exact** and **likely** matches get a task. Due date is calendar days from
 - **Scheduled triggers DO run in the development environment** (verified: with `interval: fiveMinute` the first run came about 3 minutes after the deploy, then every 5 minutes). The shortest interval is `fiveMinute`. If you ever test one that way, **restore `interval: day` before leaving it**: a 5-minute trigger makes ~24 openFDA requests per run and blows through the daily limit. Changing any scheduled trigger resets all start times.
 - **Scopes/egress changes make a major version** and need `--approve MAJOR_VERSION_RULE` plus `install --upgrade`. Adding the `api.fda.gov` egress made the app **ineligible for Runs on Atlassian** (a Codegeist bonus, if it applies: check the rules).
 - **openFDA**: use `/device/enforcement.json` (it has recall number, firm, product, `code_info`, `classification`, `report_date`; the `/device/recall` endpoint has no class). Dates are `YYYYMMDD`. A search with no hits returns **404** (treat as empty). `code_info` can hold thousands of serials; one record (Z-1645-2026) is 8.7 MB because of an unused `openfda` sub-object, and openFDA cannot omit fields. Anonymous limit is about 1,000 requests a day per IP (a full check is about 24), which is why results are saved. Newest 100 recalls span only about a week, so match by manufacturer/model within a date window, never by "latest N".
-- **Assets**: Forge can *read* Assets as the app (`read:cmdb-object:jira`, `read:cmdb-schema:jira`, workspace id from `/rest/servicedeskapi/assets/workspace`) but *creating* a schema returned 403 (Assets-administrator rights). Hence devices live in Forge storage; read-only scopes are kept for a planned import.
+- **Assets**: Forge can *read* Assets as the app (`read:cmdb-object:jira`, `read:cmdb-schema:jira`, workspace id from `/rest/servicedeskapi/assets/workspace`) but *creating* a schema returned 403 (Assets-administrator rights). Hence devices live in Forge storage; the unused Assets scopes were REMOVED from the manifest (least privilege); re-add them when the import is built.
 - **An invented serial can collide with a real one**: when adding demo devices, check them against the real recall (`scripts/check-demo-matches.mjs`).
 - `forge webtrigger create` has no `--non-interactive` flag. `forge lint --fix` converts deprecated manifest forms.
 - Rovo agent "RecallRadar Assistant" is only a hello-world test (`hello-action`); a free developer site has no Rovo chat, the demo site does.

@@ -13,6 +13,7 @@ import {
 } from './taskService';
 import { assigneesForMatches, checkExplicitAssignees, setWardTeam } from './teamService';
 import { createRecallPages } from './recallPageService';
+import { importDevices } from './deviceCsv';
 import {
   deviceStore,
   matchCache,
@@ -69,6 +70,17 @@ resolver.define('loadDemoHospital', async () => {
   } catch (error) {
     console.error('Failed to load demo hospital', error);
     return { ok: false, error: 'Could not load the demo hospital.' };
+  }
+});
+
+// "Import your own devices": pasted spreadsheet text. All or nothing; the answer lists every problem line.
+resolver.define('importDevices', async ({ payload }) => {
+  try {
+    const text = payload && typeof payload.text === 'string' ? payload.text : '';
+    return await importDevices(deviceStore, text);
+  } catch (error) {
+    console.error('Failed to import devices', error);
+    return { ok: false, errors: ['Could not save the devices. Please try again.'] };
   }
 });
 

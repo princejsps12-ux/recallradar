@@ -4,10 +4,31 @@ A Forge app for hospital teams. It compares **FDA medical device recalls** ([ope
 
 It runs as a panel on every Jira issue, as a Rovo agent, and as MCP tools other agents can call. It reads **teams and their members from the Teamwork Graph** (read-only) to say who should handle a device's ward.
 
+## Judge quick start
+
+**Install link:** _paste the install link from the developer console here (Distribution, Sharing)._ Pick your site; install it in **Jira**, and also in **Confluence** if you want the recall pages.
+
+**Before you start**
+- A Jira site where you can create issues, and a Jira issue to open (any issue works).
+- Optional, each unlocks one feature: **Rovo** (the chat agent), **Confluence** (recall pages), and membership of at least one **team** in your Atlassian directory (the ward-to-team feature lists the teams you belong to; with none, that dropdown is empty and everything else still works).
+
+**Five minutes, in order**
+1. Jira, **Apps**, **RecallRadar**: the dashboard. On a fresh site it shows a first-run screen. Click **Load demo hospital** (30 sample devices with real manufacturer and model names), or **Import your own devices** and paste rows from a spreadsheet. It then checks them against the last year of FDA recalls in the background (about 15 seconds).
+2. Expect cards for devices, open recalls by class, and task progress, plus a table of affected devices. With the demo hospital you should see roughly 20 to 30 open exact or likely recalls across Class I, II and III; the exact numbers drift as the FDA publishes new recalls.
+3. Open any Jira issue: the **RecallRadar** panel shows each match with its reason. Click **Create task** (or **Create & assign** if you mapped a ward to a team).
+4. Ask **Rovo** (Ask Rovo, pick **RecallRadar Assistant**): "Which ICU devices have open Class I recalls?"
+
+**Try it safely.** Tasks and Confluence pages are real. All RecallRadar tasks carry the label `recallradar`: find them with the Jira search `labels = recallradar` and delete them when you are done. Creating a task for the same recall and device twice is blocked on purpose, so delete the tasks before re-running. Assigning someone sends them a Jira notification, and nobody is assigned unless you click the assign button.
+
+**Words used here.** *Device recall*: the FDA tells hospitals a device model or lot has a problem. *Class I / II / III*: how dangerous (I most, III least). *Ward*: the hospital unit, such as ICU. *Rovo*: Atlassian's AI chat agent. *MCP*: a standard way for other AI tools to call an app's functions. *Teamwork Graph*: Atlassian's directory of teams and people.
+
+**Scope today.** Your devices come from the demo hospital or a pasted spreadsheet (the import replaces your earlier paste). A direct JSM Assets import is not built. Only manufacturer and model names ever leave Atlassian (to openFDA); there is no patient data.
+
 ## What it does today
 
 | Part | What it does |
 | --- | --- |
+| **Dashboard** | A full-page app (Apps, RecallRadar): summary cards (devices, open recalls by class, tasks open and done), a table of affected devices you can filter by ward and class, the latest FDA recalls, a first-run screen with **Load demo hospital**, and **Import your own devices** (paste from a spreadsheet). The issue panel links to it. |
 | **Latest recalls** | Lists the 20 newest FDA device recalls: recall number, firm, product, model/lot info, class, date. |
 | **Hospital devices** | Stores the hospital's devices in Forge storage. **Load demo hospital** adds 30 sample devices. |
 | **Check devices for recalls** | Finds recent recalls for the hospital's manufacturers and models and matches them to devices with a confidence level and a reason. |
@@ -286,7 +307,7 @@ Checked in Rovo chat on the demo site: the agent asked for a space (listing the 
 
 ### Limits
 
-- **Answers are only as fresh as the saved check** (6 hours; the answer says how old it is, and the panel refreshes it). A check saved before this feature has no per-recall reason text, so refresh it once in the panel.
+- **Answers are only as fresh as the saved check** (6 hours; the answer says how old it is, and the panel refreshes it). A check saved by an older version has no per-recall reason text, so refresh it once in the panel.
 - **Only devices in the hospital list** can be checked, against recalls the check found for them.
 - **Action inputs are plain text, numbers or true/false** (Rovo does not allow lists), so "which matches" is chosen with filters: recall number, device id, ward, class.
 
@@ -349,8 +370,8 @@ claude mcp add --transport http recallradar https://mcp.atlassian.com/forge/<app
 
 ### What was and was not verified
 
-- Verified: the module and the new action deploy and pass Forge's linter, the three tools are unit tested, the same actions work in Rovo chat on the demo site, and the admin page (steps above) shows the app at the new version with the **Tools** switch, currently *Disabled*. I left it disabled.
-- **Not verified from here:** a real external client connection (Claude Desktop, Claude Code). It needs a site admin to switch the tools on and an interactive OAuth sign-in, which I did not do. The Claude Desktop steps are the standard remote-MCP setup rather than something Atlassian documents for Forge apps, so treat them as untested.
+- Verified: the module and the single-task action deploy and pass Forge's linter, the three tools are unit tested, the same actions work in Rovo chat on the demo site, and the admin page (steps above) shows the app at the new version with the **Tools** switch, *Disabled* until an admin chooses to enable it.
+- **Not verified:** a real external client connection (Claude Desktop, Claude Code). It needs a site admin to switch the tools on and an interactive OAuth sign-in, so it has not been run. Step-by-step instructions for a live demo are in [`docs/mcp-demo.md`](docs/mcp-demo.md). The Claude Desktop steps are the standard remote-MCP setup rather than something Atlassian documents for Forge apps, so treat them as untested.
 - Rovo shows its own "Please review" card for `CREATE` actions in chat; whether external clients get an equivalent prompt is up to the client.
 
 ## How the demo hospital is built
@@ -369,7 +390,7 @@ Results can drift as the FDA publishes new recalls, and recalls fall out of the 
 
 Devices sit behind one small interface in [`src/deviceStore.js`](src/deviceStore.js) (`listDevices`, `saveDevices`, `clear`, `removeBySource`, `replaceAll`). Today they are stored in **Forge storage** ([`src/kvAdapter.js`](src/kvAdapter.js)), one key per device, so the app works on any site with no setup.
 
-**JSM Assets** is a possible extra source. Forge can *read* Assets objects (`read:cmdb-object:jira`, `read:cmdb-schema:jira` are already declared), but in testing it could not *create* a schema as the app (403: Assets administrator rights are required). A read-only import that maps Assets objects to the device shape and calls `saveDevices` is the planned route. It is not built yet.
+**Your own devices** come from **Import your own devices** on the dashboard (paste rows from a spreadsheet; [`src/deviceCsv.js`](src/deviceCsv.js)). **JSM Assets** is a possible extra source, but it is not built: in testing, Forge could not *create* an Assets schema as the app (403: Assets administrator rights are required), and the app does not declare any Assets scopes. A read-only import that maps Assets objects to the device shape and calls `saveDevices` is the planned route.
 
 ## Project layout
 
@@ -440,9 +461,19 @@ forge install --upgrade -e development     # only when scopes or permissions cha
 | `read:space:confluence`, `read:page:confluence`, `write:page:confluence` | The Confluence recall pages: list spaces, find a page by title, create or update it (as the person chatting). |
 | `read:graph:team:atlassian`, `read:graph:user:atlassian` | The two read-only Teamwork Graph queries (a user's teams, a team's members), run as the signed-in person. |
 | `storage:app` | The device list, the saved check, and the ward-to-team mapping in Forge storage. |
-| `read:servicedesk-request`, `read:cmdb-object:jira`, `read:cmdb-schema:jira` | Reserved for the read-only Assets import. Not used yet. |
 | External fetch: `api.fda.gov` | Recall data from openFDA. |
+
+## Data and trust
+
+- **No patient data.** The app stores equipment information only: device name, type, manufacturer, model, serial or lot, ward, the saved check, and the ward-to-team mapping. Do not enter patient data.
+- **Where it lives.** Forge app storage, inside Atlassian's infrastructure and scoped to the site. Uninstalling removes it. Jira tasks and Confluence pages are your content and stay.
+- **What leaves Atlassian.** Only searches to `api.fda.gov` that contain manufacturer and model names. For that reason the app is **not** eligible for "Runs on Atlassian".
+- **Acts as the person.** Tasks, pages and Teamwork Graph reads run as the signed-in user, so their permissions apply. The Teamwork Graph is only read, never written.
+- **No certification claims.** This README does not claim HIPAA or any other certification.
+- Draft [privacy policy](marketplace/PRIVACY.md) and [terms](marketplace/TERMS.md).
 
 ## Support
 
-See [Get help](https://developer.atlassian.com/platform/forge/get-help/) for Forge help and feedback.
+- Support contact: _to be filled in by the app owner before the Marketplace listing_ (see [`marketplace/SUBMIT.md`](marketplace/SUBMIT.md)).
+- Tests: `npm test` runs the unit tests with no network or extra packages.
+- For Forge platform help see [Get help](https://developer.atlassian.com/platform/forge/get-help/).

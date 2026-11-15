@@ -311,9 +311,6 @@ permissions:
   scopes:
     - read:jira-work
     - write:jira-work
-    - read:servicedesk-request
-    - read:cmdb-object:jira
-    - read:cmdb-schema:jira
     - storage:app
     - read:space:confluence
     - read:page:confluence

@@ -71,7 +71,7 @@ Try it in a minute: open the dashboard and click **Load demo hospital** (30 devi
 - **What is stored** (Forge storage, `storage:app`, inside Atlassian's infrastructure): the device list (name, type, manufacturer, model, serial/lot, ward), the latest saved check result, the ward-to-team mapping, short-lived task and preview guards. **No patient data is stored or needed.**
 - **What leaves Atlassian**: only searches to `api.fda.gov` containing manufacturer and model names from the device list. Nothing else is sent anywhere.
 - **Teamwork Graph**: read-only; two queries (a user's teams, a team's members), run as the signed-in person. Nothing is written to the graph.
-- **Permissions and why**: see the "Permissions" table in the README. Jira work and Confluence page scopes act as the signed-in person. `read:cmdb-*` and `read:servicedesk-request` are reserved for a planned read-only Assets import and are not used yet; consider removing them before submission if you do not want to explain them.
+- **Permissions and why**: see the "Permissions" table in the README. Jira work and Confluence page scopes act as the signed-in person. No unused scopes are declared (the Assets scopes were removed until an Assets import exists).
 - **No claim of HIPAA or other certification** is made here. Do not add one unless it is true for your organisation.
 - Output written to Jira and Confluence is built on the server from saved data, and every piece of FDA or hospital text is escaped before it goes into a Confluence page.
 

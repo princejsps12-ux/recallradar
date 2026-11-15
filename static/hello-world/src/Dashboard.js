@@ -87,6 +87,86 @@ function openIssue(key) {
   };
 }
 
+const IMPORT_EXAMPLE = 'Name\tManufacturer\tModel\tSerial\tWard\nSigma Spectrum pump\tBaxter Healthcare\t35700BAX2\tSP-30977\tMed-Surg 4E';
+
+// "Import your own devices": paste rows from a spreadsheet (or a .csv). The first row names the columns;
+// "manufacturer" and "model" are required. All or nothing: any bad row is listed and nothing is imported.
+function ImportDevices({ onImported, startOpen }) {
+  const [open, setOpen] = useState(Boolean(startOpen));
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [problems, setProblems] = useState([]);
+  const [done, setDone] = useState('');
+
+  const submit = async () => {
+    setBusy(true);
+    setProblems([]);
+    setDone('');
+    try {
+      const response = await invoke('importDevices', { text });
+      if (response && response.ok) {
+        setDone(`Imported ${response.count} devices. Checking them against recalls now…`);
+        setText('');
+        onImported(response.count);
+      } else {
+        setProblems((response && response.errors) || ['Could not import the devices.']);
+      }
+    } catch (e) {
+      setProblems(['Could not reach RecallRadar. Check your connection and try again.']);
+    }
+    setBusy(false);
+  };
+
+  if (!open) {
+    return (
+      <button style={s.button} onClick={() => setOpen(true)}>
+        Import your own devices
+      </button>
+    );
+  }
+  return (
+    <div style={{ ...s.card, textAlign: 'left' }}>
+      <h2 style={s.h2}>Import your own devices</h2>
+      <p style={s.muted}>
+        Copy rows from a spreadsheet (or a .csv) and paste them here. The first row names the columns: Manufacturer and
+        Model are required; Name, Type, Serial (or Lot), and Ward are optional. Up to 200 devices at a time. Importing
+        replaces the devices you imported before and leaves the demo hospital alone. Do not include patient data.
+      </p>
+      <textarea
+        aria-label="Devices to import"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={IMPORT_EXAMPLE}
+        rows={8}
+        style={{ ...s.select, width: '100%', boxSizing: 'border-box', fontFamily: 'monospace' }}
+      />
+      {problems.length > 0 && (
+        <div role="alert" style={{ ...s.alert, marginTop: space(100) }}>
+          <strong>Nothing was imported.</strong>
+          <ul style={{ margin: `${space(50)} 0 0`, paddingLeft: '20px' }}>
+            {problems.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {done && (
+        <div role="status" style={s.muted}>
+          {done}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: space(100), marginTop: space(100) }}>
+        <button style={s.primary} onClick={submit} disabled={busy || !text.trim()}>
+          {busy ? 'Importing…' : 'Import devices'}
+        </button>
+        <button style={s.button} onClick={() => setOpen(false)} disabled={busy}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const POLL_EVERY_MS = 2000;
 const POLL_GIVE_UP_MS = 8 * 60 * 1000;
 
@@ -248,6 +328,12 @@ export default function Dashboard() {
     setBusy(false);
   };
 
+  const afterImport = (count) => {
+    setDevicesCount(count);
+    setSummary(null);
+    begin(true);
+  };
+
   const screen = screenFor({ devicesCount, result, error: devicesCount === null && error ? error : '', loading: false });
   const running = progress !== null;
 
@@ -290,7 +376,10 @@ export default function Dashboard() {
           <button style={s.heroButton} onClick={loadDemo} disabled={busy}>
             {busy ? 'Loading demo hospital…' : 'Load demo hospital'}
           </button>
-          <p style={s.muted}>Takes a moment. You can replace it with your own devices later.</p>
+          <p style={s.muted}>Takes a moment. Or use your own devices:</p>
+          <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+            <ImportDevices onImported={afterImport} />
+          </div>
         </div>
       </div>
     );
@@ -337,6 +426,9 @@ export default function Dashboard() {
             </button>
           </div>
         )}
+        <div style={s.section}>
+          <ImportDevices onImported={afterImport} />
+        </div>
       </div>
     );
   }
@@ -474,6 +566,12 @@ export default function Dashboard() {
           </div>
         )}
         <p style={s.muted}>Create tasks from the RecallRadar panel on any Jira issue. Team names come from the Teamwork Graph.</p>
+      </div>
+
+      <div style={s.section}>
+        <h2 style={s.h2}>Your devices</h2>
+        <p style={s.muted}>{devicesCount} devices are loaded. Replace the ones you imported, or add the demo hospital from the Jira issue panel.</p>
+        <ImportDevices onImported={afterImport} />
       </div>
 
       <div style={s.section}>

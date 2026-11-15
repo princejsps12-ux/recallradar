@@ -68,11 +68,11 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 
 ## Step H: Judge simulation
 
-- [ ] A fresh subagent with only the README and the install link installs on the personal dev site and uses the app like a judge; report what confuses or breaks; fix it.
+- [x] Production installed on the personal dev site (Jira and Confluence) by CLI. The browser tool was offline, so the fresh subagent reviewed the README only (it could not click through). Its 19 findings are fixed where possible: quick start, prerequisites, expected results, safe-try note, glossary, data and trust, dashboard documented, first-person wording removed, unused scopes removed, and a paste-in device import added (its biggest point). Not fixed: screenshots/video, README split into docs, install link (yours).
 
 ## Step I: Strict review against the five Codegeist criteria
 
-- [ ] Technical, design, impact, innovation, presentation: score 1 to 10, list the weakest points, fix what can be fixed.
+- [x] See `docs/REVIEW.md`: 8 / 6.5 / 7 / 8 / 5 with the weakest points and what remains yours.
 
 ## Standing rules
 

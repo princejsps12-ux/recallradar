@@ -3,15 +3,15 @@ import { invoke, router } from '@forge/bridge';
 
 const styles = {
   list: { listStyle: 'none', margin: 0, padding: 0 },
-  item: { padding: '8px 0', borderBottom: '1px solid #dfe1e6' },
+  item: { padding: '8px 0', borderBottom: '1px solid var(--ds-border, #dfe1e6)' },
   title: { fontWeight: 600 },
-  meta: { color: '#5e6c84', fontSize: '12px' },
+  meta: { color: 'var(--ds-text-subtle, #5e6c84)', fontSize: '12px' },
   detail: { fontSize: '12px', marginTop: '2px' },
   bar: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0 10px' },
   button: { padding: '4px 10px', cursor: 'pointer' },
-  section: { padding: '0 0 12px', borderBottom: '2px solid #dfe1e6', marginBottom: '12px' },
+  section: { padding: '0 0 12px', borderBottom: '2px solid var(--ds-border, #dfe1e6)', marginBottom: '12px' },
   smallButton: { padding: '2px 8px', cursor: 'pointer', fontSize: '12px', marginTop: '2px' },
-  badge: { color: '#fff', fontSize: '11px', fontWeight: 700, padding: '1px 6px', borderRadius: '3px' },
+  badge: { color: 'var(--ds-text-inverse, #fff)', fontSize: '11px', fontWeight: 700, padding: '1px 6px', borderRadius: '3px' },
 };
 
 function Recall({ recall }) {
@@ -167,7 +167,7 @@ function WardTeams({ wardInfo, onChanged }) {
 }
 
 // Colour AND a text label, so the confidence never depends on colour alone.
-const BADGE_COLORS = { exact: '#c9372c', likely: '#b65c02', possible: '#5e6c84' };
+const BADGE_COLORS = { exact: 'var(--ds-background-danger-bold, #c9372c)', likely: 'var(--ds-background-warning-bold, #b65c02)', possible: 'var(--ds-text-subtle, #5e6c84)' };
 
 // Only matches we are fairly sure about get a task. Keep in step with TASK_CONFIDENCES in src/taskRules.js.
 const TASK_CONFIDENCES = ['exact', 'likely'];
@@ -231,7 +231,7 @@ function TaskAction({ match, taskUi }) {
 function Match({ match, taskUi }) {
   return (
     <div style={styles.detail}>
-      <span style={{ ...styles.badge, background: BADGE_COLORS[match.confidence] || '#5e6c84' }}>
+      <span style={{ ...styles.badge, background: BADGE_COLORS[match.confidence] || 'var(--ds-text-subtle, #5e6c84)' }}>
         {match.confidence.toUpperCase()}
       </span>{' '}
       <strong>{match.recallNumber}</strong> · Class {match.recallClass || '?'} · {match.firm} · {match.date}
