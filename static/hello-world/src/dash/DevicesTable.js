@@ -5,8 +5,9 @@ import Button from '@atlaskit/button/new';
 import Lozenge from '@atlaskit/lozenge';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import EmptyState from '@atlaskit/empty-state';
+import Skeleton from '@atlaskit/skeleton';
 import { router } from '@forge/bridge';
-import { sp, color, muted, noBreak, ClassLozenge, MatchLozenge, useNarrow, DetailsButton } from '../ui/kit';
+import { sp, color, muted, noBreak, ClassLozenge, MatchLozenge, useNarrow, DetailsButton, LinkLike } from '../ui/kit';
 import { CLASSES, UNKNOWN_CLASS, filterMatches, wardsOf, urgencyRank } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 
@@ -15,7 +16,7 @@ export const openIssue = (key) => router.open(`/browse/${key}`);
 const classOptions = [{ label: 'All classes', value: '' }, ...[...CLASSES, UNKNOWN_CLASS].map((c) => ({ label: c === UNKNOWN_CLASS ? 'Unknown class' : `Class ${c}`, value: c }))];
 
 // The affected devices: filter by ward and class, sort by any column, click a row (or Details) for the side drawer.
-export default function DevicesTable({ matches, tasks, teams, onOpen }) {
+export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady = true }) {
   const [filters, setFilters] = useState({ ward: '', recallClass: '' });
   const wardOptions = useMemo(() => [{ label: 'All wards', value: '' }, ...wardsOf(matches).map((w) => ({ label: w, value: w }))], [matches]);
   const narrow = useNarrow();
@@ -25,13 +26,13 @@ export default function DevicesTable({ matches, tasks, teams, onOpen }) {
 
   const head = {
     cells: [
-      { key: 'device', content: 'Device', isSortable: true, width: 26 },
-      { key: 'ward', content: 'Ward', isSortable: true, width: 12 },
-      { key: 'recall', content: 'Recall', isSortable: true, width: 16 },
+      { key: 'device', content: 'Device', isSortable: true, width: 24 },
+      { key: 'ward', content: 'Ward', isSortable: true, width: 11 },
+      { key: 'recall', content: 'Recall', isSortable: true, width: 15 },
       { key: 'class', content: 'Class', isSortable: true, width: 11 },
       { key: 'match', content: 'Match', isSortable: true, width: 13 },
-      { key: 'task', content: 'Task', isSortable: true, width: 12 },
-      { key: 'actions', content: <VisuallyHidden>Actions</VisuallyHidden>, width: 10 },
+      { key: 'task', content: 'Task', isSortable: true, width: 11 },
+      { key: 'actions', content: <VisuallyHidden>Actions</VisuallyHidden>, width: 15 },
     ],
   };
   const rows = shown.map((m) => {
@@ -45,7 +46,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen }) {
         { key: m.recallNumber, content: (<div><span style={noBreak}>{m.recallNumber}</span><div style={muted}>{m.firm}</div></div>) },
         { key: urgencyRank({ ...m, confidence: 'exact' }), content: <ClassLozenge recallClass={m.recallClass} /> },
         { key: m.confidence, content: <MatchLozenge confidence={m.confidence} /> },
-        { key: key || '~', content: key ? (<Button appearance="link" spacing="none" onClick={(e) => { e.stopPropagation(); openIssue(key); }}>{key}</Button>) : (<Lozenge>No task</Lozenge>) },
+        { key: key || '~', content: !tasksReady ? (<Skeleton height="20px" width="64px" isShimmering />) : key ? (<LinkLike onClick={(e) => { e.stopPropagation(); openIssue(key); }}>{key}</LinkLike>) : (<Lozenge>No task</Lozenge>) },
         { key: 'a', content: <DetailsButton onClick={(e) => { e.stopPropagation(); onOpen(m.deviceId); }} /> },
       ],
     };
@@ -62,7 +63,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen }) {
           <label style={muted} htmlFor="rr-class-filter">Class</label>
           <Select inputId="rr-class-filter" aria-label="Filter by recall class" spacing="compact" options={classOptions} value={classOptions.find((o) => o.value === filters.recallClass)} onChange={(o) => setFilters({ ...filters, recallClass: o.value })} menuPosition="fixed" />
         </div>
-        {filtered && (<Button appearance="subtle" onClick={() => setFilters({ ward: '', recallClass: '' })}>Clear filters</Button>)}
+        {filtered && shown.length > 0 && (<Button appearance="subtle" onClick={() => setFilters({ ward: '', recallClass: '' })}>Clear filters</Button>)}
         <span style={muted} role="status" aria-live="polite">Showing {shown.length} of {matches.length} device and recall matches</span>
       </div>
       {narrow ? (
@@ -81,7 +82,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen }) {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), margin: `${sp(100)} 0`, alignItems: 'center' }}>
                       <ClassLozenge recallClass={m.recallClass} />
                       <MatchLozenge confidence={m.confidence} />
-                      {key ? (<Button appearance="link" spacing="none" onClick={() => openIssue(key)}>{key}</Button>) : (<Lozenge>No task</Lozenge>)}
+                      {key ? (<LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>) : (<Lozenge>No task</Lozenge>)}
                     </div>
                     <DetailsButton onClick={() => onOpen(m.deviceId)} />
                   </li>

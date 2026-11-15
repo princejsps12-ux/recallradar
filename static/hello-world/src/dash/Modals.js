@@ -7,7 +7,7 @@ import Select from '@atlaskit/select';
 import Checkbox from '@atlaskit/checkbox';
 import SectionMessage from '@atlaskit/section-message';
 import Spinner from '@atlaskit/spinner';
-import { sp, color, muted } from '../ui/kit';
+import { sp, color, muted, LinkLike } from '../ui/kit';
 import { affectedMatches } from '../dashboardData.mjs';
 
 const EXAMPLE = 'Name\tManufacturer\tModel\tSerial\tWard\nSigma Spectrum pump\tBaxter Healthcare\t35700BAX2\tSP-30977\tMed-Surg 4E';
@@ -63,7 +63,7 @@ export function ImportModal({ isOpen, onClose, onImported }) {
           <ModalBody>
             <p style={{ marginTop: 0, marginBottom: sp(200) }}>Copy rows from a spreadsheet (or a .csv) and paste them here. The first row names the columns: <strong>Manufacturer</strong> and <strong>Model</strong> are required; Name, Type, Serial (or Lot) and Ward are optional. Up to 200 devices at a time. Importing replaces the devices you imported before and leaves the demo hospital alone. <strong>Do not include patient data.</strong></p>
             <Textarea aria-label="Devices to import" placeholder={EXAMPLE} minimumRows={8} resize="vertical" value={text} onChange={(e) => setText(e.target.value)} />
-            <div role="status" aria-live="polite" style={{ marginTop: sp(150), minHeight: '48px' }}>
+            <div role="status" aria-live="polite" style={{ marginTop: sp(100) }}>
               {problems.length > 0 && (
                 <SectionMessage appearance="error" title="Nothing was imported">
                   <ul style={{ margin: 0, paddingLeft: '20px' }}>{problems.map((p) => <li key={p}>{p}</li>)}</ul>
@@ -81,8 +81,8 @@ export function ImportModal({ isOpen, onClose, onImported }) {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center', marginTop: sp(100) }}>
-                  <Button appearance="danger" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('imported')}>Remove imported devices</Button>
-                  <Button appearance="danger" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('all')}>Remove all devices</Button>
+                  <Button appearance="subtle" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('imported')}><span style={{ color: color.danger }}>Remove imported devices</span></Button>
+                  <Button appearance="subtle" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('all')}><span style={{ color: color.danger }}>Remove all devices</span></Button>
                 </div>
               )}
             </section>
@@ -99,17 +99,33 @@ export function ImportModal({ isOpen, onClose, onImported }) {
 
 // "Create all": one confirmation for every device and recall that still has no task, with the optional
 // assignment (off by default). Tasks go in the project chosen on the dashboard.
-export function CreateAllModal({ isOpen, onClose, count, suggestedCount, projectName, onConfirm, running }) {
+export function CreateAllModal({ isOpen, onClose, count, deviceCount, suggestedCount, projectName, onConfirm, running }) {
   const [assign, setAssign] = useState(false);
+  const facts = [
+    ['Devices', deviceCount],
+    ['Tasks', `${count} (one for each device and recall)`],
+    ['Project', projectName],
+  ];
   return (
     <ModalTransition>
       {isOpen && (
-        <Modal onClose={onClose} width="small" label="Create all tasks">
+        <Modal onClose={onClose} width="medium" label="Create all tasks">
           <ModalHeader hasCloseButton><ModalTitle>{`Create ${count} task${count === 1 ? '' : 's'}?`}</ModalTitle></ModalHeader>
           <ModalBody>
-            <p style={{ marginTop: 0 }}>One Jira task for each device and recall that has none yet, in <strong>{projectName}</strong>. Each has the ward, the reason, a link to the FDA recall and a due date from the recall class. A task is never created twice.</p>
+            <p style={{ marginTop: 0, marginBottom: sp(200) }}>Each task has the ward, the reason the device matches, a link to the FDA recall and a due date from the recall class. A task is never created twice for the same device and recall.</p>
+            <div role="group" aria-label="What will be created" style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: sp(200), background: color.sunken, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: `${sp(100)} ${sp(300)}` }}>
+              {facts.map(([label, value]) => (
+                <React.Fragment key={label}>
+                  <span style={muted}>{label}</span>
+                  <strong>{value}</strong>
+                </React.Fragment>
+              ))}
+            </div>
             {suggestedCount > 0 && (
-              <Checkbox label={`Also assign the suggested team member (${suggestedCount} of ${count}, spread across each ward's team). Nobody is assigned unless you tick this.`} isChecked={assign} onChange={(e) => setAssign(e.target.checked)} />
+              <div style={{ marginTop: sp(200) }}>
+                <Checkbox label="Also assign the suggested team member" isChecked={assign} onChange={(e) => setAssign(e.target.checked)} />
+                <div style={{ ...muted, marginLeft: sp(300) }}>{suggestedCount} of {count} tasks have a team in the Teamwork Graph; the work is spread across each ward's team. Nobody is assigned unless you tick this.</div>
+              </div>
             )}
             <div role="status" aria-live="polite" style={{ marginTop: sp(150), minHeight: '24px' }}>
               {running && <span style={muted}>Creating tasks… this takes a moment.</span>}
@@ -184,7 +200,7 @@ export function ConfluenceModal({ isOpen, onClose, result }) {
                 <SectionMessage appearance="success" title={`Done in the ${outcome.space} space`}>
                   <ul style={{ margin: 0, paddingLeft: '20px' }}>
                     {outcome.pages.map((p) => (
-                      <li key={p.recallNumber}>{p.recallNumber}: page {p.action}. <Button appearance="link" spacing="none" onClick={() => router.open(p.url)}>{p.title}</Button></li>
+                      <li key={p.recallNumber}>{p.recallNumber}: page {p.action}. <LinkLike onClick={() => router.open(p.url)}>{p.title}</LinkLike></li>
                     ))}
                   </ul>
                   {outcome.failed.length > 0 && <p>{outcome.failed.length} failed ({outcome.failed[0].error}).</p>}

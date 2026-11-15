@@ -8,10 +8,10 @@ import Avatar from '@atlaskit/avatar';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
-import { sp, color, muted, noBreak, ClassLozenge, MatchLozenge, Progress } from './ui/kit';
+import { sp, color, muted, noBreak, ClassLozenge, MatchLozenge, Progress, formatWhen, LinkLike } from './ui/kit';
 import { affectedMatches, heroStats, sortByUrgency } from './dashboardData.mjs';
 
-const PANEL_ROWS = 5; // the panel stays compact: the rest lives in the dashboard
+const PANEL_ROWS = 3; // the panel stays compact and fits its frame with the bulk button: the rest lives in the dashboard
 
 const openDashboard = () => router.navigate({ target: 'module', moduleKey: 'recallradar-dashboard' }).catch(() => {});
 const openIssue = (key) => router.open(`/browse/${key}`);
@@ -78,7 +78,7 @@ export default function App() {
         <div>
           <strong style={{ fontSize: '16px' }}>{stats.devices} {stats.devices === 1 ? 'device needs' : 'devices need'} action</strong>
           {stats.classIDevices > 0 && <span style={{ color: color.danger, fontWeight: 600 }}> · {stats.classIDevices} with a Class I recall</span>}
-          <div style={muted}>Checked {new Date(d.result.checkedAt).toLocaleString()}{d.result.stale ? ' (older than 6 hours)' : ''}</div>
+          <div style={muted}>Checked {formatWhen(d.result.checkedAt)}{d.result.stale ? ' (older than 6 hours)' : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: sp(50) }}>
           <Button appearance="subtle" spacing="compact" isDisabled={running} onClick={() => d.begin(true)}>{running ? 'Checking…' : 'Refresh'}</Button>
@@ -111,7 +111,7 @@ export default function App() {
                 </div>
                 <div style={{ marginTop: sp(75), display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center' }}>
                   {key ? (
-                    <><span style={muted}>Task:</span><Button appearance="link" spacing="none" onClick={() => openIssue(key)}>{key}</Button></>
+                    <><span style={muted}>Task:</span><LinkLike onClick={() => openIssue(key)}>{key}</LinkLike></>
                   ) : (
                     <>
                       <Button spacing="compact" isDisabled={d.creating.active} onClick={() => d.createTasks([m], false)}>Create task</Button>

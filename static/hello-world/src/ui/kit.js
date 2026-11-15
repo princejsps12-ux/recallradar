@@ -106,3 +106,29 @@ export function Progress({ done, total, label }) {
     </div>
   );
 }
+
+// "15 Nov 2026, 23:49" in the reader's own locale, never an ambiguous 15/11/2026.
+export function formatWhen(iso) {
+  try {
+    return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch (e) {
+    return String(iso || '');
+  }
+}
+
+// A button that looks like a real text link: token blue, underlined, with the browser's own keyboard focus ring.
+// (Atlaskit's new Button has no link look, and the legacy one did not render as a link here.) `iconAfter` is an icon
+// component, shown small after the text.
+export function LinkLike({ children, onClick, iconAfter: Icon, ...rest }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      {...rest}
+      style={{ background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', color: color.link, textDecoration: 'underline', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: sp(50) }}
+    >
+      {children}
+      {Icon ? <Icon label="" size="small" /> : null}
+    </button>
+  );
+}

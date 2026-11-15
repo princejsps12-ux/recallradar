@@ -24,6 +24,9 @@ export default function useRecallData({ withProjects = false } = {}) {
   const [progress, setProgress] = useState(null); // null = no check running
   const [tasks, setTasks] = useState({});
   const [summary, setSummary] = useState(null);
+  const [summaryState, setSummaryState] = useState('loading'); // 'loading' | 'ok' | 'error'
+  const [tasksReady, setTasksReady] = useState(false); // task links known (so rows do not change after they appear)
+  const [wardLoaded, setWardLoaded] = useState(false);
   const [suggestions, setSuggestions] = useState({});
   const [wardInfo, setWardInfo] = useState({ mappings: [], wards: [], byKey: {} });
   const [recent, setRecent] = useState({ state: 'loading', recalls: [] });
@@ -112,6 +115,7 @@ export default function useRecallData({ withProjects = false } = {}) {
     } catch (e) {
       // works without ward teams
     }
+    setWardLoaded(true);
   }, []);
 
   const load = useCallback(async () => {
@@ -167,18 +171,25 @@ export default function useRecallData({ withProjects = false } = {}) {
     if (!result) return undefined;
     let cancelled = false;
     const pairs = affectedMatches(result).map((m) => ({ recallNumber: m.recallNumber, deviceId: m.deviceId }));
-    if (pairs.length) {
-      invoke('getTaskStates', { pairs })
-        .then((r) => {
-          if (!cancelled && r && r.ok) setTasks(r.tasks);
-        })
-        .catch(() => {});
-    }
+    const states = pairs.length
+      ? invoke('getTaskStates', { pairs })
+          .then((r) => {
+            if (!cancelled && r && r.ok) setTasks(r.tasks);
+          })
+          .catch(() => {})
+      : Promise.resolve();
+    states.then(() => {
+      if (!cancelled) setTasksReady(true);
+    });
     invoke('getTaskSummary')
       .then((r) => {
-        if (!cancelled) setSummary(r && r.ok ? r.summary : null);
+        if (cancelled) return;
+        setSummary(r && r.ok ? r.summary : null);
+        setSummaryState(r && r.ok ? 'ok' : 'error');
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setSummaryState('error');
+      });
     return () => {
       cancelled = true;
     };
@@ -225,8 +236,8 @@ export default function useRecallData({ withProjects = false } = {}) {
     });
     setCreating({ active: false, done: 0, total: 0 });
     const text = summarize(totals);
-    if (text) setNote({ kind: totals.stopped || totals.failed.length ? 'warning' : 'success', text });
-    if (totals.created) invoke('getTaskSummary').then((r) => setSummary(r && r.ok ? r.summary : null)).catch(() => {});
+    if (text) setNote({ kind: totals.stopped || totals.failed.length ? 'warning' : 'success', title: totals.stopped || totals.failed.length ? 'Some tasks were not created' : totals.created ? 'Tasks created' : 'Nothing new to create', text });
+    if (totals.created) invoke('getTaskSummary').then((r) => { setSummary(r && r.ok ? r.summary : null); setSummaryState(r && r.ok ? 'ok' : 'error'); }).catch(() => {});
     return totals;
   };
 
@@ -250,13 +261,14 @@ export default function useRecallData({ withProjects = false } = {}) {
   const afterDevicesChanged = (count) => {
     setDevicesCount(count);
     setSummary(null);
+    setSummaryState('loading');
     if (count > 0) begin(true);
     else setResult(null);
     loadWardInfo();
   };
 
   return {
-    devicesCount, result, error, progress, tasks, summary, suggestions, wardInfo, recent, projects, projectKey, creating, note,
+    devicesCount, result, error, progress, tasks, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, projects, projectKey, creating, note,
     setProjectKey, setNote, load, begin, createTasks, loadDemo, loadWardInfo, afterDevicesChanged,
   };
 }

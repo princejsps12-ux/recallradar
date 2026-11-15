@@ -5,11 +5,18 @@ import Spinner from '@atlaskit/spinner';
 import Skeleton from '@atlaskit/skeleton';
 import SectionMessage, { SectionMessageAction } from '@atlaskit/section-message';
 import Heading from '@atlaskit/heading';
+import { token } from '@atlaskit/tokens';
+import { FlagGroup, AutoDismissFlag } from '@atlaskit/flag';
+import SuccessIcon from '@atlaskit/icon/core/success';
+import WarningIcon from '@atlaskit/icon/core/warning';
+import RefreshIcon from '@atlaskit/icon/core/refresh';
+import PageIcon from '@atlaskit/icon/core/page';
+import UploadIcon from '@atlaskit/icon/core/upload';
 import DynamicTable from '@atlaskit/dynamic-table';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
-import { sp, color, card, muted, useNarrow, Progress } from './ui/kit';
+import { sp, color, card, muted, useNarrow, Progress, formatWhen } from './ui/kit';
 import { affectedMatches, heroStats, urgentMatches, taskProgress, screenFor } from './dashboardData.mjs';
 import { Hero, UrgentList, SummaryCards } from './dash/Hero';
 import DevicesTable from './dash/DevicesTable';
@@ -68,29 +75,29 @@ export default function Dashboard() {
   if (screen === 'first-run') return page(<FirstRun onLoadDemo={d.loadDemo} onImport={() => setImportOpen(true)} error={d.error} />);
 
   const ready = screen === 'ready';
+  // While a check runs, its progress takes the place of the "last checked" sentence, so nothing below moves.
   const header = (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'center', justifyContent: 'space-between', marginBottom: sp(100) }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'center', justifyContent: 'space-between', marginBottom: sp(200), minHeight: '32px' }}>
       <div style={{ ...muted, fontSize: '14px' }}>
-        FDA device recalls matched to your hospital's devices.
-        {d.result && <> Last checked {new Date(d.result.checkedAt).toLocaleString()}{d.result.stale ? ' (older than 6 hours)' : ''}.</>}
+        {running ? (
+          <Progress done={d.progress.done} total={d.progress.total} label="Checking FDA recalls" />
+        ) : (
+          <>
+            FDA device recalls matched to your hospital's devices.
+            {d.result && <> Last checked {formatWhen(d.result.checkedAt)}{d.result.stale ? ' (older than 6 hours)' : ''}.</>}
+          </>
+        )}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100) }}>
-        <Button onClick={() => d.begin(true)} isDisabled={!ready || running}>{running ? 'Checking…' : 'Refresh'}</Button>
-        <Button onClick={() => setConfluenceOpen(true)} isDisabled={!ready}>Confluence recall page</Button>
-        <Button onClick={() => setImportOpen(true)}>Import devices</Button>
+        <Button iconBefore={RefreshIcon} onClick={() => d.begin(true)} isDisabled={!ready || running}>{running ? 'Checking…' : 'Refresh'}</Button>
+        <Button iconBefore={PageIcon} onClick={() => setConfluenceOpen(true)} isDisabled={!ready}>Confluence recall page</Button>
+        <Button iconBefore={UploadIcon} onClick={() => setImportOpen(true)}>Import devices</Button>
       </div>
-    </div>
-  );
-  // The progress and message area always takes the same room, so the page below does not jump.
-  const status = (
-    <div style={{ minHeight: '28px', marginBottom: sp(100) }}>
-      {running && <Progress done={d.progress.done} total={d.progress.total} label="Checking FDA recalls" />}
     </div>
   );
   const messages = (
-    <div style={{ display: 'grid', gap: sp(150), marginBottom: d.error || d.note || (d.result && d.result.failedQueries > 0) ? sp(200) : 0 }}>
+    <div style={{ display: 'grid', gap: sp(150), marginBottom: d.error || (d.result && d.result.failedQueries > 0) ? sp(200) : 0 }}>
       {d.error && <SectionMessage appearance="error" title="Something went wrong">{d.error}</SectionMessage>}
-      {d.note && <SectionMessage appearance={d.note.kind === 'success' ? 'success' : 'warning'} actions={<SectionMessageAction onClick={() => d.setNote(null)}>Dismiss</SectionMessageAction>}>{d.note.text}</SectionMessage>}
       {d.result && d.result.failedQueries > 0 && <SectionMessage appearance="warning" title="Result may be incomplete">{d.result.failedQueries} FDA lookups failed or timed out. Try Refresh.</SectionMessage>}
     </div>
   );
@@ -99,7 +106,6 @@ export default function Dashboard() {
     return page(
       <>
         {header}
-        {status}
         {messages}
         {running && <LoadingScreen quiet />}
         {!running && (
@@ -126,35 +132,36 @@ export default function Dashboard() {
     setCreateAllOpen(false);
   };
 
+  // Two lines at most, with the full text on hover: some FDA product names are 300 characters long.
+  const clamp = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
   const recentRows = (d.recent.recalls || []).slice(0, 10).map((r) => ({
     key: r.recallNumber,
     cells: [
-      { key: 'n', content: r.recallNumber },
+      { key: 'n', content: <span style={{ whiteSpace: 'nowrap' }}>{r.recallNumber}</span> },
       { key: 'c', content: r.recallClass ? `Class ${r.recallClass}` : '?' },
       { key: 'f', content: r.firm || 'Unknown firm' },
-      { key: 'p', content: r.product },
-      { key: 'd', content: r.date || '–' },
+      { key: 'p', content: <span style={clamp} title={r.product}>{r.product}</span> },
+      { key: 'd', content: <span style={{ whiteSpace: 'nowrap' }}>{r.date || '–'}</span> },
     ],
   }));
 
   return page(
     <>
       {header}
-      {status}
       {messages}
       <Tabs id="rr-tabs" selected={tab} onChange={setTab}>
         <TabList>
           <Tab>Overview</Tab>
-          <Tab>{`Ward teams (${d.wardInfo.mappings.length} of ${d.wardInfo.wards.length})`}</Tab>
+          <Tab>{d.wardLoaded ? `Ward teams (${d.wardInfo.mappings.length} of ${d.wardInfo.wards.length})` : 'Ward teams'}</Tab>
         </TabList>
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300) }}>
             <Hero stats={stats} />
-            <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} />
-            <SummaryCards devicesCount={d.devicesCount} stats={stats} result={d.result} summary={d.summary} progressTasks={progressTasks} />
+            <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} loading={!d.tasksReady} />
+            <SummaryCards devicesCount={d.devicesCount} stats={stats} result={d.result} summary={d.summary} summaryState={d.summaryState} progressTasks={progressTasks} />
             <section style={card} aria-labelledby="rr-affected-h">
               <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-affected-h">Affected devices</Heading></div>
-              <DevicesTable matches={all} tasks={d.tasks} teams={teams} onOpen={setDrawerDevice} />
+              <DevicesTable matches={all} tasks={d.tasks} teams={teams} onOpen={setDrawerDevice} tasksReady={d.tasksReady} />
             </section>
             <section style={card} aria-labelledby="rr-recent-h">
               <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-recent-h">Recent FDA device recalls</Heading></div>
@@ -171,17 +178,29 @@ export default function Dashboard() {
                   ))}
                 </ul>
               ) : (
-                <DynamicTable caption={<VisuallyHidden>The newest FDA device recalls</VisuallyHidden>} label="Recent FDA device recalls" isLoading={d.recent.state === 'loading'} head={{ cells: [{ key: 'n', content: 'Recall' }, { key: 'c', content: 'Class' }, { key: 'f', content: 'Firm' }, { key: 'p', content: 'Product' }, { key: 'd', content: 'Date' }] }} rows={recentRows} rowsPerPage={10} isFixedSize />
+                <DynamicTable caption={<VisuallyHidden>The newest FDA device recalls</VisuallyHidden>} label="Recent FDA device recalls" isLoading={d.recent.state === 'loading'} head={{ cells: [{ key: 'n', content: 'Recall', width: 14 }, { key: 'c', content: 'Class', width: 10 }, { key: 'f', content: 'Firm', width: 22 }, { key: 'p', content: 'Product', width: 44 }, { key: 'd', content: 'Date', width: 10 }] }} rows={recentRows} rowsPerPage={10} isFixedSize />
               )}
             </section>
           </div>
         </TabPanel>
         <TabPanel>
-          <WardTeamsTab wardInfo={d.wardInfo} onChanged={d.loadWardInfo} />
+          <WardTeamsTab wardInfo={d.wardInfo} onChanged={d.loadWardInfo} result={d.result} />
         </TabPanel>
       </Tabs>
       <DeviceDrawer deviceId={drawerDevice} result={d.result} tasks={d.tasks} suggestions={d.suggestions} teams={teams} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onClose={() => setDrawerDevice(null)} />
-      <CreateAllModal isOpen={createAllOpen} onClose={() => setCreateAllOpen(false)} count={missing.length} suggestedCount={suggestedCount} projectName={projectName} onConfirm={createAll} running={d.creating.active} />
+      <CreateAllModal isOpen={createAllOpen} onClose={() => setCreateAllOpen(false)} count={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} suggestedCount={suggestedCount} projectName={projectName} onConfirm={createAll} running={d.creating.active} />
+      <FlagGroup onDismissed={() => d.setNote(null)}>
+        {d.note ? (
+          <AutoDismissFlag
+            key={d.note.text}
+            id="rr-note"
+            appearance={d.note.kind === 'success' ? 'success' : 'warning'}
+            icon={d.note.kind === 'success' ? <SuccessIcon label="Success" color={token('color.icon.success')} /> : <WarningIcon label="Warning" color={token('color.icon.warning')} />}
+            title={d.note.title}
+            description={d.note.text}
+          />
+        ) : null}
+      </FlagGroup>
       <ConfluenceModal isOpen={confluenceOpen} onClose={() => setConfluenceOpen(false)} result={d.result} />
     </>,
   );

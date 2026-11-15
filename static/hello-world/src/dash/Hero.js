@@ -3,6 +3,7 @@ import Heading from '@atlaskit/heading';
 import Button from '@atlaskit/button/new';
 import Select from '@atlaskit/select';
 import ProgressBar from '@atlaskit/progress-bar';
+import Skeleton from '@atlaskit/skeleton';
 import CheckCircleIcon from '@atlaskit/icon/core/check-circle';
 import { sp, color, card, muted, noBreak, ClassLozenge, MatchLozenge, DetailsButton, useNarrow } from '../ui/kit';
 import { openRecallsByClass, UNKNOWN_CLASS, CLASSES } from '../dashboardData.mjs';
@@ -48,7 +49,7 @@ export function Hero({ stats }) {
 
 // "Do this first": the most urgent devices that have no task yet. One primary action for the whole block
 // (create them all, with a confirmation), and a quiet default button on each row.
-export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, projects, projectKey, onProject, hasAll, onCreateAll, pendingCount }) {
+export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, projects, projectKey, onProject, hasAll, onCreateAll, pendingCount, deviceCount, loading }) {
   const options = projects.map((p) => ({ label: `${p.name} (${p.key})`, value: p.key }));
   return (
     <section aria-labelledby="rr-urgent" style={{ ...card, minHeight: '120px' }}>
@@ -57,21 +58,25 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
           <div style={{ margin: 0 }}>
             <Heading size="medium" as="h2" id="rr-urgent">Do this first</Heading>
           </div>
-          <div style={muted}>The most urgent devices that have no task yet.</div>
+          <div style={muted}>Most urgent first, one row per device. A task is one device and one recall, so {deviceCount} {deviceCount === 1 ? 'device needs' : 'devices need'} {pendingCount} {pendingCount === 1 ? 'task' : 'tasks'}.</div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'flex-end' }}>
           <div style={{ minWidth: '240px' }}>
             <label style={muted} htmlFor="rr-project">Create tasks in project</label>
             <Select inputId="rr-project" aria-label="Jira project for new tasks" spacing="compact" options={options} value={options.find((o) => o.value === projectKey) || null} placeholder="Choose a project" onChange={(o) => onProject(o.value)} menuPosition="fixed" />
           </div>
-          {pendingCount > 0 && (
+          {!loading && pendingCount > 0 && (
             <Button appearance="primary" isDisabled={!canCreate || busy} onClick={onCreateAll}>
               {`Create all ${pendingCount} tasks…`}
             </Button>
           )}
         </div>
       </div>
-      {matches.length === 0 ? (
+      {loading ? (
+        <div aria-hidden="true" style={{ display: 'grid', gap: sp(150), minHeight: '290px' }}>
+          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} height="44px" width="100%" isShimmering />)}
+        </div>
+      ) : matches.length === 0 ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: sp(100) }}>
           <CheckCircleIcon label="" color={color.success} />
           <span>{hasAll ? 'Every urgent device already has a task.' : 'Nothing urgent right now.'}</span>
@@ -113,7 +118,7 @@ function StatCard({ label, value, children, accent }) {
   );
 }
 
-export function SummaryCards({ devicesCount, stats, result, summary, progressTasks }) {
+export function SummaryCards({ devicesCount, stats, result, summary, summaryState, progressTasks }) {
   const byClass = openRecallsByClass(result);
   const narrow = useNarrow();
   const none = !progressTasks || progressTasks.total === 0;
@@ -123,7 +128,7 @@ export function SummaryCards({ devicesCount, stats, result, summary, progressTas
         <div style={muted}>{stats.devices} of them need action</div>
       </StatCard>
       <StatCard label="Open recalls" value={stats.openRecalls} accent={stats.openRecalls ? color.borderDanger : color.borderSuccess}>
-        <div style={muted}>recalls, by class:</div>
+        <div style={muted}>By class</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), marginTop: sp(50) }}>
           {CLASSES.map((cls) => (
             <span key={cls} style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100), ...noBreak }}>
@@ -134,13 +139,17 @@ export function SummaryCards({ devicesCount, stats, result, summary, progressTas
           {byClass[UNKNOWN_CLASS] > 0 && <span style={muted}>+{byClass[UNKNOWN_CLASS]} unknown class</span>}
         </div>
       </StatCard>
-      <StatCard label="Tasks open" value={progressTasks ? progressTasks.open : '–'}>
+      <StatCard label="Tasks open" value={summaryState === 'loading' ? <Skeleton height="32px" width="48px" isShimmering /> : progressTasks ? progressTasks.open : '–'}>
         <div style={muted}>
-          {none ? 'No tasks yet. Start with Do this first.' : `of ${progressTasks.total}${summary && summary.capped ? '+' : ''} RecallRadar tasks`}
+          {summaryState === 'loading' ? ' ' : summaryState === 'error' ? 'Could not read the task counts.' : none ? 'No tasks yet. Start with Do this first.' : `of ${progressTasks.total}${summary && summary.capped ? '+' : ''} RecallRadar tasks`}
         </div>
       </StatCard>
-      <StatCard label="Tasks done" value={progressTasks ? progressTasks.done : '–'}>
-        {!none ? (
+      <StatCard label="Tasks done" value={summaryState === 'loading' ? <Skeleton height="32px" width="48px" isShimmering /> : progressTasks ? progressTasks.done : '–'}>
+        {summaryState === 'loading' ? (
+          <div style={muted}> </div>
+        ) : summaryState === 'error' ? (
+          <div style={muted}>Try Refresh.</div>
+        ) : !none ? (
           <div style={{ marginTop: sp(100) }}>
             <ProgressBar ariaLabel={`${progressTasks.percentDone}% of tasks done`} value={progressTasks.percentDone / 100} appearance="success" />
             <div style={muted}>{progressTasks.percentDone}% complete</div>

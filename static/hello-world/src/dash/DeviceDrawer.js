@@ -9,7 +9,7 @@ import SectionMessage from '@atlaskit/section-message';
 import CrossIcon from '@atlaskit/icon/core/cross';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import { router } from '@forge/bridge';
-import { sp, color, muted, ClassLozenge, MatchLozenge } from '../ui/kit';
+import { sp, color, muted, ClassLozenge, MatchLozenge, LinkLike } from '../ui/kit';
 import { matchesForDevice } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 import { openIssue } from './DevicesTable';
@@ -24,7 +24,7 @@ function ExpandableText({ text }) {
     <p style={{ margin: 0 }}>
       {long && !open ? `${text.slice(0, SHORT).trimEnd()}…` : text}{' '}
       {long && (
-        <Button appearance="link" spacing="none" onClick={() => setOpen(!open)}>{open ? 'Show less' : 'Show more'}</Button>
+        <LinkLike onClick={() => setOpen(!open)}>{open ? 'Show less' : 'Show more'}</LinkLike>
       )}
     </p>
   );
@@ -141,7 +141,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                           {key ? (
                             <>
                               <span>Task:</span>
-                              <Button appearance="link" spacing="none" onClick={() => openIssue(key)}>{key}</Button>
+                              <LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>
                             </>
                           ) : (
                             <>
@@ -156,7 +156,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                               )}
                             </>
                           )}
-                          <Button appearance="link" spacing="compact" iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</Button>
+                          <LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike>
                         </div>
                         {!key && !canCreate && <div style={{ ...muted, marginTop: sp(50) }}>Choose a project on the Overview tab first.</div>}
                         {suggestion && <div style={{ ...muted, marginTop: sp(50) }}>Suggested because they have the fewest open RecallRadar tasks in {suggestion.teamName}. Nobody is assigned unless you choose it.</div>}
