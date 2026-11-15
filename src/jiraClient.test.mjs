@@ -238,3 +238,27 @@ test('taskStatusCounts throws when Jira refuses', async () => {
   const { request } = fakeRequest([{ status: 403, json: {} }]);
   await assert.rejects(createJiraClient({ request, route }).taskStatusCounts(), /403/);
 });
+
+// --- Projects for the dashboard ------------------------------------------------------------------------
+
+test('listProjects returns the visible projects and the recently viewed keys, newest first', async () => {
+  const { request, calls } = fakeRequest([
+    { status: 200, json: { values: [{ key: 'MOBL', name: 'Mobile', id: '1' }, { key: 'X' }, null, { key: 'OPS', name: 'Operations' }] } },
+    { status: 200, json: [{ key: 'OPS' }, { key: 'MOBL' }, null] },
+  ]);
+  const out = await createJiraClient({ request, route }).listProjects();
+  assert.deepEqual(out.projects, [{ key: 'MOBL', name: 'Mobile' }, { key: 'OPS', name: 'Operations' }]);
+  assert.deepEqual(out.recent, ['OPS', 'MOBL']);
+  assert.match(calls[0].path, /project\/search/);
+  assert.match(calls[1].path, /project\/recent/);
+});
+
+test('listProjects still works when the recent list cannot be read', async () => {
+  const { request } = fakeRequest([{ status: 200, json: { values: [{ key: 'MOBL', name: 'Mobile' }] } }, { status: 403, json: {} }]);
+  assert.deepEqual(await createJiraClient({ request, route }).listProjects(), { projects: [{ key: 'MOBL', name: 'Mobile' }], recent: [] });
+});
+
+test('listProjects throws when Jira refuses the project list', async () => {
+  const { request } = fakeRequest([{ status: 401, json: {} }]);
+  await assert.rejects(createJiraClient({ request, route }).listProjects(), /401/);
+});

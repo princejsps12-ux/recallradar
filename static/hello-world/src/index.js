@@ -1,12 +1,11 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import Root from './Root';
 
 import '@atlaskit/css-reset';
 
-ReactDOM.render(
+createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Root />
   </React.StrictMode>,
-  document.getElementById('root')
 );

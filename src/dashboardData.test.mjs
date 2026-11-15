@@ -9,6 +9,11 @@ import {
   taskProgress,
   screenFor,
   NO_WARD,
+  urgencyRank,
+  sortByUrgency,
+  urgentMatches,
+  heroStats,
+  matchesForDevice,
 } from '../static/hello-world/src/dashboardData.mjs';
 
 const m = (deviceId, recallNumber, extra = {}) => ({ deviceId, recallNumber, confidence: 'exact', recallClass: 'I', ward: 'ICU', ...extra });
@@ -69,4 +74,32 @@ test('which screen: error beats everything, then loading, first run, no check, r
   assert.equal(screenFor({ devicesCount: 0, result: null }), 'first-run');
   assert.equal(screenFor({ devicesCount: 5, result: null }), 'no-check');
   assert.equal(screenFor({ devicesCount: 5, result }), 'ready');
+});
+
+test('urgency: Class I before II before III, exact before likely, unknown class counts as Class I', () => {
+  const a = m('a', 'Z-1', { recallClass: 'II' });
+  const b = m('b', 'Z-2', { recallClass: 'I', confidence: 'likely' });
+  const c = m('c', 'Z-3', { recallClass: 'I' });
+  const d = m('d', 'Z-4', { recallClass: undefined });
+  assert.deepEqual(sortByUrgency([a, b, c, d]).map((x) => x.deviceId), ['c', 'd', 'b', 'a']);
+  assert.ok(urgencyRank(c) < urgencyRank(b) && urgencyRank(b) < urgencyRank(a));
+});
+
+test('do-this-first: one row per device, skips devices that have a task, respects the limit', () => {
+  const r = { matches: [m('d1', 'Z-1'), m('d1', 'Z-2', { recallClass: 'II' }), m('d2', 'Z-3', { recallClass: 'II' }), m('d3', 'Z-4', { recallClass: 'III' }), m('d4', 'Z-5')], recallDetails: {} };
+  assert.deepEqual(urgentMatches(r, {}, 10).map((x) => x.deviceId), ['d1', 'd4', 'd2', 'd3']);
+  assert.deepEqual(urgentMatches(r, { 'Z-1|d1': 'P-1' }, 10).map((x) => `${x.deviceId}:${x.recallNumber}`), ['d4:Z-5', 'd1:Z-2', 'd2:Z-3', 'd3:Z-4']);
+  assert.equal(urgentMatches(r, {}, 2).length, 2);
+  assert.deepEqual(urgentMatches(null, {}), []);
+});
+
+test('hero numbers: devices needing action, devices with a Class I match, open recalls', () => {
+  assert.deepEqual(heroStats(result), { devices: 4, classIDevices: 2, openRecalls: 3 }); // d1,d2 are Class I; d6 (unknown class) is urgent but not counted as Class I
+  assert.deepEqual(heroStats({ matches: [] }), { devices: 0, classIDevices: 0, openRecalls: 0 });
+});
+
+test('matches for one device, most urgent first', () => {
+  const r = { matches: [m('d1', 'Z-2', { recallClass: 'II' }), m('d1', 'Z-1'), m('d2', 'Z-3')], recallDetails: {} };
+  assert.deepEqual(matchesForDevice(r, 'd1').map((x) => x.recallNumber), ['Z-1', 'Z-2']);
+  assert.deepEqual(matchesForDevice(r, 'nope'), []);
 });

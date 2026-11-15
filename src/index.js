@@ -129,9 +129,16 @@ resolver.define('getCheckStatus', async () => {
 
 // --- Jira tasks for matches (see taskService.js) ---------------------------------------------------------
 
-// Tasks are created in the project of the issue the panel is open on.
-function projectKeyFrom(context) {
+// Jira project keys: letters, digits and underscores, starting with a letter (for example MOBL).
+const PROJECT_KEY = /^[A-Z][A-Z0-9_]{1,19}$/;
+
+// Tasks are created in the project of the issue the panel is open on. The dashboard (a global page) has no
+// issue, so it sends the project the person chose; Jira still applies that person's permissions to it.
+function projectKeyFrom(context, chosen) {
   const extension = (context && context.extension) || {};
+  if (typeof chosen === 'string' && PROJECT_KEY.test(chosen.trim().toUpperCase()) && !(extension.issue && extension.issue.key)) {
+    return chosen.trim().toUpperCase();
+  }
   if (extension.project && extension.project.key) return extension.project.key;
   const issueKey = extension.issue && extension.issue.key;
   return issueKey ? issueKey.slice(0, issueKey.lastIndexOf('-')) : null;
@@ -162,8 +169,8 @@ resolver.define('getTaskStates', async ({ payload }) => {
 //                      cannot assign anybody else. Nobody is assigned unless the panel asked.
 resolver.define('createTasks', async ({ payload, context }) => {
   try {
-    const projectKey = projectKeyFrom(context);
-    if (!projectKey) return { ok: false, error: 'Could not tell which project to create tasks in.' };
+    const projectKey = projectKeyFrom(context, payload && payload.projectKey);
+    if (!projectKey) return { ok: false, error: 'Choose a project for the new tasks first.' };
     const { matches, notFound } = await requestedMatches(payload && payload.pairs);
     let assignees = new Map();
     let assignRefused = [];
@@ -252,6 +259,39 @@ resolver.define('suggestAssignees', async ({ payload }) => {
   } catch (error) {
     console.error('Failed to suggest assignees', error);
     return { ok: false, error: 'Could not read team members from the Teamwork Graph.' };
+  }
+});
+
+// The Jira projects the person can see, for the dashboard's project choice.
+resolver.define('listProjects', async () => {
+  try {
+    return { ok: true, ...(await jiraAsUser.listProjects()) };
+  } catch (error) {
+    console.error('Failed to list projects', error);
+    return { ok: false, error: 'Could not read your Jira projects.' };
+  }
+});
+
+// Remove the devices that were imported by paste (the demo hospital is left alone).
+resolver.define('removeImportedDevices', async () => {
+  try {
+    await deviceStore.removeBySource('manual');
+    return { ok: true, count: (await deviceStore.listDevices()).length };
+  } catch (error) {
+    console.error('Failed to remove imported devices', error);
+    return { ok: false, error: 'Could not remove the imported devices.' };
+  }
+});
+
+// "Remove all devices": start over (demo and imported). Also forgets the saved check, which belonged to them.
+resolver.define('clearDevices', async () => {
+  try {
+    await deviceStore.clear();
+    await matchCache.clear();
+    return { ok: true, count: 0 };
+  } catch (error) {
+    console.error('Failed to clear devices', error);
+    return { ok: false, error: 'Could not remove the devices.' };
   }
 });
 

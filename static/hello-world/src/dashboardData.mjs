@@ -63,3 +63,44 @@ export function screenFor({ devicesCount, result, error, loading }) {
   if (!result) return 'no-check';
   return 'ready';
 }
+
+// --- "Do this first" and the hero -------------------------------------------------------------------------
+
+// Lower is more urgent: Class I first (an unknown class is treated as Class I, like the task due-date rule),
+// then exact before likely.
+export function urgencyRank(match) {
+  const cls = { I: 0, II: 1, III: 2 }[match.recallClass] ?? 0;
+  return cls * 2 + (match.confidence === 'exact' ? 0 : 1);
+}
+
+// Matches sorted most urgent first (stable: the saved order breaks ties).
+export function sortByUrgency(matches) {
+  return matches.map((m, i) => [m, i]).sort((a, b) => urgencyRank(a[0]) - urgencyRank(b[0]) || a[1] - b[1]).map(([m]) => m);
+}
+
+// The `limit` most urgent DEVICES that still have no task: one row per device (its most urgent match).
+// `tasks` is the { "recall|device": "MOBL-1" } map.
+export function urgentMatches(result, tasks = {}, limit = 5) {
+  const seen = new Set();
+  const out = [];
+  for (const m of sortByUrgency(affectedMatches(result))) {
+    if (tasks[`${m.recallNumber}|${m.deviceId}`] || seen.has(m.deviceId)) continue;
+    seen.add(m.deviceId);
+    out.push(m);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+// The big numbers: devices that need action, how many of them have a Class I match, and open recalls.
+export function heroStats(result) {
+  const affected = affectedMatches(result);
+  const devices = new Set(affected.map((m) => m.deviceId));
+  const classI = new Set(affected.filter((m) => classOf(m) === 'I').map((m) => m.deviceId));
+  return { devices: devices.size, classIDevices: classI.size, openRecalls: new Set(affected.map((m) => m.recallNumber)).size };
+}
+
+// Every affected match of one device, most urgent first (for the side drawer).
+export function matchesForDevice(result, deviceId) {
+  return sortByUrgency(affectedMatches(result).filter((m) => m.deviceId === deviceId));
+}

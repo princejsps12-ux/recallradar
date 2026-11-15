@@ -171,5 +171,25 @@ export function createJiraClient({ request, route }) {
     return { ...countByStatusCategory(issues), capped: issues.length >= SEARCH_RESULT_LIMIT };
   }
 
-  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts };
+  // The Jira projects the signed-in person can see, for the dashboard's "create tasks in project" choice (a global
+  // page has no issue to take the project from), plus the keys of the ones they viewed most recently, newest
+  // first, so the dashboard can start on a project they are actually working in. At most 50 projects, by name.
+  async function listProjects() {
+    const response = await request(route`/rest/api/3/project/search?maxResults=50&orderBy=name`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) throw await readError(response);
+    const body = await response.json();
+    const projects = (body.values || []).filter((p) => p && p.key && p.name).map((p) => ({ key: p.key, name: p.name }));
+    let recent = [];
+    try {
+      const recentResponse = await request(route`/rest/api/3/project/recent`, { headers: { Accept: 'application/json' } });
+      if (recentResponse.ok) recent = (await recentResponse.json()).filter((p) => p && p.key).map((p) => p.key);
+    } catch (error) {
+      // no "recent" list is fine: nothing is preselected then
+    }
+    return { projects, recent };
+  }
+
+  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects };
 }
