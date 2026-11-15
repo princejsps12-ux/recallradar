@@ -60,11 +60,11 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 
 ## Step F: Production and Marketplace prep
 
-- [ ] Deploy to production; install/share link for judges; listing material in the repo (icon, short and long description, screenshot list, privacy policy, terms, support contact, data/security notes); the exact steps the user must do to submit.
+- [x] Deployed to production (2.0.0). Listing material is in `marketplace/` (LISTING.md, PRIVACY.md, TERMS.md, icon.svg, SUBMIT.md with the steps you do yourself). [ ] **Not done, yours:** the install/share link (developer console, Distribution, Sharing, Generate link: the browser tool was unreachable and it is your account), support email, 144 px icon PNG export, screenshots, Marketplace form.
 
 ## Step G: MCP demo
 
-- [ ] Exact step-by-step instructions to enable the MCP tools on the demo site, connect Claude Desktop, and ask "Are any of our infusion pumps recalled?". The user does the clicking.
+- [x] Written in `docs/mcp-demo.md` (not run end to end: needs the admin switch and your consent). Exact step-by-step instructions to enable the MCP tools on the demo site, connect Claude Desktop, and ask "Are any of our infusion pumps recalled?". The user does the clicking.
 
 ## Step H: Judge simulation
 
