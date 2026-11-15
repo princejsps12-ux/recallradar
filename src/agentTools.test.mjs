@@ -13,6 +13,7 @@ import {
   checkDevice,
   recallDetails,
   createRemediationTasks,
+  createRemediationTask,
   createPreviewStore,
 } from './agentTools.js';
 import { createTaskGuard } from './taskService.js';
@@ -643,4 +644,105 @@ test('list: an empty ward answer suggests only wards that fit the other filters 
   assert.deepEqual(out.wardsWithMatches, ['ER', 'ICU']);
   const classII = await listOpenRecalls({ snapshot: snap(), inputs: { ward: 'Pediatrics', recallClass: 'II' } });
   assert.deepEqual(classII.wardsWithMatches, ['Med-Surg 3W']);
+});
+
+// --- create_remediation_task (one task, for external agents) ----------------------------------------------------------------
+
+const runOne = (s, inputs, snapshot = snap()) => createRemediationTask({ snapshot, inputs, deps: s.deps });
+
+test('one task: without a saved check it says how to get one', async () => {
+  assert.match((await runOne(setupTasks(), { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'MOBL' }, snap(null))).error, /saved recall check/);
+});
+
+test('one task: both the recall number and the device id are required (it never creates in bulk)', async () => {
+  const s = setupTasks();
+  assert.match((await runOne(s, { recallNumber: 'Z-1-2026', projectKey: 'MOBL' })).error, /Both recallNumber and deviceId/);
+  assert.match((await runOne(s, { deviceId: 'd1', projectKey: 'MOBL' })).error, /Both recallNumber and deviceId/);
+  assert.match((await runOne(s, { projectKey: 'MOBL' })).error, /Both recallNumber and deviceId/);
+  assert.equal(s.state.bulkCalls.length, 0);
+});
+
+test('one task: the project is required unless one is known from context', async () => {
+  const s = setupTasks();
+  s.deps.defaultProjectKey = undefined;
+  assert.match((await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1' })).error, /projectKey is required/);
+  assert.match((await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'bad key!' })).error, /projectKey is required/);
+  assert.equal(s.state.bulkCalls.length, 0);
+});
+
+test('one task: creates exactly one task for the named recall and device', async () => {
+  const s = setupTasks();
+  const out = await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'mobl' });
+  assert.equal(out.state, 'created');
+  assert.equal(out.jiraTask, 'MOBL-1');
+  assert.equal(out.projectKey, 'MOBL');
+  assert.equal(out.taskTitle, 'FDA recall Z-1-2026: Device d1 (ICU Medical M-d1)');
+  assert.equal(out.dueDate, '2026-11-17');
+  assert.deepEqual(out.citations.recallNumbers, ['Z-1-2026']);
+  assert.deepEqual(out.citations.deviceIds, ['d1']);
+  assert.equal(s.state.created.length, 1);
+  // The recall also affects d2, but only d1 was asked for.
+  assert.equal(s.state.created[0].fields.labels[1], taskLabel('Z-1-2026', 'd1'));
+});
+
+test('one task: a second call for the same pair creates nothing and returns the existing key', async () => {
+  const s = setupTasks();
+  await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'MOBL' });
+  s.clock.now += 3 * 60 * 1000; // past the short guard, so Jira's own search is what knows about it
+  const again = await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'MOBL' });
+  assert.equal(again.state, 'already-exists');
+  assert.equal(again.jiraTask, 'MOBL-1');
+  assert.equal(s.state.created.length, 1);
+});
+
+test('one task: an immediate repeat is caught by the guard too', async () => {
+  const s = setupTasks();
+  await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'MOBL' });
+  assert.equal((await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'MOBL' })).state, 'already-exists');
+  assert.equal(s.state.created.length, 1);
+});
+
+test('one task: a pair that is not in the saved check is not guessed at', async () => {
+  const s = setupTasks();
+  const out = await runOne(s, { recallNumber: 'Z-4242-2026', deviceId: 'd1', projectKey: 'MOBL' });
+  assert.equal(out.state, 'not-found');
+  assert.match(out.message, /list_open_recalls/);
+  assert.deepEqual(out.citations.recallNumbers, []);
+  assert.equal(s.state.bulkCalls.length, 0);
+});
+
+test('one task: the recall number and device id are found however they are typed', async () => {
+  const s = setupTasks();
+  assert.equal((await runOne(s, { recallNumber: ' z-1-2026 ', deviceId: 'D1', projectKey: 'MOBL' })).state, 'created');
+});
+
+test('one task: a possible match is refused', async () => {
+  const s = setupTasks();
+  const out = await runOne(s, { recallNumber: 'Z-3-2026', deviceId: 'd4', projectKey: 'MOBL' });
+  assert.equal(out.ok, false);
+  assert.match(out.error, /only a possible match/);
+  assert.equal(s.state.bulkCalls.length, 0);
+});
+
+test('one task: a closed recall is refused', async () => {
+  const s = setupTasks();
+  const out = await runOne(s, { recallNumber: 'Z-9-2026', deviceId: 'd5', projectKey: 'MOBL' });
+  assert.equal(out.ok, false);
+  assert.match(out.error, /no longer open/);
+  assert.equal(s.state.bulkCalls.length, 0);
+});
+
+test('one task: a Jira failure is reported, not hidden', async () => {
+  const s = setupTasks({ bulkError: new Error('Jira answered 500') });
+  const out = await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'MOBL' });
+  assert.equal(out.ok, false);
+  assert.equal(out.state, 'failed');
+  assert.match(out.error, /500/);
+});
+
+test('one task: a task being created by someone else right now is reported as in progress', async () => {
+  const s = setupTasks();
+  await s.deps.guard.reserve(taskLabel('Z-1-2026', 'd1'));
+  assert.equal((await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'MOBL' })).state, 'in-progress');
+  assert.equal(s.state.created.length, 0);
 });

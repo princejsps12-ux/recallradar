@@ -181,6 +181,37 @@ modules:
           type: string
           required: true
           description: The FDA recall number, for example Z-2723-2026.
+    - key: create_remediation_task
+      name: Create one remediation task
+      function: create-task-fn
+      actionVerb: CREATE
+      description: "Creates ONE Jira task for one recall and one device (an exact or likely match of an open recall), as the calling user. Never twice for the same pair. Needs recallNumber, deviceId and projectKey. Get real pairs from list_open_recalls first."
+      inputs:
+        recallNumber:
+          title: Recall number
+          type: string
+          required: true
+          description: The FDA recall number, for example Z-2723-2026, exactly as returned by list_open_recalls.
+        deviceId:
+          title: Device id
+          type: string
+          required: true
+          description: The hospital's device id, for example demo-001, exactly as returned by list_open_recalls.
+        projectKey:
+          title: Jira project key
+          type: string
+          required: true
+          description: The Jira project for the new task, for example MOBL.
+  # Exposes some of the actions above to OTHER agents: Rovo Studio agents, and external clients such as
+  # Claude Desktop (once a site admin turns it on; see the README). Only three, on purpose: reading, and
+  # creating ONE task. The preview/confirm action stays private to the RecallRadar Assistant.
+  rovo:mcp:
+    - key: recallradar-mcp
+      name: RecallRadar
+      tools:
+        - check_device
+        - list_open_recalls
+        - create_remediation_task
   # The recall check runs in the background: the button queues it, this consumer does it.
   # Only queue consumers and scheduled triggers may set timeoutSeconds (UI functions are fixed
   # at 25 s), which is exactly why the check lives here.
@@ -204,6 +235,8 @@ modules:
       handler: rovoActions.createRemediationTasksAction
     - key: recall-details-fn
       handler: rovoActions.recallDetailsAction
+    - key: create-task-fn
+      handler: rovoActions.createRemediationTaskAction
     - key: check-consumer-fn
       handler: consumer.handler
       timeoutSeconds: 300

@@ -20,9 +20,9 @@ Turned "RecallRadar Assistant" into a real agent: four reusable `action` modules
 
 ## Step B: Expose the actions to other agents with `rovo:mcp`
 
-- [ ] `rovo:mcp` module exposing `check_device`, `list_open_recalls` and `create_remediation_task`.
-- [ ] A skill file (`SKILL.md`) for third-party agents.
-- [ ] README steps to connect it from Claude Desktop.
+- [x] `rovo:mcp` module (`recallradar-mcp`) exposing `check_device`, `list_open_recalls` and a new single-task `create_remediation_task`. Deploys and lints; unit tested (12 new tests).
+- [x] A skill file for third-party agents: `integrations/claude/recallradar/SKILL.md`.
+- [x] README steps to connect from Claude Desktop (custom connector, or `mcp-remote`), Claude Code, and the admin switch. **A real external client was not connected**: it needs a site admin to enable the tools and an interactive OAuth sign-in.
 
 ## Step C: Teamwork Graph
 

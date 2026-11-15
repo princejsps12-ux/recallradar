@@ -69,6 +69,10 @@ Four actions (`list_open_recalls`, `check_device`, `create_remediation_tasks`, `
 - Rovo action quirks: inputs are **primitives only** (string, integer, number, boolean); an action `description` is **max 255 characters** and must be **quoted in YAML if it contains `: `**; function keys must be short (`create-remediation-tasks-fn` was rejected as too long, keep to about 20 characters); inputs arrive directly on the payload (with `context`, `orgId`, `contextToken` beside them).
 - Testing the agent: **Ask Rovo**, open the agent picker, search "RecallRadar". The skill shows up in the agent's steps as "Read Skills for agents".
 
+### MCP exposure (`rovo:mcp`)
+
+`recallradar-mcp` exposes `check_device`, `list_open_recalls` and `create_remediation_task` (ONE task: recall + device + project, all required; no preview, because MCP clients show each tool call; creates as the calling user, exact/likely and open recalls only, never a duplicate). The bulk preview/confirm action is deliberately **not** exposed. External access is off until a site admin enables the app's tools (Atlassian Administration, Apps, Sites, site, Connected apps) and each user signs in over OAuth. Endpoint `https://mcp.atlassian.com/forge/<appId>`. The admin switch is under Connected apps, View app details, **Tools** ("Expose tools to MCP-compatible apps"), found there and left **Disabled** on purpose: its page warns that enabling it allows "any action the app is capable of, on behalf of users", so it is the user's call. A real external-client connection has **not** been tested (it needs that switch and an interactive consent): the README says so. A third-party skill file lives in `integrations/claude/recallradar/SKILL.md`; do not confuse it with the Rovo skill in `skills/recall-triage/`.
+
 ### Jira tasks for matches
 
 Only **exact** and **likely** matches get a task. Due date is calendar days from creation (UTC): Class I 2, Class II/III 7, unknown class 2 (treated as Class I); the numbers and reasons live in `taskRules.js` and the README, so change them there and in the README together.

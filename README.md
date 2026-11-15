@@ -194,6 +194,68 @@ So the agent cannot create a task it has not previewed, and a made-up or reused 
 - **Only devices in the hospital list** can be checked, against recalls the check found for them.
 - **Action inputs are plain text, numbers or true/false** (Rovo does not allow lists), so "which matches" is chosen with filters: recall number, device id, ward, class.
 
+## Connect other agents (MCP)
+
+The `recallradar-mcp` module (`rovo:mcp`, a Preview feature of Forge) exposes **three** of the actions to other agents:
+
+| Tool | What it does |
+| --- | --- |
+| `list_open_recalls` | Devices with an open exact or likely recall match; filter by ward, class, confidence. |
+| `check_device` | Does this model / serial / device id match any recall? |
+| `create_remediation_task` | Creates **one** Jira task for **one** recall and **one** device (`recallNumber`, `deviceId`, `projectKey`, all required). |
+
+They are the same tools as the in-Jira agent, so they read the **saved recall check** (never live openFDA) and answer with `citations`. Only three are exposed, on purpose: reading, and creating a single task. The agent's preview-then-confirm action (`create_remediation_tasks`, which can make up to 20) stays private to the RecallRadar Assistant. External clients show the user each tool call and ask before running it, and one recall plus one device fully defines the task, so the single-task action needs no preview step of its own. It never creates a duplicate; it only accepts exact or likely matches of open recalls; and it creates the task **as the person using the client**, so Jira's own permissions apply.
+
+### Inside Atlassian: other Rovo agents
+
+The tools can be added to agents you build in Rovo Studio, with no setup beyond installing the app.
+
+### Outside Atlassian: Claude Desktop, Claude Code, Cursor and others
+
+**1. A site admin switches it on.** External MCP exposure is **off by default**. In Atlassian Administration open **Apps**, **Sites**, your site, **Connected apps**, then **View app details** for RecallRadar and scroll to **Tools**. It shows *Expose tools to MCP-compatible apps: Disabled*; click **Enable tools**. This is per app and per site, and needs an organization admin. Read the warning on that page first: *"Enabling this gives access to perform any action the app is capable of, on behalf of users."* RecallRadar's own tools only read the saved check and create single tasks as the signed-in user, but the switch is for the whole app, so enable it only for a site you trust.
+
+**2. Use the app's MCP address.**
+
+```
+https://mcp.atlassian.com/forge/<appId>
+```
+
+`<appId>` is the UUID in `manifest.yml` after `ari:cloud:ecosystem::app/` (under `app: id:`).
+
+**3. Add it to your client and sign in.** The first connection opens Atlassian's OAuth consent screen: pick the site, review the tools, approve. No API token is involved.
+
+*Claude Desktop*, either way (Atlassian's docs do not cover Claude Desktop; this is the standard way to add a remote MCP server to it):
+
+- **Custom connector** (Settings, then Connectors, then **Add custom connector**): paste the address above.
+- **Or** the `mcp-remote` bridge, in **Settings, Developer, Edit Config** (`claude_desktop_config.json`), then restart Claude Desktop and complete the sign-in that opens:
+
+```json
+{
+  "mcpServers": {
+    "recallradar": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.atlassian.com/forge/<appId>"]
+    }
+  }
+}
+```
+
+*Claude Code* (this is the command Atlassian documents), then run `/mcp` and sign in:
+
+```bash
+claude mcp add --transport http recallradar https://mcp.atlassian.com/forge/<appId>
+```
+
+**4. Teach the agent how to use the tools (optional but recommended).** [`integrations/claude/recallradar/SKILL.md`](integrations/claude/recallradar/SKILL.md) is a skill file for third-party agents: which tool for which question, always cite real recall numbers and device ids, say how fresh the data is, and ask the user before creating a task. In Claude Code copy the `recallradar` folder to `~/.claude/skills/`; in Claude Desktop zip the folder and add it under **Settings, Capabilities, Skills**.
+
+**5. Make sure there is a check to read.** The tools read the saved check. Open the RecallRadar panel on a Jira issue and click **Check devices for recalls** once (the daily refresh then keeps it current). Without a saved check the tools say so.
+
+### What was and was not verified
+
+- Verified: the module and the new action deploy and pass Forge's linter, the three tools are unit tested, the same actions work in Rovo chat on the demo site, and the admin page (steps above) shows the app at the new version with the **Tools** switch, currently *Disabled*. I left it disabled.
+- **Not verified from here:** a real external client connection (Claude Desktop, Claude Code). It needs a site admin to switch the tools on and an interactive OAuth sign-in, which I did not do. The Claude Desktop steps are the standard remote-MCP setup rather than something Atlassian documents for Forge apps, so treat them as untested.
+- Rovo shows its own "Please review" card for `CREATE` actions in chat; whether external clients get an equivalent prompt is up to the client.
+
 ## How the demo hospital is built
 
 [`src/demoHospital.js`](src/demoHospital.js) holds 30 devices with **real manufacturer and model names taken from actual openFDA recalls**. Devices meant to match have serial/lot numbers that the real recall lists. Wards and the serial numbers of unaffected devices are invented. The file's header explains the groups (exact, likely, possible, none) and how it was checked.
@@ -231,7 +293,8 @@ src/deviceStore.js        Device list interface
 src/kvAdapter.js          Forge storage behind that interface
 src/agentTools.js         The four Rovo agent tools (pure) and the preview/confirm store
 src/rovoActions.js        Forge handlers for the agent's actions
-skills/recall-triage/     The skill that groups the actions (SKILL.md)
+skills/recall-triage/     The Rovo skill that groups the actions (SKILL.md)
+integrations/claude/      Skill file for third-party agents (Claude) using the MCP tools
 src/taskRules.js          What a task looks like: due date rule, title, labels, description
 src/taskService.js        Creating tasks without duplicates (Jira search + short guard)
 src/jiraClient.js         The Jira calls: find by label, issue type, bulk create

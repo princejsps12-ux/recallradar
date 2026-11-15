@@ -6,6 +6,7 @@ import {
   checkDevice,
   recallDetails,
   createRemediationTasks,
+  createRemediationTask,
   readInputs,
 } from './agentTools';
 import { loadSnapshot, jiraAsUser, taskGuard, previewStore } from './runtime';
@@ -71,5 +72,15 @@ export const createRemediationTasksAction = (payload, context) =>
         now: () => new Date(),
         defaultProjectKey: projectKeyFrom(payload, context),
       },
+    }),
+  );
+
+// ONE task, for external agents (see the rovo:mcp module). Creates a single task as the calling user.
+export const createRemediationTaskAction = (payload, context) =>
+  runTool('create_remediation_task', payload, context, (snapshot, inputs) =>
+    createRemediationTask({
+      snapshot,
+      inputs,
+      deps: { jira: jiraAsUser, guard: taskGuard, now: () => new Date(), defaultProjectKey: projectKeyFrom(payload, context) },
     }),
   );

@@ -533,3 +533,49 @@ export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
     citations: citationsOf(batch),
   };
 }
+
+// --- create_remediation_task (ONE task, for external agents over MCP) ------------------------------------------------------------
+
+// Creates exactly ONE Jira task, for one recall and one device. This is the action external agents
+// (Claude Desktop, Cursor...) get through the MCP module. It has no preview step on purpose:
+//   * those clients show the user each tool call, with its inputs, and ask before running it, and
+//   * one recall number plus one device id fully define the task, so there is nothing hidden to preview.
+// It can never create more than one task per call, only for an exact or likely match of a recall that
+// is still open, and never twice for the same recall and device.
+// inputs: recallNumber, deviceId, projectKey (all required: an external client has no Jira issue to take the project from).
+// deps: { jira, guard, now(), defaultProjectKey }.
+export async function createRemediationTask({ snapshot, inputs = {}, deps }) {
+  const { result } = snapshot;
+  if (!result) return noData(snapshot);
+
+  const recallNumber = text(inputs.recallNumber);
+  const deviceId = text(inputs.deviceId);
+  if (!recallNumber || !deviceId) {
+    return { ok: false, error: 'Both recallNumber and deviceId are required: this action creates exactly one task, for one recall and one device.' };
+  }
+  const projectKey = parseProjectKey(inputs.projectKey) || parseProjectKey(deps.defaultProjectKey);
+  if (!projectKey) return { ok: false, error: 'projectKey is required, for example MOBL.' };
+
+  const match = result.matches.find((m) => compact(m.recallNumber) === compact(recallNumber) && compact(m.deviceId) === compact(deviceId));
+  if (!match) {
+    return {
+      ok: true,
+      state: 'not-found',
+      message: `The saved check has no match between recall ${recallNumber} and device ${deviceId}, so no task was created. Use list_open_recalls to find real pairs.`,
+      citations: { recallNumbers: [], deviceIds: [], rule: 'Nothing to cite: no such match.' },
+    };
+  }
+  if (!isTaskWorthy(match)) {
+    return { ok: false, error: `That is only a ${match.confidence} match, and tasks are created only for exact or likely matches.`, citations: citationsOf([match]) };
+  }
+  if (isClosed((result.recallDetails || {})[match.recallNumber])) {
+    return { ok: false, error: `Recall ${match.recallNumber} is no longer open (status ${result.recallDetails[match.recallNumber].status}), so no task was created.`, citations: citationsOf([match]) };
+  }
+
+  const outcome = await createTasks({ matches: [match], jira: deps.jira, guard: deps.guard, projectKey, today: deps.now() });
+  const base = { ok: true, projectKey, taskTitle: buildTaskSummary(match), dueDate: dueDateFor(match.recallClass, deps.now()), citations: citationsOf([match]) };
+  if (outcome.created.length) return { ...base, state: 'created', jiraTask: outcome.created[0].key };
+  if (outcome.existing.length) return { ...base, state: 'already-exists', jiraTask: outcome.existing[0].key, message: 'A task for this recall and device already exists; nothing new was created.' };
+  if (outcome.inProgress.length) return { ...base, state: 'in-progress', message: 'This task is being created right now by another request. Ask again in a moment.' };
+  return { ok: false, state: 'failed', error: (outcome.failed[0] && outcome.failed[0].error) || 'Jira could not create the task.', citations: citationsOf([match]) };
+}
