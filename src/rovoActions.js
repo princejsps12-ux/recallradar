@@ -10,8 +10,18 @@ import {
   readInputs,
 } from './agentTools';
 import { createRecallPages } from './recallPageService';
-import { loadSnapshot, jiraAsUser, confluenceAsUser, taskGuard, previewStore } from './runtime';
-import { getTaskStates, selectMatches } from './taskService';
+import { whoHandlesWard } from './teamService';
+import {
+  loadSnapshot,
+  jiraAsUser,
+  confluenceAsUser,
+  taskGuard,
+  previewStore,
+  teamGraph,
+  wardTeams,
+  openTaskCounts,
+  taskKeyLookup,
+} from './runtime';
 
 // Where the conversation happens, if Rovo says (for example inside a Jira issue): used as the
 // default Jira project for new tasks. Rovo's exact context shape is not guaranteed, so look in the
@@ -22,14 +32,6 @@ export function projectKeyFrom(payload, context) {
   const issueKey = jira.issueKey || (context && context.extension && context.extension.issue && context.extension.issue.key);
   if (issueKey && issueKey.includes('-')) return issueKey.slice(0, issueKey.lastIndexOf('-'));
   return (context && context.extension && context.extension.project && context.extension.project.key) || '';
-}
-
-// "Which of these already have a Jira task?", as the person talking to the agent.
-function taskKeyLookup(snapshot) {
-  return async (pairs) => {
-    const { matches } = selectMatches(snapshot.result.matches, pairs);
-    return getTaskStates({ matches, jira: jiraAsUser, guard: taskGuard });
-  };
 }
 
 async function runTool(name, payload, context, tool) {
@@ -72,6 +74,7 @@ export const createRemediationTasksAction = (payload, context) =>
         previewStore,
         now: () => new Date(),
         defaultProjectKey: projectKeyFrom(payload, context),
+        team: { store: wardTeams, graph: teamGraph, openCounts: openTaskCounts },
       },
     }),
   );
@@ -95,3 +98,16 @@ export const createRecallPageAction = (payload, context) =>
       deps: { confluence: confluenceAsUser, ...(snapshot.result ? { getTaskKeys: taskKeyLookup(snapshot) } : {}) },
     }),
   );
+
+// Which Teamwork Graph team handles a ward, who is in it, and who to suggest (read-only). Needs no saved
+// check, so it does not go through runTool. The mapping itself is saved in the RecallRadar panel.
+export const whoHandlesWardAction = async (payload) => {
+  try {
+    const inputs = readInputs(payload);
+    console.info('Rovo action who_handles_ward: input keys', Object.keys(payload || {}));
+    return await whoHandlesWard({ ward: inputs.ward, store: wardTeams, graph: teamGraph, openCounts: await openTaskCounts() });
+  } catch (error) {
+    console.error('Rovo action who_handles_ward failed', error);
+    return { ok: false, error: 'RecallRadar could not read the Teamwork Graph. Please try again.' };
+  }
+};

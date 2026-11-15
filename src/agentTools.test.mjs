@@ -746,3 +746,99 @@ test('one task: a task being created by someone else right now is reported as in
   assert.equal((await runOne(s, { recallNumber: 'Z-1-2026', deviceId: 'd1', projectKey: 'MOBL' })).state, 'in-progress');
   assert.equal(s.state.created.length, 0);
 });
+
+// --- create_remediation_tasks: proposing assignees from the Teamwork Graph ------------------------------------------------
+
+import { createWardTeamStore } from './wardTeams.js';
+import { SUGGESTION_RULE } from './teamService.js';
+
+const T_ICU = 'ari:cloud:identity::team/11111111-aaaa-4bbb-8ccc-111111111111';
+
+async function setupAssign({ graphDown = false, memberIds = ['acc-a', 'acc-b'] } = {}) {
+  const s = setupTasks();
+  const store = createWardTeamStore(fakeKv());
+  await store.set('ICU', { ari: T_ICU, name: 'ICU Team' });
+  const members = memberIds.map((id) => ({ accountId: id, name: `Person ${id}` }));
+  const graph = {
+    async listMembers() {
+      if (graphDown) throw new Error('graph down');
+      return members;
+    },
+    async listTeams() {
+      return [];
+    },
+  };
+  s.deps.team = { store, graph, openCounts: async () => new Map() };
+  s.members = members;
+  return s;
+}
+
+test('assign: without assignSuggested the preview proposes nobody', async () => {
+  const s = await setupAssign();
+  const out = await run(s, { ward: 'ICU', recallClass: 'I' });
+  assert.equal('proposedAssignee' in out.willCreate[0], false);
+  assert.equal(out.assignment, undefined);
+});
+
+test('assign: the preview shows each proposed person, the team, the source and the rule, and creates nothing', async () => {
+  const s = await setupAssign();
+  const out = await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: true });
+  assert.equal(out.state, 'preview');
+  assert.equal(s.state.bulkCalls.length, 0);
+  assert.deepEqual(out.willCreate[0].proposedAssignee, { name: 'Person acc-a', team: 'ICU Team', source: 'Teamwork Graph' });
+  assert.equal(out.assignment.rule, SUGGESTION_RULE);
+  assert.match(out.assignment.note, /only proposed/);
+});
+
+test('assign: confirming assigns exactly the people shown in the preview', async () => {
+  const s = await setupAssign();
+  const preview = await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: true });
+  const done = await run(s, { confirmed: true, confirmationToken: preview.confirmationToken });
+  assert.equal(done.state, 'created');
+  assert.deepEqual(s.state.created[0].fields.assignee, { accountId: 'acc-a' });
+  assert.equal(done.created[0].assignedTo, 'Person acc-a');
+});
+
+test('assign: a person who left the team since the preview is not assigned (the task is still created)', async () => {
+  const s = await setupAssign();
+  const preview = await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: true });
+  s.deps.team.graph.listMembers = async () => [{ accountId: 'acc-z', name: 'Someone Else' }];
+  const done = await run(s, { confirmed: true, confirmationToken: preview.confirmationToken });
+  assert.equal(done.state, 'created');
+  assert.equal('assignee' in s.state.created[0].fields, false);
+});
+
+test('assign: a preview made without assignSuggested never assigns, even on a team ward', async () => {
+  const s = await setupAssign();
+  const preview = await run(s, { ward: 'ICU', recallClass: 'I' });
+  await run(s, { confirmed: true, confirmationToken: preview.confirmationToken });
+  assert.equal('assignee' in s.state.created[0].fields, false);
+});
+
+test('assign: a ward with no team gets no proposal and the reason is listed', async () => {
+  const s = await setupAssign();
+  const out = await run(s, { ward: 'ER', assignSuggested: true });
+  assert.equal(out.willCreate[0].proposedAssignee, null);
+  assert.match(out.assignment.noAssignee[0].reason, /ward ER has no team yet/);
+});
+
+test('assign: if the Teamwork Graph is down the preview still works, with a note and no proposals', async () => {
+  const s = await setupAssign({ graphDown: true });
+  const out = await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: true });
+  assert.equal(out.state, 'preview');
+  assert.equal(out.willCreate[0].proposedAssignee, null);
+  assert.match(out.assignment.note, /could not be reached/);
+});
+
+test('assign: when assigning is not available at all, the note says tasks are unassigned', async () => {
+  const s = setupTasks(); // no deps.team
+  const out = await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: true });
+  assert.equal(out.state, 'preview');
+  assert.match(out.assignment.note, /unassigned/);
+});
+
+test('assign: assignSuggested may arrive as the text "true"', async () => {
+  const s = await setupAssign();
+  const out = await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: 'true' });
+  assert.ok(out.willCreate[0].proposedAssignee);
+});

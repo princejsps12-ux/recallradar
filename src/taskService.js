@@ -141,7 +141,10 @@ export async function getTaskStates({ matches, jira, guard }) {
 //   inProgress  [pair]             being created right now by another click
 //   failed      [{ pair, error }]  Jira refused or something broke
 //   skipped     [pair]             not task-worthy (a "possible" match)
-export async function createTasks({ matches, jira, guard, projectKey, today }) {
+//
+// `assignees` (optional) is a Map(pairKey -> { accountId }) of people the user has already agreed to
+// assign; pairs not in it stay unassigned. It only matters for tasks that are really created.
+export async function createTasks({ matches, jira, guard, projectKey, today, assignees = new Map() }) {
   const result = { created: [], existing: [], inProgress: [], failed: [], skipped: [] };
 
   // The same pair twice in one request must still produce one task.
@@ -178,7 +181,10 @@ export async function createTasks({ matches, jira, guard, projectKey, today }) {
   await Promise.all(toCreate.map((item) => guard.reserve(item.label)));
 
   for (const group of chunk(toCreate, BULK_CREATE_LIMIT)) {
-    const fields = group.map((item) => buildIssueFields({ match: item.match, projectKey, issueTypeId, today }));
+    const fields = group.map((item) => {
+      const assignee = assignees.get(item.pair);
+      return buildIssueFields({ match: item.match, projectKey, issueTypeId, today, assigneeAccountId: assignee && assignee.accountId });
+    });
     let outcome;
     try {
       outcome = await jira.bulkCreate(fields);

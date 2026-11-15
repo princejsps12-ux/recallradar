@@ -28,6 +28,7 @@ import {
   FDA_RECALL_DATABASE_URL,
 } from './taskRules.js';
 import { createTasks, getTaskStates, selectMatches } from './taskService.js';
+import { assigneesForMatches, checkExplicitAssignees, SUGGESTION_RULE } from './teamService.js';
 
 // --- Limits (each with its reason) ------------------------------------------------------------------
 
@@ -427,7 +428,10 @@ function parseProjectKey(value) {
 
 // inputs: recallNumber, deviceId, ward, recallClass, confidence ("exact"|"likely") choose the matches
 // (at least one is required); projectKey; confirmed (true/false); confirmationToken.
-// Without confirmed=true it only PREVIEWS. deps: { jira, guard, previewStore, now(), defaultProjectKey }.
+// Without confirmed=true it only PREVIEWS. deps: { jira, guard, previewStore, now(), defaultProjectKey, team }.
+// assignSuggested=true (preview only) also proposes, for each task, a member of the ward's Teamwork Graph team,
+// shown in the preview; confirming then assigns exactly those people (re-checked against the team first).
+// `team` is { store, graph, openCounts() } (see teamService.js); without it nobody is ever assigned.
 export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
   const { result } = snapshot;
   if (!result) return noData(snapshot);
@@ -444,12 +448,28 @@ export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
       return { ok: false, error: 'Nothing was created: that confirmation token is unknown, already used, or older than 10 minutes. Ask for a new preview and confirm again.' };
     }
     const { matches, notFound } = selectMatches(result.matches, entry.pairs);
-    const outcome = await createTasks({ matches, jira: deps.jira, guard: deps.guard, projectKey: entry.projectKey, today: deps.now() });
-    const created = outcome.created.map((c) => ({ pair: c.pair, jiraTask: c.key }));
+    // Only people the user saw in the preview, and only if they are still in the ward's team.
+    let assignees = new Map();
+    let assignNote;
+    if (entry.assignees && Object.keys(entry.assignees).length > 0 && deps.team) {
+      try {
+        const explicit = Object.fromEntries(Object.entries(entry.assignees).map(([pair, a]) => [pair, a.accountId]));
+        ({ assignees } = await checkExplicitAssignees({ explicit, matches, store: deps.team.store, graph: deps.team.graph }));
+      } catch (error) {
+        assignNote = 'The Teamwork Graph could not be reached, so the tasks were created without an assignee.';
+      }
+    }
+    const outcome = await createTasks({ matches, jira: deps.jira, guard: deps.guard, projectKey: entry.projectKey, today: deps.now(), assignees });
+    const created = outcome.created.map((c) => ({
+      pair: c.pair,
+      jiraTask: c.key,
+      ...(assignees.has(c.pair) ? { assignedTo: assignees.get(c.pair).name } : {}),
+    }));
     return {
       ok: true,
       state: 'created',
       projectKey: entry.projectKey,
+      ...(assignNote ? { assignNote } : {}),
       created,
       alreadyHadTask: outcome.existing.map((e) => ({ pair: e.pair, jiraTask: e.key })),
       beingCreatedElsewhere: outcome.inProgress,
@@ -503,9 +523,33 @@ export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
 
   const batch = creatable.slice(0, MAX_TASKS_PER_ACTION);
   const today = deps.now();
+
+  // Optional: propose an assignee per task from the ward's team. Only a proposal until the user confirms.
+  const wantAssignees = inputs.assignSuggested === true || String(inputs.assignSuggested).toLowerCase() === 'true';
+  let proposed = new Map();
+  let assignSkipped = [];
+  let assignNote;
+  if (wantAssignees) {
+    if (!deps.team) {
+      assignNote = 'Assigning is not available here, so the tasks will be created unassigned.';
+    } else {
+      try {
+        ({ assignees: proposed, skipped: assignSkipped } = await assigneesForMatches({
+          matches: batch,
+          store: deps.team.store,
+          graph: deps.team.graph,
+          openCounts: await deps.team.openCounts(),
+        }));
+      } catch (error) {
+        assignNote = 'The Teamwork Graph could not be reached, so no assignees are proposed.';
+      }
+    }
+  }
+
   const token = await deps.previewStore.save({
     projectKey,
     pairs: batch.map((m) => ({ recallNumber: m.recallNumber, deviceId: m.deviceId })),
+    ...(proposed.size ? { assignees: Object.fromEntries(proposed) } : {}),
   });
   return {
     ok: true,
@@ -521,7 +565,27 @@ export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
       taskTitle: buildTaskSummary(m),
       dueDate: dueDateFor(m.recallClass, today),
       whyMatched: m.reason,
+      ...(wantAssignees
+        ? {
+            proposedAssignee: proposed.has(pairKey(m.recallNumber, m.deviceId))
+              ? {
+                  name: proposed.get(pairKey(m.recallNumber, m.deviceId)).name,
+                  team: proposed.get(pairKey(m.recallNumber, m.deviceId)).teamName,
+                  source: 'Teamwork Graph',
+                }
+              : null,
+          }
+        : {}),
     })),
+    ...(wantAssignees
+      ? {
+          assignment: {
+            rule: SUGGESTION_RULE,
+            note: assignNote || (proposed.size ? 'These people are only proposed: they are assigned only if the user confirms.' : 'No one could be proposed.'),
+            noAssignee: assignSkipped.map((s) => ({ pair: s.pair, reason: s.reason })),
+          },
+        }
+      : {}),
     alreadyHadTask: alreadyHave.map((m) => ({ deviceId: m.deviceId, recallNumber: m.recallNumber, jiraTask: existing[pairKey(m.recallNumber, m.deviceId)] })),
     notIncluded: creatable.length - batch.length,
     confirmationToken: token,

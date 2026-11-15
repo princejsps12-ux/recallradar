@@ -225,3 +225,10 @@ test('buildIssueFields gives a Class I recall an earlier due date than Class II'
   assert.ok(one.duedate < two.duedate);
   assert.match(JSON.stringify(one.description), /Class I,/);
 });
+
+test('buildIssueFields adds an assignee only when one was given', () => {
+  const m = { confidence: 'exact', reason: 'r', deviceId: 'd1', deviceName: 'Pump', deviceManufacturer: 'X', deviceModel: 'M1', ward: 'ICU', recallNumber: 'Z-1-2026', recallClass: 'I', firm: 'X', product: 'p', date: '2026-01-01' };
+  const base = { match: m, projectKey: 'MOBL', issueTypeId: '1', today: new Date(Date.UTC(2026, 10, 14)) };
+  assert.equal('assignee' in buildIssueFields(base), false);
+  assert.deepEqual(buildIssueFields({ ...base, assigneeAccountId: 'acc-1' }).assignee, { accountId: 'acc-1' });
+});

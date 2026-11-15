@@ -31,12 +31,28 @@ Turned "RecallRadar Assistant" into a real agent: four reusable `action` modules
 - [x] **Decision (15 Nov 2026): skip graph writes.** Writing recalls to the graph was blocked on a consent only the user can give, and was not wanted. Step D's Confluence pages cover the same visibility. Original blocker: Creating the connection shows a legal dialog (data ingested, shared with MCP clients, visible to every workspace user). I did not accept it. Also, the object types are a fixed list (a recall can only be an `atlassian:document`), links to Jira tasks are documented, and links to devices or teams are not.
 - Decisions needed from you are listed at the end of the findings document (accept the consent and what to ingest, how to choose an assignee without an owner, or skip graph writes).
 
+## Step C2: Teamwork Graph, read-only (decided 15 Nov 2026)
+
+Skip writes; build what only **reads** the graph (the bonus also counts read-only apps).
+
+- [x] Pure modules with tests: `src/teamGraph.js` (the two read calls), `src/wardTeams.js` (ward-to-team mapping in Forge storage), `src/teamService.js` (the assignee rule, ward lookups, checks before assigning). 63 new tests.
+- [x] Tasks can carry an assignee (`taskRules`, `taskService`); `jiraClient.openTaskCounts()` feeds the "fewest open tasks" rule.
+- [x] Panel: **Ward teams** mapping (team list read from the graph), **Team: <name> (from Teamwork Graph)** on match rows, suggested assignee with **Create & assign** (asks first), and an off-by-default checkbox for "create all".
+- [x] Agent and MCP: `who_handles_ward` (read-only); the agent's task preview can propose assignees (`assignSuggested`) and confirming assigns exactly those people.
+- [x] README lists **exactly the two Teamwork Graph calls** made.
+- [x] Deployed (14.x); installs upgraded in Jira and Confluence. Rovo chat: `who_handles_ward` answered "no team mapped" without guessing.
+- [ ] **Live panel check pending**: the test machine's DNS refuses `*.cdn.prod.atlassian-dev.net` (Forge's CDN), so the panel iframe cannot load there. Needs: switch the Mac's DNS (for example to 1.1.1.1 / 8.8.8.8) or another network, then map ICU to a team, create a task with "Create & assign", and ask the agent "Who handles the ICU?".
+
+## Step E: Panel button for the Confluence page
+
+- [x] **Create Confluence recall page** in the panel: space chooser (read from Confluence, never guessed), recall chooser (all open or one), result links. Resolvers `listSpaces` and `createRecallPage` reuse the agent action's service. Checked in a simulated panel; the live click is pending for the same DNS reason as above.
+
 ## Step D: Confluence page per recall
 
 - [x] A Confluence page for each recall: what is wrong, what to do, affected devices, links to the tasks (live Jira cards). Built as the agent action `create_recall_page`, with a pure page builder, a Confluence client and a service (42 new tests).
 - [x] Tested on the demo site: the agent listed the real spaces, asked to confirm, created the page in Mobile Development; asking again **updated** it (version 2, still one page) and returned a working link; the rendered page was checked in Confluence.
 - [x] Needed: the app installed in Confluence as well as Jira, and the Confluence page scopes.
-- [ ] Not built: a panel button for it (the agent action covers "one recall" or "all open recalls", up to 10 per call).
+- [x] Panel button: see Step E (the agent action covers "one recall" or "all open recalls", up to 10 per call).
 
 ## Standing rules
 

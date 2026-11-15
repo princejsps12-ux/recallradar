@@ -27,6 +27,19 @@ export function buildLabelsJql(labels) {
   return `labels in (${labels.map((label) => `"${label}"`).join(', ')})`;
 }
 
+// Every RecallRadar task carries the label "recallradar" (APP_LABEL); "not done" is Jira's own status category.
+export const OPEN_TASKS_JQL = 'labels = "recallradar" AND statusCategory != Done';
+
+// Issues from a search -> Map(accountId -> how many are assigned to that person).
+export function countByAssignee(issues) {
+  const counts = new Map();
+  for (const issue of issues || []) {
+    const assignee = issue && issue.fields && issue.fields.assignee;
+    if (assignee && assignee.accountId) counts.set(assignee.accountId, (counts.get(assignee.accountId) || 0) + 1);
+  }
+  return counts;
+}
+
 // Choose the issue type for a task: one named "Task", otherwise the first that is not a sub-task.
 export function chooseTaskIssueType(types) {
   const usable = (types || []).filter((type) => type && !type.subtask);
@@ -118,5 +131,18 @@ export function createJiraClient({ request, route }) {
     return parseBulkResponse(await response.json(), fieldsList.length);
   }
 
-  return { findByLabels, taskIssueTypeId, bulkCreate };
+  // How many NOT-done RecallRadar tasks each person has: Map(accountId -> count). Feeds the
+  // "fewest open tasks" assignee suggestion. Unassigned tasks are not counted. One search of at most
+  // SEARCH_RESULT_LIMIT issues is enough for a suggestion, and a failure only means "no load data".
+  async function openTaskCounts() {
+    const response = await request(route`/rest/api/3/search/jql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ jql: OPEN_TASKS_JQL, fields: ['assignee'], maxResults: SEARCH_RESULT_LIMIT }),
+    });
+    if (!response.ok) throw await readError(response);
+    return countByAssignee((await response.json()).issues);
+  }
+
+  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts };
 }

@@ -360,3 +360,27 @@ test('the lookup limit still stops an absurdly large request', () => {
   const huge = Array.from({ length: MAX_STATE_PAIRS_PER_REQUEST + 1 }, (_, i) => ({ recallNumber: 'Z-1', deviceId: `d${i}` }));
   assert.throws(() => validatePairs(huge, MAX_STATE_PAIRS_PER_REQUEST), /Too many/);
 });
+
+// --- Assignees ----------------------------------------------------------------------------------------------
+
+test('a task is unassigned unless the caller passes an assignee for it', async () => {
+  const s = setup();
+  await run(s, [match(1)]);
+  assert.equal('assignee' in s.state.created[0].fields, false);
+});
+
+test('an agreed assignee is set on exactly that task', async () => {
+  const s = setup();
+  const assignees = new Map([[pairKey('Z-1-2026', 'demo-002'), { accountId: 'acc-2', name: 'Sam' }]]);
+  await run(s, [match(1), match(2)], { assignees });
+  assert.equal('assignee' in s.state.created[0].fields, false);
+  assert.deepEqual(s.state.created[1].fields.assignee, { accountId: 'acc-2' });
+});
+
+test('an assignee for a task that already exists changes nothing', async () => {
+  const s = setup({ existing: { [taskLabel('Z-1-2026', 'demo-001')]: 'P-9' } });
+  const assignees = new Map([[pairKey('Z-1-2026', 'demo-001'), { accountId: 'acc-1' }]]);
+  const out = await run(s, [match(1)], { assignees });
+  assert.equal(out.created.length, 0);
+  assert.equal(s.state.bulkCalls.length, 0);
+});

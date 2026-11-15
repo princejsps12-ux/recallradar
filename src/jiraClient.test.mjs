@@ -6,6 +6,8 @@ import {
   chooseTaskIssueType,
   parseBulkResponse,
   createJiraClient,
+  countByAssignee,
+  OPEN_TASKS_JQL,
 } from './jiraClient.js';
 
 // A stand-in for Forge's route`...` tag: just glue the pieces together.
@@ -173,4 +175,37 @@ test('bulkCreate keeps partial success: some created, some failed', async () => 
 test('bulkCreate throws when Jira refuses the whole request', async () => {
   const { request } = fakeRequest([{ status: 401, text: 'not logged in' }]);
   await assert.rejects(createJiraClient({ request, route }).bulkCreate([{}]), /401/);
+});
+
+// --- Open task counts (for the assignee suggestion) -----------------------------------------------------
+
+test('open tasks are RecallRadar-labelled issues that are not done', () => {
+  assert.equal(OPEN_TASKS_JQL, 'labels = "recallradar" AND statusCategory != Done');
+});
+
+test('countByAssignee counts per person and ignores unassigned and odd issues', () => {
+  const issues = [
+    { fields: { assignee: { accountId: 'a1' } } },
+    { fields: { assignee: { accountId: 'a1' } } },
+    { fields: { assignee: { accountId: 'b2' } } },
+    { fields: { assignee: null } },
+    { fields: {} },
+    null,
+  ];
+  assert.deepEqual([...countByAssignee(issues)], [['a1', 2], ['b2', 1]]);
+  assert.equal(countByAssignee(undefined).size, 0);
+});
+
+test('openTaskCounts searches once, asking only for the assignee', async () => {
+  const { request, calls } = fakeRequest([{ status: 200, json: { issues: [{ key: 'P-1', fields: { assignee: { accountId: 'a1' } } }] } }]);
+  const counts = await createJiraClient({ request, route }).openTaskCounts();
+  assert.equal(counts.get('a1'), 1);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.jql, OPEN_TASKS_JQL);
+  assert.deepEqual(calls[0].body.fields, ['assignee']);
+});
+
+test('openTaskCounts throws when Jira refuses', async () => {
+  const { request } = fakeRequest([{ status: 403, json: {} }]);
+  await assert.rejects(createJiraClient({ request, route }).openTaskCounts(), /403/);
 });

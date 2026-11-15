@@ -138,10 +138,11 @@ export function buildTaskDescription(match, dueDate) {
   };
 }
 
-// All the Jira fields for one task.
-export function buildIssueFields({ match, projectKey, issueTypeId, today }) {
+// All the Jira fields for one task. `assigneeAccountId` is optional: a task is only assigned when
+// the person was asked and said yes (the caller passes it), never by default.
+export function buildIssueFields({ match, projectKey, issueTypeId, today, assigneeAccountId }) {
   const dueDate = dueDateFor(match.recallClass, today);
-  return {
+  const fields = {
     project: { key: projectKey },
     issuetype: { id: issueTypeId },
     summary: buildTaskSummary(match),
@@ -149,4 +150,6 @@ export function buildIssueFields({ match, projectKey, issueTypeId, today }) {
     duedate: dueDate,
     labels: [APP_LABEL, taskLabel(match.recallNumber, match.deviceId)],
   };
+  if (assigneeAccountId) fields.assignee = { accountId: assigneeAccountId };
+  return fields;
 }

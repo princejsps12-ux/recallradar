@@ -22,7 +22,8 @@ modules:
         HOW YOU WORK
         - Answer ONLY from your tools. Use list_open_recalls for "which devices / which ward / which class"
           questions, check_device for one model, serial number or device id, recall_details to explain a
-          recall, and create_remediation_tasks to create Jira tasks.
+          recall, create_remediation_tasks to create Jira tasks, and who_handles_ward for "who handles the ICU?"
+        (it reads the ward's team and members from the Teamwork Graph).
         - Every tool answer has a "citations" list: the ONLY FDA recall numbers and device ids you may
           mention. Quote them exactly as written (for example Z-2723-2026 or demo-001). NEVER invent, guess
           or complete a recall number, device id, serial number, Jira key or link. If a tool finds nothing,
@@ -48,6 +49,11 @@ modules:
            from the preview, then report the Jira keys exactly as returned. If the user says no or changes
            their mind, do not call it again.
         Never confirm on the user's behalf. If you do not know the Jira project key, ask for it.
+        ASSIGNING: never assign anyone unless the user asks. You may offer: "I can also propose an assignee for
+        each task from the ward's team." If they want that, preview with assignSuggested=true, show each
+        proposedAssignee (name and team) and the assignment rule, and ask them to confirm. Name only people
+        and teams a tool returned; if a ward has no team, say so and tell the user to map it in the RecallRadar
+        panel (Ward teams). Never guess a team or a person.
 
         CONFLUENCE RECALL PAGES: create_recall_page writes one Confluence page per open recall (what is
         wrong, what to do, affected devices, task links) and updates the page if it already exists. The pages
@@ -67,6 +73,7 @@ modules:
         - create_remediation_tasks
         - recall_details
         - create_recall_page
+        - who_handles_ward
       skills:
         - recall-triage
   rovo:skill:
@@ -80,6 +87,7 @@ modules:
           - create_remediation_tasks
           - recall_details
           - create_recall_page
+          - who_handles_ward
   action:
     - key: list_open_recalls
       name: List open recalls
@@ -179,6 +187,11 @@ modules:
           type: string
           required: false
           description: The confirmationToken returned by the preview. Required when confirmed is true.
+        assignSuggested:
+          title: Propose assignees
+          type: boolean
+          required: false
+          description: Set true (preview only) to also propose a member of each ward's Teamwork Graph team as assignee. Only if the user wants assigning. The user still confirms.
     - key: recall_details
       name: Explain a recall
       function: recall-details-fn
@@ -190,6 +203,17 @@ modules:
           type: string
           required: true
           description: The FDA recall number, for example Z-2723-2026.
+    - key: who_handles_ward
+      name: Who handles a ward
+      function: who-handles-fn
+      actionVerb: GET
+      description: "Says which Teamwork Graph team handles a hospital ward (for example ICU), who is in the team, and who to suggest for a task. Read-only. If the ward has no team it says so; never guess one."
+      inputs:
+        ward:
+          title: Ward
+          type: string
+          required: true
+          description: The hospital ward, for example ICU or ER, as in the device list.
     - key: create_remediation_task
       name: Create one remediation task
       function: create-task-fn
@@ -228,8 +252,8 @@ modules:
           required: false
           description: Only this FDA recall, for example Z-2723-2026. Leave empty for every open recall (at most 10 per call).
   # Exposes some of the actions above to OTHER agents: Rovo Studio agents, and external clients such as
-  # Claude Desktop (once a site admin turns it on; see the README). Only three, on purpose: reading, and
-  # creating ONE task. The preview/confirm action stays private to the RecallRadar Assistant.
+  # Claude Desktop (once a site admin turns it on; see the README). Four, on purpose: reading (including who handles a
+  # ward, read-only), and creating ONE task. The preview/confirm action stays private to the RecallRadar Assistant.
   rovo:mcp:
     - key: recallradar-mcp
       name: RecallRadar
@@ -264,6 +288,8 @@ modules:
       handler: rovoActions.createRemediationTaskAction
     - key: create-page-fn
       handler: rovoActions.createRecallPageAction
+    - key: who-handles-fn
+      handler: rovoActions.whoHandlesWardAction
     - key: check-consumer-fn
       handler: consumer.handler
       timeoutSeconds: 300
@@ -284,6 +310,8 @@ permissions:
     - read:space:confluence
     - read:page:confluence
     - write:page:confluence
+    - read:graph:team:atlassian
+    - read:graph:user:atlassian
   external:
     fetch:
       backend:

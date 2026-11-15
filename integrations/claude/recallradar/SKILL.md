@@ -11,12 +11,13 @@ Atlassian's MCP server. They read RecallRadar's **saved recall check**; they do 
 
 ## The tools
 
-Your client may show the names with a prefix. The three tools:
+Your client may show the names with a prefix. The four tools:
 
 | Tool | Use it to | Inputs |
 | --- | --- | --- |
 | `list_open_recalls` | See which devices have an open recall that matches EXACT or LIKELY | optional `ward`, `recallClass` (I, II or III), `confidence` (exact or likely), `limit` |
 | `check_device` | Ask whether one device matches any recall | at least one of `model`, `serial`, `deviceId`; optional `manufacturer` |
+| `who_handles_ward` | Ask which Teamwork Graph team handles a ward, who is in it, and who to suggest (read-only) | `ward` (required). If the ward has no team it says so: do not guess one |
 | `create_remediation_task` | Create ONE Jira task for one recall and one device | `recallNumber`, `deviceId`, `projectKey` (all required) |
 
 ## How to work

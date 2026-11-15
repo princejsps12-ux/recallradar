@@ -11,8 +11,10 @@ import { matchDevicesToRecalls } from './matching';
 import { performCheck, getLatestResult } from './matchService';
 import { createJiraClient } from './jiraClient';
 import { createConfluenceClient } from './confluenceClient';
-import { createTaskGuard } from './taskService';
+import { createTaskGuard, getTaskStates, selectMatches } from './taskService';
 import { createPreviewStore } from './agentTools';
+import { createTeamGraph } from './teamGraph';
+import { createWardTeamStore } from './wardTeams';
 
 export const deviceStore = createDeviceStore(forgeKv);
 export const matchCache = createMatchCache(forgeKv);
@@ -32,6 +34,24 @@ export const confluenceAsUser = createConfluenceClient({
   request: (path, options) => api.asUser().requestConfluence(path, options),
   route,
 });
+
+// Teamwork Graph, READ-ONLY, as the signed-in person (the API has no app-level version). The two
+// calls it makes are listed in the README.
+export const teamGraph = createTeamGraph({
+  request: (query, variables, operationName) => api.asUser().requestTeamworkGraph(query, variables, operationName),
+});
+export const wardTeams = createWardTeamStore(forgeKv);
+
+// Open RecallRadar tasks per person, for the assignee suggestion. A failure only means "no load
+// data": the suggestion then falls back to alphabetical order instead of blocking anything.
+export async function openTaskCounts() {
+  try {
+    return await jiraAsUser.openTaskCounts();
+  } catch (error) {
+    console.error('Could not count open tasks', error);
+    return new Map();
+  }
+}
 
 // Name of the queue in manifest.yml (the consumer module listens to the same name).
 export const CHECK_QUEUE_KEY = 'recall-check';
@@ -88,4 +108,13 @@ export async function loadSnapshot() {
   const devices = await deviceStore.listDevices();
   const result = devices.length ? await getLatestResult({ devices, cache: matchCache, jobs: checkJobs }) : null;
   return { devices, result };
+}
+
+// "Which of these already have a Jira task?", as the signed-in person. Used by the Confluence pages (to link
+// the tasks) and by the agent's answers.
+export function taskKeyLookup(snapshot) {
+  return async (pairs) => {
+    const { matches } = selectMatches(snapshot.result.matches, pairs);
+    return getTaskStates({ matches, jira: jiraAsUser, guard: taskGuard });
+  };
 }

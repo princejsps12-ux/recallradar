@@ -11,7 +11,22 @@ import {
   selectMatches,
   MAX_STATE_PAIRS_PER_REQUEST,
 } from './taskService';
-import { deviceStore, matchCache, checkJobs, taskGuard, jiraAsUser, CHECK_QUEUE_KEY } from './runtime';
+import { assigneesForMatches, checkExplicitAssignees, setWardTeam } from './teamService';
+import { createRecallPages } from './recallPageService';
+import {
+  deviceStore,
+  matchCache,
+  checkJobs,
+  taskGuard,
+  jiraAsUser,
+  teamGraph,
+  wardTeams,
+  openTaskCounts,
+  loadSnapshot,
+  confluenceAsUser,
+  taskKeyLookup,
+  CHECK_QUEUE_KEY,
+} from './runtime';
 
 const resolver = new Resolver();
 const checkQueue = new Queue({ key: CHECK_QUEUE_KEY });
@@ -130,22 +145,135 @@ resolver.define('getTaskStates', async ({ payload }) => {
 });
 
 // "Create task" / "Create tasks for all": one task per recall + device that does not have one yet.
+//   payload.assignees  optional { "recall|device": accountId } the person agreed to. Each one is
+//                      re-checked against the ward's team in the Teamwork Graph, so a forged request
+//                      cannot assign anybody else. Nobody is assigned unless the panel asked.
 resolver.define('createTasks', async ({ payload, context }) => {
   try {
     const projectKey = projectKeyFrom(context);
     if (!projectKey) return { ok: false, error: 'Could not tell which project to create tasks in.' };
     const { matches, notFound } = await requestedMatches(payload && payload.pairs);
+    let assignees = new Map();
+    let assignRefused = [];
+    let assignError = null;
+    if (payload && payload.assignees && Object.keys(payload.assignees).length > 0) {
+      try {
+        ({ assignees, refused: assignRefused } = await checkExplicitAssignees({
+          explicit: payload.assignees,
+          matches,
+          store: wardTeams,
+          graph: teamGraph,
+        }));
+      } catch (error) {
+        // The graph is down: still create the tasks, unassigned, and say so.
+        console.error('Could not check assignees', error);
+        assignError = 'The Teamwork Graph could not be reached, so the tasks were created without an assignee.';
+      }
+    }
     const outcome = await createTasks({
       matches,
       jira: jiraAsUser,
       guard: taskGuard,
       projectKey,
       today: new Date(),
+      assignees,
     });
-    return { ok: true, ...outcome, notFound };
+    const assignedTo = {};
+    for (const { pair } of outcome.created) if (assignees.has(pair)) assignedTo[pair] = assignees.get(pair).name;
+    return { ok: true, ...outcome, notFound, assignedTo, assignRefused, assignError };
   } catch (error) {
     console.error('Failed to create tasks', error);
     return { ok: false, error: 'Could not create the tasks. Please try again.' };
+  }
+});
+
+// --- Ward teams (Teamwork Graph, read-only; see teamService.js) -------------------------------------------
+
+// The saved ward-to-team mappings, plus the wards found in the device list. Storage only: no graph call,
+// so the panel can show "Team: ICU (from Teamwork Graph)" on every open.
+resolver.define('getWardTeams', async () => {
+  try {
+    const devices = await deviceStore.listDevices();
+    const wards = [...new Set(devices.map((d) => d.ward).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    return { ok: true, mappings: await wardTeams.list(), wards };
+  } catch (error) {
+    console.error('Failed to read ward teams', error);
+    return { ok: false, error: 'Could not load the ward teams.' };
+  }
+});
+
+// Teamwork Graph call 1: the teams the signed-in person belongs to, for the mapping dropdown.
+resolver.define('listTeams', async ({ context }) => {
+  try {
+    return { ok: true, teams: await teamGraph.listTeams(context.accountId) };
+  } catch (error) {
+    console.error('Failed to read teams from the Teamwork Graph', error);
+    return { ok: false, error: 'Could not read teams from the Teamwork Graph.' };
+  }
+});
+
+// Save (or, with an empty teamAri, remove) one ward's team. The server checks the team in the graph.
+resolver.define('setWardTeam', async ({ payload, context }) => {
+  try {
+    const ward = payload && typeof payload.ward === 'string' ? payload.ward : '';
+    const teamAri = payload && typeof payload.teamAri === 'string' && payload.teamAri ? payload.teamAri : null;
+    return await setWardTeam({ ward, teamAri, accountId: context.accountId, graph: teamGraph, store: wardTeams });
+  } catch (error) {
+    console.error('Failed to save the ward team', error);
+    return { ok: false, error: error.message || 'Could not save the ward team.' };
+  }
+});
+
+// Suggested assignees for matches (Teamwork Graph call 2, once per team, plus one Jira search for load).
+// Returns { suggestions: { "recall|device": { accountId, name, teamName, ward } }, skipped }.
+// Only a suggestion: the panel asks before anything is assigned.
+resolver.define('suggestAssignees', async ({ payload }) => {
+  try {
+    const { matches } = await requestedMatches(payload && payload.pairs, MAX_STATE_PAIRS_PER_REQUEST);
+    const { assignees, skipped } = await assigneesForMatches({
+      matches,
+      store: wardTeams,
+      graph: teamGraph,
+      openCounts: await openTaskCounts(),
+    });
+    return { ok: true, suggestions: Object.fromEntries(assignees), skipped };
+  } catch (error) {
+    console.error('Failed to suggest assignees', error);
+    return { ok: false, error: 'Could not read team members from the Teamwork Graph.' };
+  }
+});
+
+// --- Confluence recall pages (same service as the agent's create_recall_page; see recallPageService.js) ----
+
+// The Confluence spaces the signed-in person can see, for the space chooser. Never guessed: the person picks.
+resolver.define('listSpaces', async () => {
+  try {
+    const spaces = await confluenceAsUser.listSpaces();
+    return { ok: true, spaces: spaces.map((s) => ({ key: s.key, name: s.name })) };
+  } catch (error) {
+    console.error('Failed to list Confluence spaces', error);
+    return { ok: false, error: 'Could not read Confluence spaces. Is RecallRadar installed in Confluence?' };
+  }
+});
+
+// "Create Confluence recall page": one page per open recall in the chosen space (or just one recall), or an
+// update of the page that is already there. Written as the clicking person, so Confluence applies their rights.
+//   payload.spaceKey, payload.recallNumber (optional)
+resolver.define('createRecallPage', async ({ payload }) => {
+  try {
+    const inputs = {
+      spaceKey: payload && typeof payload.spaceKey === 'string' ? payload.spaceKey : '',
+      recallNumber: payload && typeof payload.recallNumber === 'string' ? payload.recallNumber : '',
+    };
+    const snapshot = await loadSnapshot();
+    return await createRecallPages({
+      snapshot,
+      inputs,
+      deps: { confluence: confluenceAsUser, ...(snapshot.result ? { getTaskKeys: taskKeyLookup(snapshot) } : {}) },
+    });
+  } catch (error) {
+    console.error('Failed to create the recall page', error);
+    return { ok: false, error: 'Could not create the Confluence page. Please try again.' };
   }
 });
 

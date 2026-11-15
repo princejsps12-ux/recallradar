@@ -2,7 +2,7 @@
 
 A Forge app for hospital teams. It compares **FDA medical device recalls** ([openFDA](https://open.fda.gov/apis/device/enforcement/)) with the devices a hospital owns, and tells you which devices a recall may affect, **how sure it is, and why**.
 
-It runs as a panel on every Jira issue, and as a Rovo agent (currently a small test agent).
+It runs as a panel on every Jira issue, as a Rovo agent, and as MCP tools other agents can call. It reads **teams and their members from the Teamwork Graph** (read-only) to say who should handle a device's ward.
 
 ## What it does today
 
@@ -12,7 +12,8 @@ It runs as a panel on every Jira issue, and as a Rovo agent (currently a small t
 | **Hospital devices** | Stores the hospital's devices in Forge storage. **Load demo hospital** adds 30 sample devices. |
 | **Check devices for recalls** | Finds recent recalls for the hospital's manufacturers and models and matches them to devices with a confidence level and a reason. |
 | **Create task** | For each exact or likely match, creates a Jira task (one, or all at once) with the ward, the reason, a link to the FDA recall and a due date based on the recall's class. Never twice for the same recall and device. |
-| **Create task** | For each exact or likely match, creates a Jira task (one, or all at once) with the ward, the reason, a link to the FDA recall and a due date based on the recall's class. Never twice for the same recall and device. |
+| **Ward teams** | Map each hospital ward (ICU, ER, ...) to a **Teamwork Graph team**. The team list is read from the graph; the mapping is saved in Forge storage. Match rows then show *Team: <name> (from Teamwork Graph)* and a suggested assignee. See "Teamwork Graph (read-only)". |
+| **Create Confluence recall page** | Pick a space and a recall (or all open ones): one Confluence page per recall with what is wrong, what to do, affected devices and live task cards. Running it again updates the page. |
 | **RecallRadar Assistant** | A Rovo agent that answers questions about recalls from the saved check, explains them in plain English, and creates Jira tasks after you confirm. See "The Rovo agent". |
 
 ## Try it
@@ -20,8 +21,9 @@ It runs as a panel on every Jira issue, and as a Rovo agent (currently a small t
 1. Open any Jira issue on a site where the app is installed and find the **RecallRadar** panel.
 2. Click **Load demo hospital**. It adds 30 devices. Running it again replaces only the demo devices and leaves any other devices in storage alone.
 3. Click **Check devices for recalls**. Results are grouped by device, strongest match first.
-4. Click **Create task** under an exact or likely match, or **Create tasks for all** (it asks you to confirm). Tasks are created in the project of the issue the panel is open on, as you, so Jira applies your permissions.
-4. Click **Create task** under an exact or likely match, or **Create tasks for all** (it asks you to confirm). Tasks are created in the project of the issue the panel is open on, as you, so Jira applies your permissions.
+4. Open **Ward teams**, and for each ward pick the team that handles it (the list comes from the Teamwork Graph).
+5. Click **Create task** under an exact or likely match, or **Create tasks for all** (it asks you to confirm). Tasks are created in the project of the issue the panel is open on, as you, so Jira applies your permissions. If the ward has a team, the row shows **Team: <name> (from Teamwork Graph)** and a **suggested assignee**; **Create & assign to <name>** assigns only if you click it. In the "create all" confirmation, **Also assign the suggested team member** is a checkbox that starts **off**.
+6. Click **Create Confluence recall page**, choose a space and a recall, and click **Create page**.
 
 ## How matching works
 
@@ -159,6 +161,74 @@ Checked on the demo site: after creating all 35 tasks, a second tab that still t
 - **Project.** Tasks go to the project of the current issue; choosing a different project is not built.
 - **Task state is not tracked.** The panel shows the task's key as a link, not whether it is done.
 
+## Teamwork Graph (read-only)
+
+RecallRadar **only reads** from the Atlassian Teamwork Graph. It never writes to it (no mutations, no connection, no ingestion). It is used for one job: finding out **which team handles a ward and who is in that team**, so a recall task can go to the right people.
+
+### Exactly which Teamwork Graph API calls are made
+
+Both go through `api.asUser().requestTeamworkGraph(query, variables, operationName)` from `@forge/api`, **as the signed-in person** (the API has no app-level version, so nothing in the graph is read by background jobs). Every value is passed as a GraphQL variable, never pasted into the query text. The code is in [`src/teamGraph.js`](src/teamGraph.js); the two documents below are copied from it.
+
+**Call 1: the teams the signed-in person belongs to** (operation `recallradar_myteams`)
+
+```graphql
+query recallradar_myteams($userId: ID!, $first: Int) {
+  atlassianUserInTeams(userId: $userId, first: $first) {
+    edges { node { __typename ... on AtlassianTeam { id displayName } } }
+  }
+}
+```
+
+Variables: `userId` = `ari:cloud:identity::user/<the signed-in person's account id>`, `first` = 50. Runs when you open **Ward teams** in the panel (to fill the team dropdown) and when a ward-to-team choice is saved (the server checks that the team really is in this list, and takes the team's **name from the graph**, not from the browser).
+
+**Call 2: the members of one team** (operation `recallradar_teammembers`)
+
+```graphql
+query recallradar_teammembers($teamAri: ID!, $first: Int) {
+  atlassianTeamMembers(teamAri: $teamAri, first: $first) {
+    edges { node { __typename ... on AtlassianUser { accountId name } } }
+  }
+}
+```
+
+Variables: `teamAri` = a saved team's ARI (`ari:cloud:identity::team/<id>`), `first` = 50. Runs when the panel suggests an assignee, when a chosen assignee is checked before creating tasks, and when the agent or an MCP client asks `who_handles_ward`. A team is read once per request, however many tasks use it.
+
+That is all: **two read queries**. Scopes: `read:graph:team:atlassian` and `read:graph:user:atlassian`.
+
+What the API does **not** offer (found by probing it, see [`docs/teamwork-graph-findings.md`](docs/teamwork-graph-findings.md)): there is no "list every team" query, so the dropdown shows the teams **you** belong to; and teams have **no owner, manager or role field**, only members. So RecallRadar cannot say "the team's owner" and uses a stated rule instead.
+
+### What is stored, and where it shows
+
+- **Ward-to-team mapping**: one record in Forge storage (`ward-teams`): ward name, team ARI and team name. Edited in the panel under **Ward teams**. Wards are compared ignoring case and punctuation ("med surg 3w" is "Med-Surg 3W").
+- **In the panel**: every exact or likely match whose ward has a team shows **Team: <name> (from Teamwork Graph)**, so the graph's use is visible, plus the suggested assignee.
+- **In the agent and MCP**: the `who_handles_ward` tool (below) returns the team, its members and the suggestion, marked `source: Teamwork Graph`.
+
+### Suggesting an assignee, and asking first
+
+The rule (written once, in `SUGGESTION_RULE` in [`src/teamService.js`](src/teamService.js), and returned to the agent): **the team member with the fewest open RecallRadar tasks** (counted in Jira with `labels = "recallradar" AND statusCategory != Done`), **then the first name alphabetically**. That spreads work evenly and gives the same answer every time. In a batch, people already picked earlier in the same batch count too, so ten tasks for one ward are spread across the team instead of piled on one person.
+
+**Nobody is assigned without being asked.**
+
+- **Panel, one task**: two buttons, **Create task** (unassigned) and **Create & assign to <name>**.
+- **Panel, all tasks**: a checkbox in the confirmation, off by default.
+- **Agent**: assigning is only proposed when you ask for it (`assignSuggested`); the preview shows each **proposedAssignee**, and confirming assigns **exactly those people**.
+- **Checked again on the server**: the browser (or the preview) only names an account id; before creating, the server re-reads the ward's team and keeps the assignee only if that person is **still in the team**. A made-up request cannot assign anyone else. If the graph cannot be reached, tasks are created **unassigned** and the answer says so.
+- A ward with no team, or a team with no members you can see, simply gets no suggestion.
+
+### What was and was not verified
+
+- **Verified against the live API** (earlier probe on the demo site): both queries return data in exactly the shape the code parses (20 teams for the demo user; members with account ids and names).
+- **Verified in unit tests** with a fake graph: query text, variables, parsing, the suggestion rule, balancing across a team, refusing someone who is not in the team, and the agent's preview-then-confirm with assignees.
+- **Verified on the demo site**: the agent's `who_handles_ward` runs; for a ward with no team it says so and points to the panel instead of guessing.
+- **Verified in a simulated panel** (the real React code run in jsdom with a stubbed bridge): team line, suggestion, the two buttons, and the `assignees` sent to the server.
+- **Not yet verified end to end in the live panel**: choosing a team, then creating a task with an assignee in Jira. The panel could not be opened from the test machine at that moment (its network refused to resolve Forge's CDN host).
+
+### Limits
+
+- Only people and teams the **signed-in person** can see in the graph are shown (the calls run as them).
+- A person who is in the team but cannot be assigned in the Jira project makes Jira refuse that task; it is reported as failed with Jira's reason and can be retried unassigned.
+- Only the first 50 teams and 50 members are read.
+
 ## The Rovo agent
 
 **RecallRadar Assistant** is a Rovo agent (open it with **Ask Rovo**, then pick it from the agent list). It answers only from the **saved recall check**, the same data as the panel: it never calls openFDA, so answers are fast and consistent.
@@ -169,9 +239,10 @@ Checked on the demo site: after creating all 35 tasks, a second tab that still t
 | `check_device` | Given a model, serial/lot or device id, says whether the device matches any recall. Only devices in the hospital list can be checked. |
 | `create_remediation_tasks` | Creates Jira tasks (the same code as the panel's buttons, so never a duplicate). **Preview first, then confirm** (see below). |
 | `recall_details` | Explains one recall: what is wrong (the FDA's own reason text), how serious, which devices and wards, what to do, links, and any existing task. |
-| `create_recall_page` | Writes a **Confluence page per open recall** (see below). |
+| `create_recall_page` | Writes a **Confluence page per open recall** (see below). The panel's **Create Confluence recall page** button runs the same code. |
+| `who_handles_ward` | Which **Teamwork Graph** team handles a ward, who is in it, and who to suggest. Read-only; if the ward has no team it says so and never guesses. |
 
-Each action is an `action` module (a reusable Rovo action other agents can call) and all five are grouped in one `rovo:skill`, `recall-triage` ([`skills/recall-triage/SKILL.md`](skills/recall-triage/SKILL.md)). The logic is in [`src/agentTools.js`](src/agentTools.js) (pure, unit tested); [`src/rovoActions.js`](src/rovoActions.js) is the thin Forge handler layer.
+Each action is an `action` module (a reusable Rovo action other agents can call) and all six are grouped in one `rovo:skill`, `recall-triage` ([`skills/recall-triage/SKILL.md`](skills/recall-triage/SKILL.md)). The logic is in [`src/agentTools.js`](src/agentTools.js) (pure, unit tested); [`src/rovoActions.js`](src/rovoActions.js) is the thin Forge handler layer.
 
 **Starter questions** on the agent: "Which ICU devices have open Class I recalls?", "Do any of our devices match an FDA recall?", "Is the device with serial 50003704 affected by a recall?", "Explain the most urgent recall in plain English", "Create tasks for the Class I recalls in the ER".
 
@@ -186,6 +257,8 @@ Forge has no built-in "ask first" setting for an action, so the action itself en
 1. Called **without** `confirmed`, `create_remediation_tasks` only **previews**: the task titles, wards, due dates, the project, anything that already has a task, and a one-time `confirmationToken`. Nothing is created.
 2. The agent shows that preview and asks "Shall I create these N tasks?"
 3. Only after you say yes does it call the action again with `confirmed=true` and the token. The server creates **exactly the previewed tasks**, whatever else the call asks for. The token works once and expires after 10 minutes.
+
+Assigning is optional: with `assignSuggested` the preview also shows a **proposedAssignee** per task (from the ward's Teamwork Graph team) and the rule used; confirming assigns exactly those people, after re-checking that each is still in the team. See "Teamwork Graph (read-only)".
 
 So the agent cannot create a task it has not previewed, and a made-up or reused token creates nothing. Whether the agent actually *asks you* is enforced by its prompt, and was checked in Rovo chat. Rovo also shows its own "Please review" card for any `CREATE` action, so you approve twice (in chat, then on the card). Tasks are created **as you** (the reporter is the person chatting), and at most 20 per confirmation; a larger selection says how many were left out.
 
@@ -219,15 +292,16 @@ Checked in Rovo chat on the demo site: the agent asked for a space (listing the 
 
 ## Connect other agents (MCP)
 
-The `recallradar-mcp` module (`rovo:mcp`, a Preview feature of Forge) exposes **three** of the actions to other agents:
+The `recallradar-mcp` module (`rovo:mcp`, a Preview feature of Forge) exposes **four** of the actions to other agents:
 
 | Tool | What it does |
 | --- | --- |
 | `list_open_recalls` | Devices with an open exact or likely recall match; filter by ward, class, confidence. |
 | `check_device` | Does this model / serial / device id match any recall? |
+| `who_handles_ward` | Which Teamwork Graph team handles this ward, who is in it, and who to suggest (read-only). |
 | `create_remediation_task` | Creates **one** Jira task for **one** recall and **one** device (`recallNumber`, `deviceId`, `projectKey`, all required). |
 
-They are the same tools as the in-Jira agent, so they read the **saved recall check** (never live openFDA) and answer with `citations`. Only three are exposed, on purpose: reading, and creating a single task. The agent's preview-then-confirm action (`create_remediation_tasks`, which can make up to 20) stays private to the RecallRadar Assistant. External clients show the user each tool call and ask before running it, and one recall plus one device fully defines the task, so the single-task action needs no preview step of its own. It never creates a duplicate; it only accepts exact or likely matches of open recalls; and it creates the task **as the person using the client**, so Jira's own permissions apply.
+They are the same tools as the in-Jira agent, so they read the **saved recall check** (never live openFDA) and answer with `citations`. Only four are exposed, on purpose: reading (including who handles a ward), and creating a single task. The single-task tool never assigns anyone. The agent's preview-then-confirm action (`create_remediation_tasks`, which can make up to 20) stays private to the RecallRadar Assistant. External clients show the user each tool call and ask before running it, and one recall plus one device fully defines the task, so the single-task action needs no preview step of its own. It never creates a duplicate; it only accepts exact or likely matches of open recalls; and it creates the task **as the person using the client**, so Jira's own permissions apply.
 
 ### Inside Atlassian: other Rovo agents
 
@@ -319,6 +393,9 @@ src/recallPage.js         The Confluence page for one recall (pure, escaped)
 src/recallPageService.js  One page per open recall: choose space, create or update
 src/confluenceClient.js   The Confluence calls: spaces, find page by title, upsert
 src/rovoActions.js        Forge handlers for the agent's actions
+src/teamGraph.js          The two read-only Teamwork Graph calls (documents + parsing)
+src/wardTeams.js          Ward-to-team mapping in Forge storage
+src/teamService.js        Assignee suggestion rule, ward lookups, checks before assigning
 skills/recall-triage/     The Rovo skill that groups the actions (SKILL.md)
 integrations/claude/      Skill file for third-party agents (Claude) using the MCP tools
 src/taskRules.js          What a task looks like: due date rule, title, labels, description
@@ -361,7 +438,8 @@ forge install --upgrade -e development     # only when scopes or permissions cha
 | `read:jira-work` | Jira issue panel; finding existing RecallRadar tasks. |
 | `write:jira-work` | Creating tasks (as the clicking user). |
 | `read:space:confluence`, `read:page:confluence`, `write:page:confluence` | The Confluence recall pages: list spaces, find a page by title, create or update it (as the person chatting). |
-| `storage:app` | The device list in Forge storage. |
+| `read:graph:team:atlassian`, `read:graph:user:atlassian` | The two read-only Teamwork Graph queries (a user's teams, a team's members), run as the signed-in person. |
+| `storage:app` | The device list, the saved check, and the ward-to-team mapping in Forge storage. |
 | `read:servicedesk-request`, `read:cmdb-object:jira`, `read:cmdb-schema:jira` | Reserved for the read-only Assets import. Not used yet. |
 | External fetch: `api.fda.gov` | Recall data from openFDA. |
 

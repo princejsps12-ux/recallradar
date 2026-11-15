@@ -1,7 +1,7 @@
 ---
 name: recall-triage
 description: Triage FDA medical device recalls for a hospital - find which devices are affected, check one device, explain a recall in plain English, and create Jira remediation tasks after the user confirms. Use it for any question about device recalls and what to do next.
-allowed-tools: list_open_recalls check_device create_remediation_tasks recall_details create_recall_page
+allowed-tools: list_open_recalls check_device create_remediation_tasks recall_details create_recall_page who_handles_ward
 ---
 
 # Recall triage
@@ -20,6 +20,7 @@ so answers are fast and always come from the same data the RecallRadar panel sho
 | "Is this model / serial / device affected?" | `check_device` | Needs a model, serial/lot or device id. Only devices in the hospital list can be checked. |
 | "What is recall Z-...?" / "Explain this recall" | `recall_details` | Needs the FDA recall number. Gives what is wrong, how serious, affected devices, what to do, links. |
 | "Create tasks for ..." | `create_remediation_tasks` | **Two steps, see below.** |
+| "Who handles the ICU?" / "Who should get this task?" | `who_handles_ward` | Needs a `ward`. Reads the ward's team and members from the Teamwork Graph (read-only) and suggests one person. If the ward has no team it says so: tell the user to map it in the RecallRadar panel (Ward teams) and never guess. |
 | "Make a Confluence page for this recall" | `create_recall_page` | Needs a `spaceKey`: call without it to list spaces and ask. Say which recalls and which space, and get a yes first. Updates an existing page instead of duplicating it. |
 
 ## Rules that always apply
@@ -42,6 +43,10 @@ so answers are fast and always come from the same data the RecallRadar panel sho
    `confirmationToken` from the preview. Report the Jira keys exactly as returned.
 4. If the user says no, do not call it again. Never confirm on the user's behalf. If the Jira project
    is unknown, ask for its key.
+
+Assigning is optional and never automatic. Offer it ("I can also propose an assignee from the ward's
+team"). If the user wants it, preview with `assignSuggested` set to true, show each `proposedAssignee`
+and the `assignment.rule`, and ask them to confirm. Name only teams and people a tool returned.
 
 Due dates follow the recall class: Class I is due 2 days after creation, Class II and III 7 days. A task
 is never created twice for the same recall and device.
