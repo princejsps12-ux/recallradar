@@ -7,7 +7,7 @@ import VisuallyHidden from '@atlaskit/visually-hidden';
 import EmptyState from '@atlaskit/empty-state';
 import Skeleton from '@atlaskit/skeleton';
 import { router } from '@forge/bridge';
-import { sp, color, muted, noBreak, ClassLozenge, MatchLozenge, useNarrow, DetailsButton, LinkLike } from '../ui/kit';
+import { sp, cap, color, muted, noBreak, ClassLozenge, MatchLozenge, useNarrow, DetailsButton, LinkLike } from '../ui/kit';
 import { CLASSES, UNKNOWN_CLASS, filterMatches, wardsOf, urgencyRank } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 
@@ -41,7 +41,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady
       key: pairOf(m),
       onClick: () => onOpen(m.deviceId),
       cells: [
-        { key: m.deviceName.toLowerCase(), content: (<div><strong>{m.deviceName}</strong><div style={muted}>{m.deviceManufacturer} {m.deviceModel}</div></div>) },
+        { key: m.deviceName.toLowerCase(), content: (<div><strong>{cap(m.deviceName)}</strong><div style={muted}>{m.deviceManufacturer} {m.deviceModel}</div></div>) },
         { key: (m.ward || '').toLowerCase(), content: (<div>{m.ward || 'No ward'}<div style={muted}>{m.ward && teams[m.ward] ? teams[m.ward] : 'No team yet'}</div></div>) },
         { key: m.recallNumber, content: (<div><span style={noBreak}>{m.recallNumber}</span><div style={muted}>{m.firm}</div></div>) },
         { key: urgencyRank({ ...m, confidence: 'exact' }), content: <ClassLozenge recallClass={m.recallClass} /> },
@@ -76,7 +76,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady
                 const key = tasks[pairOf(m)];
                 return (
                   <li key={pairOf(m)} style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: sp(150), background: color.raised }}>
-                    <strong>{m.deviceName}</strong>
+                    <strong>{cap(m.deviceName)}</strong>
                     <div style={muted}>{m.deviceManufacturer} {m.deviceModel}</div>
                     <div style={muted}>{m.ward || 'No ward'} · {m.ward && teams[m.ward] ? teams[m.ward] : 'No team yet'} · <span style={noBreak}>{m.recallNumber}</span></div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), margin: `${sp(100)} 0`, alignItems: 'center' }}>

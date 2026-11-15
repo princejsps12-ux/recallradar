@@ -5,7 +5,7 @@ import Select from '@atlaskit/select';
 import ProgressBar from '@atlaskit/progress-bar';
 import Skeleton from '@atlaskit/skeleton';
 import CheckCircleIcon from '@atlaskit/icon/core/check-circle';
-import { sp, color, card, muted, noBreak, ClassLozenge, MatchLozenge, DetailsButton, useNarrow } from '../ui/kit';
+import { sp, cap, color, card, muted, noBreak, ClassLozenge, MatchLozenge, DetailsButton, useNarrow } from '../ui/kit';
 import { openRecallsByClass, UNKNOWN_CLASS, CLASSES } from '../dashboardData.mjs';
 
 // The one big number: how many devices need action, with Class I called out in red. Every number says what it counts.
@@ -86,7 +86,7 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
           {matches.map((m, i) => (
             <li key={m.deviceId} style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'center', padding: `${sp(150)} 0`, borderTop: i ? `1px solid ${color.border}` : 'none' }}>
               <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-                <strong>{m.deviceName}</strong>
+                <strong>{cap(m.deviceName)}</strong>
                 <div style={muted}>
                   {m.ward || 'No ward'} · {m.deviceManufacturer} {m.deviceModel} · <span style={noBreak}>{m.recallNumber}</span>
                 </div>
@@ -128,7 +128,7 @@ export function SummaryCards({ devicesCount, stats, result, summary, summaryStat
   return (
     <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(auto-fit, minmax(210px, 1fr))', gap: sp(200) }}>
       <StatCard label="Devices" value={devicesCount} accent={color.borderBrand}>
-        <div style={muted}>in your hospital</div>
+        <div style={muted}>{stats.devices} need action</div>
       </StatCard>
       <StatCard label="Open recalls" value={stats.openRecalls} accent={stats.openRecalls ? color.borderDanger : color.borderSuccess}>
         <div style={muted}>By class</div>
@@ -144,22 +144,9 @@ export function SummaryCards({ devicesCount, stats, result, summary, summaryStat
       </StatCard>
       <StatCard label="Tasks open" value={summaryState === 'loading' ? <Skeleton height="32px" width="48px" isShimmering /> : progressTasks ? progressTasks.open : '–'}>
         <div style={muted}>
-          {summaryState === 'loading' ? ' ' : summaryState === 'error' ? 'Could not read the task counts.' : none ? 'None created yet.' : `of ${progressTasks.total}${summary && summary.capped ? '+' : ''} RecallRadar tasks`}
+          {summaryState === 'loading' ? ' ' : summaryState === 'error' ? 'Could not read the task counts.' : none ? 'None created yet.' : `${progressTasks.done} done, of ${progressTasks.total}${summary && summary.capped ? '+' : ''} RecallRadar tasks`}
         </div>
-      </StatCard>
-      <StatCard label="Tasks done" value={summaryState === 'loading' ? <Skeleton height="32px" width="48px" isShimmering /> : progressTasks ? progressTasks.done : '–'}>
-        {summaryState === 'loading' ? (
-          <div style={muted}> </div>
-        ) : summaryState === 'error' ? (
-          <div style={muted}>Try Refresh.</div>
-        ) : !none ? (
-          <div style={{ marginTop: sp(100) }}>
-            <ProgressBar ariaLabel={`${progressTasks.percentDone}% of tasks done`} value={progressTasks.percentDone / 100} appearance="success" />
-            <div style={muted}>{progressTasks.percentDone}% complete</div>
-          </div>
-        ) : (
-          <div style={muted}>Nothing to complete yet.</div>
-        )}
+        {!none && summaryState === 'ok' && <div style={{ marginTop: sp(100) }}><ProgressBar ariaLabel={`${progressTasks.percentDone}% of tasks done`} value={progressTasks.percentDone / 100} appearance="success" /></div>}
       </StatCard>
     </div>
   );

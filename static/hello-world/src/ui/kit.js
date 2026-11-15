@@ -8,6 +8,7 @@ import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
 // Spacing and colours come ONLY from Atlassian design tokens (they follow light and dark mode and meet
 // contrast rules). No hex colours anywhere in the UI code.
 // Token names are zero-padded to three digits: sp(50) is space.050 (4 px), sp(200) is space.200 (16 px).
+export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 export const sp = (n) => token(`space.${String(n).padStart(3, '0')}`);
 export const color = {
   text: token('color.text'),

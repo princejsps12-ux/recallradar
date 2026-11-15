@@ -30,12 +30,12 @@ function LoadingScreen({ quiet }) {
   return (
     <div role={quiet ? undefined : 'status'} aria-live="polite" aria-busy="true">
       {!quiet && <VisuallyHidden>Loading your devices and recalls…</VisuallyHidden>}
-      {!quiet && <div style={{ display: 'flex', alignItems: 'center', gap: sp(100), marginBottom: sp(200) }}><Spinner size="medium" label="" /><span style={muted}>Loading your devices and recalls…</span></div>}
       <div style={{ display: 'grid', gap: sp(200) }} aria-hidden="true">
-        <Skeleton height="112px" width="100%" isShimmering />
-        <Skeleton height="190px" width="100%" isShimmering />
+        <Skeleton height="72px" width="100%" isShimmering />
+        <Skeleton height="96px" width="100%" isShimmering />
+        <Skeleton height="400px" width="100%" isShimmering />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: sp(200) }}>
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} height="132px" width="100%" isShimmering />)}
+          {[0, 1, 2].map((i) => <Skeleton key={i} height="132px" width="100%" isShimmering />)}
         </div>
         <Skeleton height="360px" width="100%" isShimmering />
       </div>

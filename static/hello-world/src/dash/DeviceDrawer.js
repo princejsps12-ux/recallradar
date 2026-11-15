@@ -9,7 +9,7 @@ import SectionMessage from '@atlaskit/section-message';
 import CrossIcon from '@atlaskit/icon/core/cross';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import { router } from '@forge/bridge';
-import { sp, color, muted, ClassLozenge, MatchLozenge, LinkLike, formatDay } from '../ui/kit';
+import { sp, cap, color, muted, ClassLozenge, MatchLozenge, LinkLike, formatDay } from '../ui/kit';
 import { matchesForDevice } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 import { openIssue } from './DevicesTable';
@@ -103,7 +103,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                 <div style={{ padding: sp(300) }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: sp(100), position: 'sticky', top: 0, zIndex: 1, background: token('elevation.surface.overlay'), margin: `-${sp(300)} -${sp(300)} 0`, padding: `${sp(300)} ${sp(300)} 0` }}>
                     <div>
-                      <Heading size="large">{first.deviceName}</Heading>
+                      <Heading size="large">{cap(first.deviceName)}</Heading>
                       <div style={{ ...muted, marginBottom: sp(200) }}>{first.deviceManufacturer} {first.deviceModel}</div>
                     </div>
                     <span ref={closeWrap}>
