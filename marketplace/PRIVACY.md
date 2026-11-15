@@ -10,7 +10,7 @@ RecallRadar is an app for Atlassian Jira and Confluence that compares FDA medica
 - **Check results**: which recalls matched which devices, and why.
 - **Ward-to-team mapping**: a ward name and the name and id of a team in your Atlassian site.
 - **Jira and Confluence content it creates** at your request: tasks and recall pages.
-- **Atlassian account ids and names** of team members, read from the Teamwork Graph to suggest an assignee. They are shown to the signed-in person and used only to fill the assignee field when that person asks.
+- **Atlassian account ids and names** of team members, read from the Teamwork Graph to suggest an assignee. They are shown to the signed-in person and used to fill the assignee field when that person asks. When the Rovo agent previews assigned tasks, the proposed people's account ids and names are kept in app storage in the preview record until it is confirmed (then it is deleted) or overwritten.
 
 ## Where it is stored
 
@@ -26,7 +26,7 @@ Tasks, Confluence pages and Teamwork Graph reads happen **as the person who clic
 
 ## Retention and deletion
 
-Check results expire from view after 6 hours and are replaced by the next check. Device data stays until you remove it or uninstall the app; uninstalling removes the app's stored data from Forge storage. Jira tasks and Confluence pages remain, because they are your content.
+Check results are treated as fresh for 6 hours; an older result is still kept (shown flagged as old) until the next check replaces it. Short-lived guards and previews expire logically after minutes, but an unused one is not deleted until it is overwritten, so they can remain in storage longer than that. Device data stays until you remove it or uninstall the app; uninstalling removes the app's stored data from Forge storage. Jira tasks and Confluence pages remain, because they are your content.
 
 ## Your choices
 
