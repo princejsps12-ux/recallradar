@@ -6,16 +6,18 @@ import { createDeviceStore } from './deviceStore';
 import { forgeKv } from './kvAdapter';
 import { createMatchCache } from './matchCache';
 import { createCheckJobs } from './checkJob';
-import { findRecallsForDevices } from './recallSearch';
+import { findRecallsForDevices, buildRecallDetails } from './recallSearch';
 import { matchDevicesToRecalls } from './matching';
-import { performCheck } from './matchService';
+import { performCheck, getLatestResult } from './matchService';
 import { createJiraClient } from './jiraClient';
 import { createTaskGuard } from './taskService';
+import { createPreviewStore } from './agentTools';
 
 export const deviceStore = createDeviceStore(forgeKv);
 export const matchCache = createMatchCache(forgeKv);
 export const checkJobs = createCheckJobs(forgeKv);
 export const taskGuard = createTaskGuard(forgeKv);
+export const previewStore = createPreviewStore(forgeKv);
 
 // Jira as the person who clicked (asUser), so Jira applies THEIR permissions: someone who may not
 // create issues simply gets an error. Never asApp for this.
@@ -42,10 +44,12 @@ export async function searchRecalls(devices, onProgress) {
   const { recalls, failedQueries, cappedQueries } = await findRecallsForDevices(devices, fetchOpenFdaJson, {
     onProgress,
   });
+  const matches = matchDevicesToRecalls(devices, recalls);
   return {
     deviceCount: devices.length,
     recallCount: recalls.length,
-    matches: matchDevicesToRecalls(devices, recalls),
+    matches,
+    recallDetails: buildRecallDetails(recalls, matches),
     failedQueries,
     cappedQueries,
   };
@@ -69,4 +73,12 @@ export async function runCheck({ trigger, jobId = null }) {
     console.error('Recall check failed', error);
     return 'failed';
   }
+}
+
+// What the Rovo agent works from: the hospital's devices and the latest SAVED check result (fresh or
+// expired, or the last finished job). It never starts a check and never calls openFDA.
+export async function loadSnapshot() {
+  const devices = await deviceStore.listDevices();
+  const result = devices.length ? await getLatestResult({ devices, cache: matchCache, jobs: checkJobs }) : null;
+  return { devices, result };
 }

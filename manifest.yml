@@ -7,24 +7,180 @@ modules:
       viewportSize: medium
       title: RecallRadar
       icon: https://developer.atlassian.com/platform/forge/images/issue-panel-icon.svg
+  # The RecallRadar Assistant: a Rovo agent that answers from the SAVED recall check (never live
+  # openFDA), cites real recall numbers and device ids, and creates Jira tasks only after a preview
+  # the user confirms. Each action below is a reusable `action` module, grouped in one skill.
   rovo:agent:
     - key: recallradar-assistant
       name: RecallRadar Assistant
-      description: Test agent for RecallRadar. Greets the user using its hello action.
-      prompt: >
-        You are the RecallRadar Assistant. When the user says hello or asks you
-        to test, call the hello action and reply with exactly what it returns.
+      description: Finds which hospital devices are affected by FDA device recalls, explains recalls, and creates Jira follow-up tasks after you confirm.
+      prompt: |
+        You are the RecallRadar Assistant for a hospital's clinical engineering team. You find out which of
+        their devices are affected by FDA medical device recalls, explain those recalls, and help get the
+        follow-up work done.
+
+        HOW YOU WORK
+        - Answer ONLY from your tools. Use list_open_recalls for "which devices / which ward / which class"
+          questions, check_device for one model, serial number or device id, recall_details to explain a
+          recall, and create_remediation_tasks to create Jira tasks.
+        - Every tool answer has a "citations" list: the ONLY FDA recall numbers and device ids you may
+          mention. Quote them exactly as written (for example Z-2723-2026 or demo-001). NEVER invent, guess
+          or complete a recall number, device id, serial number, Jira key or link. If a tool finds nothing,
+          say so plainly. If a tool returns an error, tell the user what it says.
+        - Say where the data comes from: your tools read the hospital's SAVED recall check (see
+          basedOn.checkedAt). Mention it when the check is older than 6 hours (basedOn.stale) or incomplete.
+        - Match confidence: EXACT means manufacturer, model and serial/lot are all listed in the recall.
+          LIKELY means the model matches but the serial/lot is not listed or not recorded: say it needs
+          checking and never call it confirmed. POSSIBLE is weak: mention it only if asked.
+        - Recall classes: Class I means serious harm or death is possible (most urgent); Class II means
+          temporary or reversible harm; Class III means harm is unlikely.
+        - Be concise. Lead with the answer (a count, then a short list: device id, ward, recall number,
+          class, confidence), then offer a next step.
+        - RecallRadar does not know a manufacturer's specific fix. When explaining what to do, give the steps
+          the tool returns and point to the manufacturer's recall notice. Do not invent medical or technical
+          instructions, and do not give clinical advice.
+
+        CREATING JIRA TASKS: always two steps.
+        1. Call create_remediation_tasks WITHOUT confirmed. It only previews and creates nothing. Show the
+           user exactly what it will create (task titles, wards, due dates, the Jira project, and anything
+           that already has a task) and ASK: "Shall I create these N tasks?"
+        2. Only after the user clearly says yes, call it again with confirmed=true and the confirmationToken
+           from the preview, then report the Jira keys exactly as returned. If the user says no or changes
+           their mind, do not call it again.
+        Never confirm on the user's behalf. If you do not know the Jira project key, ask for it.
       conversationStarters:
-        - Say hello
+        - Which ICU devices have open Class I recalls?
+        - Do any of our devices match an FDA recall?
+        - Is the device with serial 50003704 affected by a recall?
+        - Explain the most urgent recall in plain English
+        - Create tasks for the Class I recalls in the ER
       actions:
-        - hello-action
+        - list_open_recalls
+        - check_device
+        - create_remediation_tasks
+        - recall_details
+      skills:
+        - recall-triage
+  rovo:skill:
+    - key: recall-triage
+      source:
+        dir: skills/recall-triage
+      dependencies:
+        tools:
+          - list_open_recalls
+          - check_device
+          - create_remediation_tasks
+          - recall_details
   action:
-    - key: hello-action
-      name: Say hello
-      function: hello-fn
+    - key: list_open_recalls
+      name: List open recalls
+      function: list-recalls-fn
       actionVerb: GET
-      description: Returns a greeting from RecallRadar. Use it when the user says
-        hello or asks to test the agent.
+      description: "Lists hospital devices with an open FDA recall that matches EXACT or LIKELY, most serious first, from the saved check. Use for which devices, wards or recall classes are affected. Rows have device id, ward, recall number, class, confidence."
+      inputs:
+        ward:
+          title: Ward
+          type: string
+          required: false
+          description: Only devices in this ward, for example ICU or ER. Leave empty for all wards.
+        recallClass:
+          title: Recall class
+          type: string
+          required: false
+          description: Only recalls of this FDA class - I (most serious), II or III. Leave empty for all classes.
+        confidence:
+          title: Match confidence
+          type: string
+          required: false
+          description: Only "exact" or "likely" matches. Leave empty for both.
+        limit:
+          title: Maximum rows
+          type: integer
+          required: false
+          description: How many rows to return (default 20, at most 50).
+    - key: check_device
+      name: Check a device
+      function: check-device-fn
+      actionVerb: GET
+      description: "Says whether one device in the hospital's list matches any FDA recall, given its model, serial/lot or device id. Returns exact, likely, possible or no match with recall numbers. Only checks devices that are in the list."
+      inputs:
+        model:
+          title: Model
+          type: string
+          required: false
+          description: The device model or catalog number.
+        serial:
+          title: Serial or lot number
+          type: string
+          required: false
+          description: The serial or lot number of the unit.
+        deviceId:
+          title: Device id
+          type: string
+          required: false
+          description: The hospital's device id, for example demo-001.
+        manufacturer:
+          title: Manufacturer
+          type: string
+          required: false
+          description: The maker, to tell apart devices with the same model name.
+    - key: create_remediation_tasks
+      name: Create remediation tasks
+      function: create-tasks-fn
+      actionVerb: CREATE
+      description: "Creates Jira tasks for chosen recall matches, never twice for the same recall and device. TWO STEPS: without confirmed it only PREVIEWS and returns a confirmationToken; show it, get the user's yes, then call again with confirmed=true and the token."
+      inputs:
+        recallNumber:
+          title: Recall number
+          type: string
+          required: false
+          description: An FDA recall number, for example Z-2723-2026, to create tasks for every affected device.
+        deviceId:
+          title: Device id
+          type: string
+          required: false
+          description: A device id, to create tasks for every recall that affects it.
+        ward:
+          title: Ward
+          type: string
+          required: false
+          description: Only matches for devices in this ward.
+        recallClass:
+          title: Recall class
+          type: string
+          required: false
+          description: Only recalls of this FDA class - I, II or III.
+        confidence:
+          title: Match confidence
+          type: string
+          required: false
+          description: Only "exact" or "likely" matches. Leave empty for both.
+        projectKey:
+          title: Jira project key
+          type: string
+          required: false
+          description: The Jira project for the new tasks, for example MOBL. Ask the user if unknown.
+        confirmed:
+          title: Confirmed
+          type: boolean
+          required: false
+          description: Leave empty or false to PREVIEW. Set true ONLY after the user has seen the preview and said yes.
+        confirmationToken:
+          title: Confirmation token
+          type: string
+          required: false
+          description: The confirmationToken returned by the preview. Required when confirmed is true.
+    - key: recall_details
+      name: Explain a recall
+      function: recall-details-fn
+      actionVerb: GET
+      description: "Gives the facts for one FDA recall that affects hospital devices: what is wrong, how serious, which devices and wards, what to do, and links, so it can be explained in plain English. Needs the FDA recall number."
+      inputs:
+        recallNumber:
+          title: Recall number
+          type: string
+          required: true
+          description: The FDA recall number, for example Z-2723-2026.
   # The recall check runs in the background: the button queues it, this consumer does it.
   # Only queue consumers and scheduled triggers may set timeoutSeconds (UI functions are fixed
   # at 25 s), which is exactly why the check lives here.
@@ -40,8 +196,14 @@ modules:
   function:
     - key: resolver
       handler: index.handler
-    - key: hello-fn
-      handler: index.hello
+    - key: list-recalls-fn
+      handler: rovoActions.listOpenRecallsAction
+    - key: check-device-fn
+      handler: rovoActions.checkDeviceAction
+    - key: create-tasks-fn
+      handler: rovoActions.createRemediationTasksAction
+    - key: recall-details-fn
+      handler: rovoActions.recallDetailsAction
     - key: check-consumer-fn
       handler: consumer.handler
       timeoutSeconds: 300

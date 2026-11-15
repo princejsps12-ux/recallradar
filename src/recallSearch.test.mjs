@@ -17,6 +17,7 @@ import {
   SEARCH_DEADLINE_MS,
   planRecallQueries,
   findRecallsForDevices,
+  buildRecallDetails,
 } from './recallSearch.js';
 
 const NOW = new Date(Date.UTC(2026, 10, 14)); // 14 Nov 2026
@@ -310,4 +311,48 @@ test('a throwing progress callback does not break the check', async () => {
     onProgress: () => { throw new Error('ui exploded'); },
   });
   assert.deepEqual(out.recalls.map((r) => r.recallNumber), ['Z-1']);
+});
+
+// --- Details saved with a check --------------------------------------------------------------------------------
+
+test('parseRecallForMatching keeps status, initiation date and a capped reason', () => {
+  const recall = parseRecallForMatching({
+    recall_number: 'Z-1-2027',
+    recalling_firm: 'Acme',
+    status: 'Ongoing',
+    recall_initiation_date: '20260917',
+    reason_for_recall: 'x'.repeat(2000),
+  });
+  assert.equal(recall.status, 'Ongoing');
+  assert.equal(recall.initiated, '2026-09-17');
+  assert.ok(recall.reasonForRecall.length <= 500);
+  assert.ok(recall.reasonForRecall.endsWith('…'));
+});
+
+test('parseRecallForMatching tolerates a record with none of those fields', () => {
+  const recall = parseRecallForMatching({ recall_number: 'Z-2-2027' });
+  assert.deepEqual([recall.status, recall.initiated, recall.reasonForRecall], ['', '', '']);
+});
+
+test('buildRecallDetails keeps one entry per exact or likely recall, and skips possible ones', () => {
+  const recalls = [
+    { recallNumber: 'Z-1', status: 'Ongoing', initiated: '2026-01-02', reasonForRecall: 'Leaks' },
+    { recallNumber: 'Z-2', status: 'Terminated', initiated: '', reasonForRecall: '' },
+    { recallNumber: 'Z-3', status: 'Ongoing', initiated: '', reasonForRecall: 'Weak match only' },
+  ];
+  const matches = [
+    { recallNumber: 'Z-1', confidence: 'exact' },
+    { recallNumber: 'Z-1', confidence: 'likely' }, // same recall, second device: still one entry
+    { recallNumber: 'Z-2', confidence: 'likely' },
+    { recallNumber: 'Z-3', confidence: 'possible' },
+    { recallNumber: 'Z-9', confidence: 'exact' }, // recall not fetched: skipped, not a crash
+  ];
+  assert.deepEqual(buildRecallDetails(recalls, matches), {
+    'Z-1': { status: 'Ongoing', initiated: '2026-01-02', reason: 'Leaks' },
+    'Z-2': { status: 'Terminated', initiated: '', reason: '' },
+  });
+});
+
+test('buildRecallDetails of nothing is empty', () => {
+  assert.deepEqual(buildRecallDetails([], []), {});
 });

@@ -59,6 +59,16 @@ A Forge **UI function is cut off at 25 s and cannot be given a longer timeout** 
 
 Rules that keep this correct: a result with failed lookups is shown but never saved; only the running job with the matching id may be updated (late or duplicate queue deliveries are skipped); a job with no update for 6 minutes counts as failed; the search has its own 240 s deadline inside the 300 s limit.
 
+### The Rovo agent (RecallRadar Assistant)
+
+Four actions (`list_open_recalls`, `check_device`, `create_remediation_tasks`, `recall_details`) plus a `rovo:skill` (`recall-triage`, `skills/recall-triage/SKILL.md`). Logic is pure in `src/agentTools.js`; `src/rovoActions.js` is the Forge handler layer.
+
+- **Saved results only**: tools read `loadSnapshot()` (devices + latest saved check, fresh or expired); they never call openFDA. Saved results carry `recallDetails` (status, initiated, reason per recall) for explanations: a check saved before that change has none until refreshed.
+- **Every answer has `citations`** (the only recall numbers / device ids the agent may quote). Keep that: the "never invent" promise rests on it plus the agent prompt in `manifest.yml`.
+- **Preview then confirm** for task creation: no confirmed flag means preview only and a one-use, 10-minute `confirmationToken`; confirming creates exactly the previewed pairs. Rovo also shows its own "Please review" card for any `actionVerb: CREATE` action (two approvals in practice). Tasks are created as the chatting user.
+- Rovo action quirks: inputs are **primitives only** (string, integer, number, boolean); an action `description` is **max 255 characters** and must be **quoted in YAML if it contains `: `**; function keys must be short (`create-remediation-tasks-fn` was rejected as too long, keep to about 20 characters); inputs arrive directly on the payload (with `context`, `orgId`, `contextToken` beside them).
+- Testing the agent: **Ask Rovo**, open the agent picker, search "RecallRadar". The skill shows up in the agent's steps as "Read Skills for agents".
+
 ### Jira tasks for matches
 
 Only **exact** and **likely** matches get a task. Due date is calendar days from creation (UTC): Class I 2, Class II/III 7, unknown class 2 (treated as Class I); the numbers and reasons live in `taskRules.js` and the README, so change them there and in the README together.

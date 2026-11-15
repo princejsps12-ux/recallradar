@@ -88,6 +88,25 @@ export function planRecallQueries(devices, now = new Date(), limit = SEARCH_LIMI
   return unique([...firmUrls, ...modelUrls].filter(Boolean));
 }
 
+// What a saved check keeps about each recall that matched a device with exact or likely confidence:
+// { "Z-2723-2026": { status, initiated, reason } }. Kept once per recall (not once per device) so a
+// saved result stays small, and used to explain a recall without asking openFDA again.
+export function buildRecallDetails(recalls, matches) {
+  const byNumber = new Map(recalls.map((recall) => [recall.recallNumber, recall]));
+  const details = {};
+  for (const match of matches) {
+    if (match.confidence === 'possible' || details[match.recallNumber]) continue;
+    const recall = byNumber.get(match.recallNumber);
+    if (!recall) continue;
+    details[match.recallNumber] = {
+      status: recall.status || '',
+      initiated: recall.initiated || '',
+      reason: recall.reasonForRecall || '',
+    };
+  }
+  return details;
+}
+
 // Run the planned queries and merge the answers into one list of recalls (no duplicates,
 // full text kept for matching). A failed query never loses the others: it is counted in
 // `failedQueries` so the caller can warn the user; so is one still running after the deadline. A query that matched more recalls than it

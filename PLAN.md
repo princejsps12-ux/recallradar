@@ -10,16 +10,13 @@ Setup done first:
 
 ## Step A: Rovo agent that does real work
 
-Turn "RecallRadar Assistant" into a real agent. Replace the hello-world action with four actions, each a reusable `action` module (Rovo action) and grouped in a `rovo:skill`.
+Turned "RecallRadar Assistant" into a real agent: four reusable `action` modules grouped in a `rovo:skill`.
 
-- [ ] `list_open_recalls`: devices with EXACT or LIKELY matches; filter by ward and recall class.
-- [ ] `check_device`: given a model and/or serial, say whether the device matches any recall.
-- [ ] `create_remediation_tasks`: create Jira tasks for chosen matches with the existing task code (no duplicates). The agent must **show what it will create and ask for confirmation first**.
-- [ ] `recall_details`: explain one recall in plain English (what is wrong, what to do), citing the FDA recall number.
-- Every answer cites FDA recall numbers and device IDs from real data, never invented.
-- Uses the **saved check results**; never refetches openFDA per question.
-- Good conversation starters (for example "Which ICU devices have open Class I recalls?").
-- Tests for each action; test in Rovo chat on the demo site.
+- [x] `list_open_recalls`: devices with EXACT or LIKELY matches; filter by ward and recall class. (Checked in Rovo chat; the "no ICU Class I" answer was verified against the data.)
+- [x] `check_device`: by model, serial or device id. (Chat: serial 50003704 gave demo-001 with exact match Z-2723-2026.)
+- [x] `create_remediation_tasks`: preview, then confirm, no duplicates. (Chat: previewed 6 tasks and asked; creating needed the preview token; MOBL-93 to MOBL-98 verified in Jira; asking again created nothing.)
+- [x] `recall_details`: plain-English explanation with the real FDA reason text, what to do, links.
+- [x] Every answer cites real recall numbers and device ids (`citations`), never invented; uses the saved check only; five conversation starters; unit tests for each action (73 new).
 
 ## Step B: Expose the actions to other agents with `rovo:mcp`
 

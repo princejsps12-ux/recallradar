@@ -13,7 +13,7 @@ It runs as a panel on every Jira issue, and as a Rovo agent (currently a small t
 | **Check devices for recalls** | Finds recent recalls for the hospital's manufacturers and models and matches them to devices with a confidence level and a reason. |
 | **Create task** | For each exact or likely match, creates a Jira task (one, or all at once) with the ward, the reason, a link to the FDA recall and a due date based on the recall's class. Never twice for the same recall and device. |
 | **Create task** | For each exact or likely match, creates a Jira task (one, or all at once) with the ward, the reason, a link to the FDA recall and a due date based on the recall's class. Never twice for the same recall and device. |
-| **RecallRadar Assistant** | A minimal Rovo agent that replies "Hello from RecallRadar". |
+| **RecallRadar Assistant** | A Rovo agent that answers questions about recalls from the saved check, explains them in plain English, and creates Jira tasks after you confirm. See "The Rovo agent". |
 
 ## Try it
 
@@ -159,6 +159,41 @@ Checked on the demo site: after creating all 35 tasks, a second tab that still t
 - **Project.** Tasks go to the project of the current issue; choosing a different project is not built.
 - **Task state is not tracked.** The panel shows the task's key as a link, not whether it is done.
 
+## The Rovo agent
+
+**RecallRadar Assistant** is a Rovo agent (open it with **Ask Rovo**, then pick it from the agent list). It answers only from the **saved recall check**, the same data as the panel: it never calls openFDA, so answers are fast and consistent.
+
+| Action | What it does |
+| --- | --- |
+| `list_open_recalls` | Devices with an open recall that matches **exact** or **likely**, most serious first. Filter by `ward`, `recallClass`, `confidence`. |
+| `check_device` | Given a model, serial/lot or device id, says whether the device matches any recall. Only devices in the hospital list can be checked. |
+| `create_remediation_tasks` | Creates Jira tasks (the same code as the panel's buttons, so never a duplicate). **Preview first, then confirm** (see below). |
+| `recall_details` | Explains one recall: what is wrong (the FDA's own reason text), how serious, which devices and wards, what to do, links, and any existing task. |
+
+Each action is an `action` module (a reusable Rovo action other agents can call) and all four are grouped in one `rovo:skill`, `recall-triage` ([`skills/recall-triage/SKILL.md`](skills/recall-triage/SKILL.md)). The logic is in [`src/agentTools.js`](src/agentTools.js) (pure, unit tested); [`src/rovoActions.js`](src/rovoActions.js) is the thin Forge handler layer.
+
+**Starter questions** on the agent: "Which ICU devices have open Class I recalls?", "Do any of our devices match an FDA recall?", "Is the device with serial 50003704 affected by a recall?", "Explain the most urgent recall in plain English", "Create tasks for the Class I recalls in the ER".
+
+### Never invented
+
+Every answer carries a `citations` list: the only recall numbers and device ids the agent may quote for that answer. The agent's prompt forbids inventing a recall number, device id, serial, Jira key or link, and tools say so plainly when nothing is found (an unknown device, a recall that matched nothing, no saved check yet). An exact match means manufacturer, model and serial/lot are all listed; a likely match is always described as needing a manual check.
+
+### Creating tasks: preview, then confirm
+
+Forge has no built-in "ask first" setting for an action, so the action itself enforces it:
+
+1. Called **without** `confirmed`, `create_remediation_tasks` only **previews**: the task titles, wards, due dates, the project, anything that already has a task, and a one-time `confirmationToken`. Nothing is created.
+2. The agent shows that preview and asks "Shall I create these N tasks?"
+3. Only after you say yes does it call the action again with `confirmed=true` and the token. The server creates **exactly the previewed tasks**, whatever else the call asks for. The token works once and expires after 10 minutes.
+
+So the agent cannot create a task it has not previewed, and a made-up or reused token creates nothing. Whether the agent actually *asks you* is enforced by its prompt, and was checked in Rovo chat. Rovo also shows its own "Please review" card for any `CREATE` action, so you approve twice (in chat, then on the card). Tasks are created **as you** (the reporter is the person chatting), and at most 20 per confirmation; a larger selection says how many were left out.
+
+### Limits
+
+- **Answers are only as fresh as the saved check** (6 hours; the answer says how old it is, and the panel refreshes it). A check saved before this feature has no per-recall reason text, so refresh it once in the panel.
+- **Only devices in the hospital list** can be checked, against recalls the check found for them.
+- **Action inputs are plain text, numbers or true/false** (Rovo does not allow lists), so "which matches" is chosen with filters: recall number, device id, ward, class.
+
 ## How the demo hospital is built
 
 [`src/demoHospital.js`](src/demoHospital.js) holds 30 devices with **real manufacturer and model names taken from actual openFDA recalls**. Devices meant to match have serial/lot numbers that the real recall lists. Wards and the serial numbers of unaffected devices are invented. The file's header explains the groups (exact, likely, possible, none) and how it was checked.
@@ -194,6 +229,9 @@ src/matching.js           The matching rules
 src/text.js               Shared text helpers (tokenize, whole-word phrase search)
 src/deviceStore.js        Device list interface
 src/kvAdapter.js          Forge storage behind that interface
+src/agentTools.js         The four Rovo agent tools (pure) and the preview/confirm store
+src/rovoActions.js        Forge handlers for the agent's actions
+skills/recall-triage/     The skill that groups the actions (SKILL.md)
 src/taskRules.js          What a task looks like: due date rule, title, labels, description
 src/taskService.js        Creating tasks without duplicates (Jira search + short guard)
 src/jiraClient.js         The Jira calls: find by label, issue type, bulk create

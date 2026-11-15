@@ -71,6 +71,9 @@ export function parseRecalls(body) {
 // Matching support: full-text parsing and targeted searches
 // ---------------------------------------------------------------------------------------
 
+// The "reason for recall" can run to a page; keep enough to explain the problem in plain English.
+export const MAX_REASON_LENGTH = 500;
+
 // Same as parseRecall, plus the FULL product and code_info text (the display fields above
 // are shortened). Matching needs the full text because a serial number can sit anywhere in a
 // list of thousands. Keep these two fields on the server; do not send them to the panel.
@@ -81,6 +84,10 @@ export function parseRecallForMatching(raw) {
     ...recall,
     productText: cleanText(raw.product_description),
     codeText: cleanText(raw.code_info),
+    // Used to explain a recall (see recallDetails below), not for matching.
+    reasonForRecall: truncate(cleanText(raw.reason_for_recall), MAX_REASON_LENGTH),
+    status: cleanText(raw.status), // "Ongoing", "Completed" or "Terminated"
+    initiated: formatFdaDate(raw.recall_initiation_date),
   };
 }
 
