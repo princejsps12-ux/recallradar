@@ -9,7 +9,8 @@ import {
   createRemediationTask,
   readInputs,
 } from './agentTools';
-import { loadSnapshot, jiraAsUser, taskGuard, previewStore } from './runtime';
+import { createRecallPages } from './recallPageService';
+import { loadSnapshot, jiraAsUser, confluenceAsUser, taskGuard, previewStore } from './runtime';
 import { getTaskStates, selectMatches } from './taskService';
 
 // Where the conversation happens, if Rovo says (for example inside a Jira issue): used as the
@@ -82,5 +83,15 @@ export const createRemediationTaskAction = (payload, context) =>
       snapshot,
       inputs,
       deps: { jira: jiraAsUser, guard: taskGuard, now: () => new Date(), defaultProjectKey: projectKeyFrom(payload, context) },
+    }),
+  );
+
+// One Confluence page per open recall (create, or update the page that is already there).
+export const createRecallPageAction = (payload, context) =>
+  runTool('create_recall_page', payload, context, (snapshot, inputs) =>
+    createRecallPages({
+      snapshot,
+      inputs,
+      deps: { confluence: confluenceAsUser, ...(snapshot.result ? { getTaskKeys: taskKeyLookup(snapshot) } : {}) },
     }),
   );

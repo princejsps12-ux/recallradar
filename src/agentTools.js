@@ -310,7 +310,7 @@ export function checkDevice({ snapshot, inputs = {} }) {
 
 // What a hospital should do about a recall. These are the same for every recall: RecallRadar does not
 // know a manufacturer's specific corrective action, so the last step is always to read the notice.
-function buildActionSteps(recallClass, anyLikely) {
+export function buildActionSteps(recallClass, anyLikely) {
   const days = dueDaysFor(recallClass);
   const steps = [
     'Find the affected device(s) listed below (ward and serial/lot) and confirm they are the same units.',

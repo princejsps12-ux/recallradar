@@ -10,6 +10,7 @@ import { findRecallsForDevices, buildRecallDetails } from './recallSearch';
 import { matchDevicesToRecalls } from './matching';
 import { performCheck, getLatestResult } from './matchService';
 import { createJiraClient } from './jiraClient';
+import { createConfluenceClient } from './confluenceClient';
 import { createTaskGuard } from './taskService';
 import { createPreviewStore } from './agentTools';
 
@@ -23,6 +24,12 @@ export const previewStore = createPreviewStore(forgeKv);
 // create issues simply gets an error. Never asApp for this.
 export const jiraAsUser = createJiraClient({
   request: (path, options) => api.asUser().requestJira(path, options),
+  route,
+});
+
+// Confluence as the person chatting (asUser): their permissions decide where they may write pages.
+export const confluenceAsUser = createConfluenceClient({
+  request: (path, options) => api.asUser().requestConfluence(path, options),
   route,
 });
 

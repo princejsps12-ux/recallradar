@@ -33,7 +33,10 @@ Turned "RecallRadar Assistant" into a real agent: four reusable `action` modules
 
 ## Step D: Confluence page per recall
 
-- [ ] A Confluence page for each recall: what is wrong, what to do, affected devices, links to the tasks.
+- [x] A Confluence page for each recall: what is wrong, what to do, affected devices, links to the tasks (live Jira cards). Built as the agent action `create_recall_page`, with a pure page builder, a Confluence client and a service (42 new tests).
+- [x] Tested on the demo site: the agent listed the real spaces, asked to confirm, created the page in Mobile Development; asking again **updated** it (version 2, still one page) and returned a working link; the rendered page was checked in Confluence.
+- [x] Needed: the app installed in Confluence as well as Jira, and the Confluence page scopes.
+- [ ] Not built: a panel button for it (the agent action covers "one recall" or "all open recalls", up to 10 per call).
 
 ## Standing rules
 

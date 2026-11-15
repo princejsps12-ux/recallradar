@@ -48,6 +48,13 @@ modules:
            from the preview, then report the Jira keys exactly as returned. If the user says no or changes
            their mind, do not call it again.
         Never confirm on the user's behalf. If you do not know the Jira project key, ask for it.
+
+        CONFLUENCE RECALL PAGES: create_recall_page writes one Confluence page per open recall (what is
+        wrong, what to do, affected devices, task links) and updates the page if it already exists. The pages
+        contain hospital device ids and wards, so write only to a space the user chose. If the user has not
+        named a space, call it WITHOUT spaceKey to get availableSpaces and ask which one. Before writing, say
+        which recall or recalls and which space, and ask the user to confirm. Then give them the page links
+        exactly as returned.
       conversationStarters:
         - Which ICU devices have open Class I recalls?
         - Do any of our devices match an FDA recall?
@@ -59,6 +66,7 @@ modules:
         - check_device
         - create_remediation_tasks
         - recall_details
+        - create_recall_page
       skills:
         - recall-triage
   rovo:skill:
@@ -71,6 +79,7 @@ modules:
           - check_device
           - create_remediation_tasks
           - recall_details
+          - create_recall_page
   action:
     - key: list_open_recalls
       name: List open recalls
@@ -202,6 +211,22 @@ modules:
           type: string
           required: true
           description: The Jira project for the new task, for example MOBL.
+    - key: create_recall_page
+      name: Create recall page
+      function: create-page-fn
+      actionVerb: CREATE
+      description: "Writes a Confluence page for each open recall that affects hospital devices (what is wrong, what to do, affected devices, task links), or updates the existing page. Needs spaceKey; call without it to list the spaces. recallNumber limits it to one."
+      inputs:
+        spaceKey:
+          title: Confluence space key
+          type: string
+          required: false
+          description: The Confluence space for the pages, for example MD. Leave empty to get the list of spaces to choose from.
+        recallNumber:
+          title: Recall number
+          type: string
+          required: false
+          description: Only this FDA recall, for example Z-2723-2026. Leave empty for every open recall (at most 10 per call).
   # Exposes some of the actions above to OTHER agents: Rovo Studio agents, and external clients such as
   # Claude Desktop (once a site admin turns it on; see the README). Only three, on purpose: reading, and
   # creating ONE task. The preview/confirm action stays private to the RecallRadar Assistant.
@@ -237,6 +262,8 @@ modules:
       handler: rovoActions.recallDetailsAction
     - key: create-task-fn
       handler: rovoActions.createRemediationTaskAction
+    - key: create-page-fn
+      handler: rovoActions.createRecallPageAction
     - key: check-consumer-fn
       handler: consumer.handler
       timeoutSeconds: 300
@@ -254,6 +281,9 @@ permissions:
     - read:cmdb-object:jira
     - read:cmdb-schema:jira
     - storage:app
+    - read:space:confluence
+    - read:page:confluence
+    - write:page:confluence
   external:
     fetch:
       backend:

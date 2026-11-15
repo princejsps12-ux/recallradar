@@ -1,7 +1,7 @@
 ---
 name: recall-triage
 description: Triage FDA medical device recalls for a hospital - find which devices are affected, check one device, explain a recall in plain English, and create Jira remediation tasks after the user confirms. Use it for any question about device recalls and what to do next.
-allowed-tools: list_open_recalls check_device create_remediation_tasks recall_details
+allowed-tools: list_open_recalls check_device create_remediation_tasks recall_details create_recall_page
 ---
 
 # Recall triage
@@ -20,6 +20,7 @@ so answers are fast and always come from the same data the RecallRadar panel sho
 | "Is this model / serial / device affected?" | `check_device` | Needs a model, serial/lot or device id. Only devices in the hospital list can be checked. |
 | "What is recall Z-...?" / "Explain this recall" | `recall_details` | Needs the FDA recall number. Gives what is wrong, how serious, affected devices, what to do, links. |
 | "Create tasks for ..." | `create_remediation_tasks` | **Two steps, see below.** |
+| "Make a Confluence page for this recall" | `create_recall_page` | Needs a `spaceKey`: call without it to list spaces and ask. Say which recalls and which space, and get a yes first. Updates an existing page instead of duplicating it. |
 
 ## Rules that always apply
 

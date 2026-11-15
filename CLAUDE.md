@@ -61,13 +61,17 @@ Rules that keep this correct: a result with failed lookups is shown but never sa
 
 ### The Rovo agent (RecallRadar Assistant)
 
-Four actions (`list_open_recalls`, `check_device`, `create_remediation_tasks`, `recall_details`) plus a `rovo:skill` (`recall-triage`, `skills/recall-triage/SKILL.md`). Logic is pure in `src/agentTools.js`; `src/rovoActions.js` is the Forge handler layer.
+Five actions (`list_open_recalls`, `check_device`, `create_remediation_tasks`, `recall_details`, `create_recall_page`) plus a `rovo:skill` (`recall-triage`, `skills/recall-triage/SKILL.md`). Logic is pure in `src/agentTools.js`; `src/rovoActions.js` is the Forge handler layer.
 
 - **Saved results only**: tools read `loadSnapshot()` (devices + latest saved check, fresh or expired); they never call openFDA. Saved results carry `recallDetails` (status, initiated, reason per recall) for explanations: a check saved before that change has none until refreshed.
 - **Every answer has `citations`** (the only recall numbers / device ids the agent may quote). Keep that: the "never invent" promise rests on it plus the agent prompt in `manifest.yml`.
 - **Preview then confirm** for task creation: no confirmed flag means preview only and a one-use, 10-minute `confirmationToken`; confirming creates exactly the previewed pairs. Rovo also shows its own "Please review" card for any `actionVerb: CREATE` action (two approvals in practice). Tasks are created as the chatting user.
 - Rovo action quirks: inputs are **primitives only** (string, integer, number, boolean); an action `description` is **max 255 characters** and must be **quoted in YAML if it contains `: `**; function keys must be short (`create-remediation-tasks-fn` was rejected as too long, keep to about 20 characters); inputs arrive directly on the payload (with `context`, `orgId`, `contextToken` beside them).
 - Testing the agent: **Ask Rovo**, open the agent picker, search "RecallRadar". The skill shows up in the agent's steps as "Read Skills for agents".
+
+### Confluence recall pages (`create_recall_page`)
+
+`src/recallPage.js` (pure XHTML builder, everything escaped) + `src/recallPageService.js` + `src/confluenceClient.js`. One page per open exact/likely recall, titled `FDA recall <number>`, **found again by title inside the space and updated** (never duplicated). Never guess the space: no `spaceKey` returns `availableSpaces` for the agent to ask. Pages hold device ids/wards/serials: only write where the user chose. Needs the app installed in **Confluence too** (`forge install -p Confluence ...`) and scopes `read:space:confluence`, `read:page:confluence`, `write:page:confluence` (lint does NOT check these for `route`-built paths, add them by hand). Gotcha: Confluence v2 returns the site base address (`_links.base`) on the **list** response and only a relative `webui` path on each page, so links are built from the base of the title search (`pageUrl(page, base)`). Jira tasks appear as live `jira` macros. A demo page "FDA recall Z-0208-2027" exists in the Mobile Development (MD) space from testing. A panel button for it is not built.
 
 ### MCP exposure (`rovo:mcp`)
 

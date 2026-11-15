@@ -169,8 +169,9 @@ Checked on the demo site: after creating all 35 tasks, a second tab that still t
 | `check_device` | Given a model, serial/lot or device id, says whether the device matches any recall. Only devices in the hospital list can be checked. |
 | `create_remediation_tasks` | Creates Jira tasks (the same code as the panel's buttons, so never a duplicate). **Preview first, then confirm** (see below). |
 | `recall_details` | Explains one recall: what is wrong (the FDA's own reason text), how serious, which devices and wards, what to do, links, and any existing task. |
+| `create_recall_page` | Writes a **Confluence page per open recall** (see below). |
 
-Each action is an `action` module (a reusable Rovo action other agents can call) and all four are grouped in one `rovo:skill`, `recall-triage` ([`skills/recall-triage/SKILL.md`](skills/recall-triage/SKILL.md)). The logic is in [`src/agentTools.js`](src/agentTools.js) (pure, unit tested); [`src/rovoActions.js`](src/rovoActions.js) is the thin Forge handler layer.
+Each action is an `action` module (a reusable Rovo action other agents can call) and all five are grouped in one `rovo:skill`, `recall-triage` ([`skills/recall-triage/SKILL.md`](skills/recall-triage/SKILL.md)). The logic is in [`src/agentTools.js`](src/agentTools.js) (pure, unit tested); [`src/rovoActions.js`](src/rovoActions.js) is the thin Forge handler layer.
 
 **Starter questions** on the agent: "Which ICU devices have open Class I recalls?", "Do any of our devices match an FDA recall?", "Is the device with serial 50003704 affected by a recall?", "Explain the most urgent recall in plain English", "Create tasks for the Class I recalls in the ER".
 
@@ -187,6 +188,28 @@ Forge has no built-in "ask first" setting for an action, so the action itself en
 3. Only after you say yes does it call the action again with `confirmed=true` and the token. The server creates **exactly the previewed tasks**, whatever else the call asks for. The token works once and expires after 10 minutes.
 
 So the agent cannot create a task it has not previewed, and a made-up or reused token creates nothing. Whether the agent actually *asks you* is enforced by its prompt, and was checked in Rovo chat. Rovo also shows its own "Please review" card for any `CREATE` action, so you approve twice (in chat, then on the card). Tasks are created **as you** (the reporter is the person chatting), and at most 20 per confirmation; a larger selection says how many were left out.
+
+### Confluence pages: one per recall
+
+`create_recall_page` (ask the agent: "Create a Confluence page for recall Z-0208-2027", or "Make pages for all open recalls") writes **one Confluence page per open recall** that has an exact or likely match. Each page, titled `FDA recall <number>`, has:
+
+- the recall's class and what that class means, the firm, product, dates and status;
+- **What is wrong**: the FDA's own reason text from the saved check;
+- **What to do**: the same steps as `recall_details` (find the device, the due date for the class, read the manufacturer's notice, record what was done);
+- **Affected devices**: a table of device id, name, ward, serial/lot and match confidence, with a **live Jira card for each device's task** (status included) or "no task yet";
+- **Sources**: the openFDA record for that recall and FDA's recall database.
+
+How it behaves:
+
+- **One page per recall.** The page is found again by its title inside the space, so running it again **updates** that page (a new version) and never makes a second one. Task links and the device table are refreshed from the latest saved check.
+- **It never guesses the space.** Without a `spaceKey` it lists the spaces you can see and the agent asks which one. The agent also says which recalls and which space, and waits for a yes, before writing. Rovo adds its own "Please review" card, as with any `CREATE` action.
+- **The pages contain device ids, wards and serial numbers**, so choose a space whose permissions suit that. Pages are written as the person chatting, so Confluence's own permissions decide where they may write.
+- Up to 10 pages per call; the answer says how many were left. Every piece of FDA or hospital text is HTML-escaped before it goes in the page.
+- Only open recalls with an exact or likely match get a page; possible matches and finished recalls do not.
+
+The app must be installed in **Confluence** as well as Jira (`forge install -p Confluence -s <site> -e development`) and needs the scopes `read:space:confluence`, `read:page:confluence` and `write:page:confluence`.
+
+Checked in Rovo chat on the demo site: the agent asked for a space (listing the real ones), asked to confirm, created the page in Mobile Development, and a second request updated the same page to version 2 (still one page) and returned a working link. The rendered page was inspected in Confluence.
 
 ### Limits
 
@@ -291,7 +314,10 @@ src/matching.js           The matching rules
 src/text.js               Shared text helpers (tokenize, whole-word phrase search)
 src/deviceStore.js        Device list interface
 src/kvAdapter.js          Forge storage behind that interface
-src/agentTools.js         The four Rovo agent tools (pure) and the preview/confirm store
+src/agentTools.js         The Rovo agent tools (pure) and the preview/confirm store
+src/recallPage.js         The Confluence page for one recall (pure, escaped)
+src/recallPageService.js  One page per open recall: choose space, create or update
+src/confluenceClient.js   The Confluence calls: spaces, find page by title, upsert
 src/rovoActions.js        Forge handlers for the agent's actions
 skills/recall-triage/     The Rovo skill that groups the actions (SKILL.md)
 integrations/claude/      Skill file for third-party agents (Claude) using the MCP tools
@@ -334,6 +360,7 @@ forge install --upgrade -e development     # only when scopes or permissions cha
 | --- | --- |
 | `read:jira-work` | Jira issue panel; finding existing RecallRadar tasks. |
 | `write:jira-work` | Creating tasks (as the clicking user). |
+| `read:space:confluence`, `read:page:confluence`, `write:page:confluence` | The Confluence recall pages: list spaces, find a page by title, create or update it (as the person chatting). |
 | `storage:app` | The device list in Forge storage. |
 | `read:servicedesk-request`, `read:cmdb-object:jira`, `read:cmdb-schema:jira` | Reserved for the read-only Assets import. Not used yet. |
 | External fetch: `api.fda.gov` | Recall data from openFDA. |
