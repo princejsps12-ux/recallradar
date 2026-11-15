@@ -5,7 +5,7 @@ Written 15 November 2026 by the assistant, scored hard on purpose. Evidence is i
 | Criterion | Score | One line |
 | --- | --- | --- |
 | Technical implementation | 8 / 10 | Deep, tested, safe; a few things unproven live |
-| Design | 6.5 / 10 | Good dashboard, dense panel, never reviewed by a designer |
+| Design | 7 / 10 | Polished dashboard with real states and keyboard focus; still hand-styled and not visually reviewed |
 | Potential impact | 7 / 10 | Real problem, honest scope, but data entry is thin |
 | Innovation (quality of idea) | 8 / 10 | Explained matching and trust rules are the differentiator |
 | Presentation | 5 / 10 | The weakest area: no video, no screenshots, install link and support contact still blank |
@@ -21,16 +21,15 @@ Written 15 November 2026 by the assistant, scored hard on purpose. Evidence is i
 4. The paste-in device import and the dashboard's import screen were verified by unit tests and a clean build, not clicked live (the browser tool was offline). *Verify once.*
 5. One real assignment was verified; the "create all with assign" checkbox was not.
 
-## Design: 6.5
+## Design: 7
 
-**Strong:** the dashboard uses Atlassian design tokens (light and dark), cards, labelled badges (colour is never the only signal), filters, and real empty, loading, error and first-run states; the panel now uses the same tokens (done in this review).
+**Strong:** the dashboard uses Atlassian design tokens (light and dark) with light fallbacks, summary cards, labelled badges (colour is never the only signal), filters with a live "Showing N of M" status, loading skeletons instead of a bare "Loading", a proper success state, first-run, error and import screens, a visible keyboard focus ring, hover and disabled states, a sticky table header with an accessible caption, reasons shown in the table, reduced-motion support, and a narrow-screen layout that hides secondary columns. The panel uses the same tokens. `npm run test:ui` clicks these flows in a simulated browser.
 
-**Weakest points**
-1. Built with plain HTML elements styled by hand, not Atlaskit components, so spacing and controls are close to but not exactly Atlassian's. *Fixable with Atlaskit packages; costs bundle size and time.*
-2. The issue panel is dense (several buttons per match row). *A "details" view per device would help.*
-3. Native dropdowns for 14 wards are tedious; a combined mapping table would be better.
-4. No accessibility audit beyond labels, roles and text-not-colour; not tested with a screen reader. *Do before submission.*
-5. Never checked on a phone-width viewport.
+**Why not 8 yet (honest)**
+1. **Not visually verified after the polish.** The browser tool was offline, so the new look has been built and smoke-tested but not seen on a real screen, in dark mode or at phone width. *Do this first: open the dashboard in light and dark and at 400 px.*
+2. Built from plain HTML elements, not Atlaskit components, so it is close to but not exactly Atlassian's look. *The step that would most raise the score.*
+3. The issue panel is still dense (several buttons per match row); the ward-to-team mapping is 14 native dropdowns in the panel and is not on the dashboard.
+4. No screen-reader pass and no designer review.
 
 ## Potential impact: 7
 
@@ -67,5 +66,5 @@ Written 15 November 2026 by the assistant, scored hard on purpose. Evidence is i
 - Dashboard added, with a first-run screen and a paste-in import for the hospital's own devices (the biggest impact gap).
 - Unused Assets scopes removed (least privilege).
 - README: judge quick start, prerequisites, expected results, safe-try and cleanup note, glossary, data-and-trust section, dashboard and import documented, first-person phrasing removed.
-- Panel moved to design tokens (dark mode).
+- Panel moved to design tokens (dark mode); dashboard polish (skeletons, focus, hover, responsive, accessible table, success state); a browser-free UI smoke test.
 - Marketplace listing, privacy, terms and MCP demo guides written.

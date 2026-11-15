@@ -87,3 +87,11 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 - [x] Expired previews and task guards are deleted (on read, on write, and by the daily cleanup).
 - [x] Saved check result and finished-job copy never kept longer than 24 hours.
 - [x] `.claude/` kept out of the repository; repository published on GitHub (main only).
+
+## Step K: Follow-ups from the user (partly done)
+
+- [x] Install link in the README quick start; local backup branch deleted; 144 px icon PNG (`scripts/make-icon.mjs`).
+- [x] Design polish (see `docs/REVIEW.md`, Design 7). Not yet seen on a real screen.
+- [ ] **Live check of the import screen** on the demo site (paste a small sheet, see the check run).
+- [ ] **Live check of "Create tasks for all" with "Also assign the suggested team member"** (creates about 28 tasks and notifies people on the demo site; delete them afterwards with the Jira search `labels = recallradar`).
+- Both are blocked only because the Claude in Chrome extension is not connected. Both flows pass in `npm run test:ui` and the assign request was verified live for one task (MOBL-99).
