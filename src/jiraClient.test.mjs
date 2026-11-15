@@ -7,6 +7,8 @@ import {
   parseBulkResponse,
   createJiraClient,
   countByAssignee,
+  countByStatusCategory,
+  ALL_TASKS_JQL,
   OPEN_TASKS_JQL,
 } from './jiraClient.js';
 
@@ -208,4 +210,31 @@ test('openTaskCounts searches once, asking only for the assignee', async () => {
 test('openTaskCounts throws when Jira refuses', async () => {
   const { request } = fakeRequest([{ status: 403, json: {} }]);
   await assert.rejects(createJiraClient({ request, route }).openTaskCounts(), /403/);
+});
+
+// --- Task counts for the dashboard ---------------------------------------------------------------------
+
+test('countByStatusCategory counts done by Jira\'s status category, everything else as open', () => {
+  const issue = (key) => ({ fields: { status: { statusCategory: { key } } } });
+  assert.deepEqual(countByStatusCategory([issue('done'), issue('new'), issue('indeterminate'), issue('done'), { fields: {} }, null]), { open: 3, done: 2 });
+  assert.deepEqual(countByStatusCategory(undefined), { open: 0, done: 0 });
+});
+
+test('taskStatusCounts searches all RecallRadar tasks once and reports open and done', async () => {
+  const { request, calls } = fakeRequest([{ status: 200, json: { issues: [{ fields: { status: { statusCategory: { key: 'done' } } } }, { fields: { status: { statusCategory: { key: 'new' } } } }] } }]);
+  const counts = await createJiraClient({ request, route }).taskStatusCounts();
+  assert.deepEqual(counts, { open: 1, done: 1, capped: false });
+  assert.equal(calls[0].body.jql, ALL_TASKS_JQL);
+  assert.deepEqual(calls[0].body.fields, ['status']);
+});
+
+test('taskStatusCounts says when the search was full (there may be more tasks)', async () => {
+  const issues = Array.from({ length: 100 }, () => ({ fields: { status: { statusCategory: { key: 'new' } } } }));
+  const { request } = fakeRequest([{ status: 200, json: { issues } }]);
+  assert.equal((await createJiraClient({ request, route }).taskStatusCounts()).capped, true);
+});
+
+test('taskStatusCounts throws when Jira refuses', async () => {
+  const { request } = fakeRequest([{ status: 403, json: {} }]);
+  await assert.rejects(createJiraClient({ request, route }).taskStatusCounts(), /403/);
 });

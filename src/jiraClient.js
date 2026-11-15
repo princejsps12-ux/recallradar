@@ -28,6 +28,7 @@ export function buildLabelsJql(labels) {
 }
 
 // Every RecallRadar task carries the label "recallradar" (APP_LABEL); "not done" is Jira's own status category.
+export const ALL_TASKS_JQL = 'labels = "recallradar"';
 export const OPEN_TASKS_JQL = 'labels = "recallradar" AND statusCategory != Done';
 
 // Issues from a search -> Map(accountId -> how many are assigned to that person).
@@ -36,6 +37,19 @@ export function countByAssignee(issues) {
   for (const issue of issues || []) {
     const assignee = issue && issue.fields && issue.fields.assignee;
     if (assignee && assignee.accountId) counts.set(assignee.accountId, (counts.get(assignee.accountId) || 0) + 1);
+  }
+  return counts;
+}
+
+// Issues from a search -> { open, done }, by Jira's own status category ("done" is the green category,
+// whatever the project calls its statuses).
+export function countByStatusCategory(issues) {
+  const counts = { open: 0, done: 0 };
+  for (const issue of issues || []) {
+    if (!issue) continue;
+    const category = issue.fields && issue.fields.status && issue.fields.status.statusCategory;
+    if (category && category.key === 'done') counts.done += 1;
+    else counts.open += 1;
   }
   return counts;
 }
@@ -144,5 +158,18 @@ export function createJiraClient({ request, route }) {
     return countByAssignee((await response.json()).issues);
   }
 
-  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts };
+  // How many RecallRadar tasks are open and how many are done, for the dashboard. One search of at most
+  // SEARCH_RESULT_LIMIT issues; `capped` says there may be more than were counted.
+  async function taskStatusCounts() {
+    const response = await request(route`/rest/api/3/search/jql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ jql: ALL_TASKS_JQL, fields: ['status'], maxResults: SEARCH_RESULT_LIMIT }),
+    });
+    if (!response.ok) throw await readError(response);
+    const issues = (await response.json()).issues || [];
+    return { ...countByStatusCategory(issues), capped: issues.length >= SEARCH_RESULT_LIMIT };
+  }
+
+  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts };
 }

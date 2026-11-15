@@ -243,6 +243,18 @@ resolver.define('suggestAssignees', async ({ payload }) => {
   }
 });
 
+// --- Dashboard ----------------------------------------------------------------------------------------------
+
+// Task counts for the dashboard cards: { open, done, capped }. Read as the signed-in person.
+resolver.define('getTaskSummary', async () => {
+  try {
+    return { ok: true, summary: await jiraAsUser.taskStatusCounts() };
+  } catch (error) {
+    console.error('Failed to count tasks', error);
+    return { ok: false, error: 'Could not count the RecallRadar tasks.' };
+  }
+});
+
 // --- Confluence recall pages (same service as the agent's create_recall_page; see recallPageService.js) ----
 
 // The Confluence spaces the signed-in person can see, for the space chooser. Never guessed: the person picks.

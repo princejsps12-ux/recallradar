@@ -43,7 +43,7 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 - [x] Deployed (14.x); installs upgraded in Jira and Confluence. Rovo chat: `who_handles_ward` answered "no team mapped" without guessing.
 - [x] Live panel check (after the user fixed DNS): team list, mapping, team line, suggestion count and the off-by-default checkbox all work. Found and fixed: the graph API caps `first` at 25. One real assignment verified live (MOBL-99 assigned to the suggested team member); the "create all" checkbox was not clicked.
 
-## Step E: Panel button for the Confluence page
+## Step D2: Panel button for the Confluence page
 
 - [x] **Create Confluence recall page** in the panel: space chooser (read from Confluence, never guessed), recall chooser (all open or one), result links. Resolvers `listSpaces` and `createRecallPage` reuse the agent action's service. Verified live: updated the Z-0208-2027 page in Mobile Development and showed its link.
 
@@ -53,6 +53,26 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 - [x] Tested on the demo site: the agent listed the real spaces, asked to confirm, created the page in Mobile Development; asking again **updated** it (version 2, still one page) and returned a working link; the rendered page was checked in Confluence.
 - [x] Needed: the app installed in Confluence as well as Jira, and the Confluence page scopes.
 - [x] Panel button: see Step E (the agent action covers "one recall" or "all open recalls", up to 10 per call).
+
+## Step E: Dashboard (full-page app)
+
+- [x] Done and checked live on the demo site (cards, filters, team column, task links, panel link opens it). A global page "RecallRadar" (same Custom UI bundle, chosen by module type): summary cards (devices, open recalls by class, tasks open/done), table of affected devices filterable by ward and class, recent recalls, first-run screen with one big "Load demo hospital" button. Atlassian design tokens; empty, loading and error states. The issue panel stays and links to it.
+
+## Step F: Production and Marketplace prep
+
+- [ ] Deploy to production; install/share link for judges; listing material in the repo (icon, short and long description, screenshot list, privacy policy, terms, support contact, data/security notes); the exact steps the user must do to submit.
+
+## Step G: MCP demo
+
+- [ ] Exact step-by-step instructions to enable the MCP tools on the demo site, connect Claude Desktop, and ask "Are any of our infusion pumps recalled?". The user does the clicking.
+
+## Step H: Judge simulation
+
+- [ ] A fresh subagent with only the README and the install link installs on the personal dev site and uses the app like a judge; report what confuses or breaks; fix it.
+
+## Step I: Strict review against the five Codegeist criteria
+
+- [ ] Technical, design, impact, innovation, presentation: score 1 to 10, list the weakest points, fix what can be fixed.
 
 ## Standing rules
 

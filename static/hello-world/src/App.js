@@ -748,6 +748,22 @@ function Recalls() {
   );
 }
 
+// A link from the panel to the full-page dashboard (a Jira global page).
+function DashboardLink() {
+  const open = (event) => {
+    event.preventDefault();
+    router.navigate({ target: 'module', moduleKey: 'recallradar-dashboard' }).catch(() => {});
+  };
+  return (
+    <div style={styles.meta}>
+      <a href="#recallradar-dashboard" onClick={open}>
+        Open the RecallRadar dashboard
+      </a>{' '}
+      for the whole hospital at a glance.
+    </div>
+  );
+}
+
 function App() {
   // Ward -> team mappings (Forge storage) and the wards in the device list. Shared by the mapping
   // editor and the match rows, which show "Team: <name> (from Teamwork Graph)".
@@ -772,6 +788,7 @@ function App() {
 
   return (
     <div>
+      <DashboardLink />
       <DevicesBar onLoaded={loadWardInfo} />
       <WardTeams wardInfo={wardInfo} onChanged={loadWardInfo} />
       <MatchesSection wardInfo={wardInfo} />

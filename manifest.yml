@@ -7,6 +7,14 @@ modules:
       viewportSize: medium
       title: RecallRadar
       icon: https://developer.atlassian.com/platform/forge/images/issue-panel-icon.svg
+  # The full-page dashboard: the same Custom UI bundle as the panel (Root.js picks the view by module type).
+  jira:globalPage:
+    - key: recallradar-dashboard
+      resource: main
+      resolver:
+        function: resolver
+      title: RecallRadar
+      icon: https://developer.atlassian.com/platform/forge/images/issue-panel-icon.svg
   # The RecallRadar Assistant: a Rovo agent that answers from the SAVED recall check (never live
   # openFDA), cites real recall numbers and device ids, and creates Jira tasks only after a preview
   # the user confirms. Each action below is a reusable `action` module, grouped in one skill.
