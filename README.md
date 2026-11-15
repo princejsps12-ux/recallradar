@@ -472,7 +472,7 @@ forge install --upgrade -e development     # only when scopes or permissions cha
 - **What leaves Atlassian.** Only searches to `api.fda.gov` that contain manufacturer and model names. For that reason the app is **not** eligible for "Runs on Atlassian".
 - **Acts as the person.** Tasks, pages and Teamwork Graph reads run as the signed-in user, so their permissions apply. The Teamwork Graph is only read, never written.
 - **No certification claims.** This README does not claim HIPAA or any other certification.
-- Draft [privacy policy](marketplace/PRIVACY.md) and [terms](marketplace/TERMS.md).
+- Draft [privacy policy](https://github.com/princejsps12-ux/recallradar/blob/main/marketplace/PRIVACY.md) and [terms](https://github.com/princejsps12-ux/recallradar/blob/main/marketplace/TERMS.md).
 
 ## Support
 

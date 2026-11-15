@@ -62,9 +62,9 @@ Try it in a minute: open the dashboard and click **Load demo hospital** (30 devi
 | Field | Value |
 | --- | --- |
 | Support contact | **Your support email or issue tracker URL** (you must choose; not filled in on purpose) |
-| Privacy policy URL | The public URL of `marketplace/PRIVACY.md` (for example the rendered file in your repository) |
-| Terms URL | The public URL of `marketplace/TERMS.md` |
-| Documentation | The public URL of `README.md` |
+| Privacy policy URL | https://github.com/princejsps12-ux/recallradar/blob/main/marketplace/PRIVACY.md |
+| Terms URL | https://github.com/princejsps12-ux/recallradar/blob/main/marketplace/TERMS.md |
+| Documentation | https://github.com/princejsps12-ux/recallradar/blob/main/README.md |
 
 ## Data and security notes (for the listing's security questionnaire)
 

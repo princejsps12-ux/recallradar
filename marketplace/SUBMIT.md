@@ -2,7 +2,7 @@
 
 I (the assistant) can not click through your Atlassian account's forms, and some answers are yours to give. In order:
 
-1. **Fill the blanks.** Put your name and support email in `marketplace/PRIVACY.md`, `marketplace/TERMS.md` and the support row of `marketplace/LISTING.md`. Have the terms and privacy text reviewed if you can. Commit and push the repository so the files have **public URLs** (the rendered markdown on your code host is fine).
+1. **Fill the blanks.** Put your name and support email in `marketplace/PRIVACY.md`, `marketplace/TERMS.md` and the support row of `marketplace/LISTING.md`. Have the terms and privacy text reviewed if you can. The repository is public at https://github.com/princejsps12-ux/recallradar, so the privacy, terms and README files already have public URLs (listed in `LISTING.md`). Commit and push after you edit them.
 2. **Take the 8 screenshots** listed in `LISTING.md` (demo site, light theme).
 3. **Check the icon.** Open `marketplace/icon.svg`. Marketplace wants a 144 x 144 PNG: export the SVG at 144 x 144 from any image tool (for example open it in Chrome, or use Figma or Preview).
 4. **Scopes**: already trimmed to what the app uses; nothing to do.
