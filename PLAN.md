@@ -92,6 +92,6 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 
 - [x] Install link in the README quick start; local backup branch deleted; 144 px icon PNG (`scripts/make-icon.mjs`).
 - [x] Design polish (see `docs/REVIEW.md`, Design 7). Not yet seen on a real screen.
-- [ ] **Live check of the import screen** on the demo site (paste a small sheet, see the check run).
-- [ ] **Live check of "Create tasks for all" with "Also assign the suggested team member"** (creates about 28 tasks and notifies people on the demo site; delete them afterwards with the Jira search `labels = recallradar`).
-- Both are blocked only because the Claude in Chrome extension is not connected. Both flows pass in `npm run test:ui` and the assign request was verified live for one task (MOBL-99).
+- [x] **Live check of the import screen**: a bad paste is refused ("Nothing was imported. Line 2: model is empty."); a good row imported, the device count went 30 to 31 and the check re-ran.
+- [x] **Live check of "Create tasks for all" with assign**: 28 tasks created, 8 assigned (delete them with the Jira search `labels = recallradar` when done).
+- Done after Chrome was reconnected. The live look found one visual bug (a screen-reader-only caption was visible), now fixed.

@@ -57,6 +57,8 @@ const s = {
   alert: { background: color.dangerSubtle, border: `1px solid ${color.danger}`, borderRadius: '4px', padding: space(150), marginBottom: space(200) },
 };
 
+// Visually hidden but read by screen readers. Inline, so it never depends on the shared stylesheet.
+const srOnly = { position: 'absolute', width: '1px', height: '1px', margin: '-1px', padding: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 };
 const CLASS_COLOR = { I: color.danger, II: color.warning, III: color.neutral, [UNKNOWN_CLASS]: color.neutral };
 const CONFIDENCE_COLOR = { exact: color.danger, likely: color.warning };
 
@@ -108,7 +110,7 @@ function ImportDevices({ onImported, startOpen }) {
     try {
       const response = await invoke('importDevices', { text });
       if (response && response.ok) {
-        setDone(`Imported ${response.count} devices. Checking them against recalls now…`);
+        setDone(`Imported ${response.count} device${response.count === 1 ? '' : 's'}. Checking them against recalls now…`);
         setText('');
         onImported(response.count);
       } else {
@@ -356,7 +358,7 @@ export default function Dashboard() {
   if (screen === 'loading') {
     return (
       <div style={s.page} role="status" aria-live="polite" aria-busy="true">
-        <span className="rr-sr-only">Loading your devices and recalls…</span>
+        <span style={srOnly}>Loading your devices and recalls…</span>
         <div style={s.grid} aria-hidden="true">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="rr-skeleton" style={{ height: '110px' }} />
@@ -532,7 +534,7 @@ export default function Dashboard() {
         ) : (
           <div style={s.tableWrap}>
             <table style={s.table}>
-              <caption className="rr-sr-only">Devices affected by an open FDA recall</caption>
+              <caption style={srOnly}>Devices affected by an open FDA recall</caption>
               <thead>
                 <tr>
                   {['Device', 'Ward', 'Team', 'Recall', 'Class', 'Match', 'Task'].map((h) => (
@@ -612,10 +614,10 @@ export default function Dashboard() {
                 {recent.recalls.slice(0, 10).map((r) => (
                   <tr key={r.recallNumber}>
                     <td style={s.td}>{r.recallNumber}</td>
-                    <td style={s.td}>{r.recallClass ? `Class ${r.recallClass}` : '?'}</td>
+                    <td style={{ ...s.td, whiteSpace: 'nowrap' }}>{r.recallClass ? `Class ${r.recallClass}` : '?'}</td>
                     <td style={s.td}>{r.firm || 'Unknown firm'}</td>
                     <td style={s.td}>{r.product}</td>
-                    <td style={s.td}>{r.date || '–'}</td>
+                    <td style={{ ...s.td, whiteSpace: 'nowrap' }}>{r.date || '–'}</td>
                   </tr>
                 ))}
               </tbody>
