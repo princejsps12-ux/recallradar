@@ -112,7 +112,7 @@ export function Progress({ done, total, label }) {
 export function formatDay(day) {
   try {
     const d = new Date(`${String(day).slice(0, 10)}T00:00:00Z`);
-    return Number.isNaN(d.getTime()) ? String(day) : d.toLocaleDateString(undefined, { dateStyle: 'medium', timeZone: 'UTC' });
+    return Number.isNaN(d.getTime()) ? String(day) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   } catch (e) {
     return String(day || '');
   }

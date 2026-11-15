@@ -152,7 +152,7 @@ export default function Dashboard() {
       <Tabs id="rr-tabs" selected={tab} onChange={setTab}>
         <TabList>
           <Tab>Overview</Tab>
-          <Tab>{d.wardLoaded ? `Ward teams · ${d.wardInfo.mappings.length} of ${d.wardInfo.wards.length} set` : 'Ward teams'}</Tab>
+          <Tab>{'Ward teams'}</Tab>
         </TabList>
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300) }}>

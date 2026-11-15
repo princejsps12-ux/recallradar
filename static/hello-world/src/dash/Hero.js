@@ -36,7 +36,7 @@ export function Hero({ stats }) {
               ) : (
                 <span style={muted}>No device has a Class I recall.</span>
               )}{' '}
-              <span style={muted}>
+              <span>
                 {stats.openRecalls} open recall{stats.openRecalls === 1 ? '' : 's'} affect{stats.openRecalls === 1 ? 's' : ''} them.
               </span>
             </div>
@@ -65,16 +65,16 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
             <label style={muted} htmlFor="rr-project">Create tasks in project</label>
             <Select inputId="rr-project" aria-label="Jira project for new tasks" spacing="compact" options={options} value={options.find((o) => o.value === projectKey) || null} placeholder="Choose a project" onChange={(o) => onProject(o.value)} menuPosition="fixed" />
           </div>
-          {!loading && pendingCount > 0 && (
-            <Button appearance="primary" isDisabled={!canCreate || busy} onClick={onCreateAll}>
+          {pendingCount > 0 && (
+            <Button appearance="primary" isDisabled={loading || !canCreate || busy} onClick={onCreateAll}>
               {`Create all ${pendingCount} tasks…`}
             </Button>
           )}
         </div>
       </div>
       {loading ? (
-        <div aria-hidden="true" style={{ display: 'grid', gap: sp(150), minHeight: '290px' }}>
-          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} height="44px" width="100%" isShimmering />)}
+        <div aria-hidden="true" style={{ display: 'grid', gap: sp(150), minHeight: '340px' }}>
+          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} height="58px" width="100%" isShimmering />)}
         </div>
       ) : matches.length === 0 ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: sp(100) }}>
@@ -128,7 +128,7 @@ export function SummaryCards({ devicesCount, stats, result, summary, summaryStat
   return (
     <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(auto-fit, minmax(210px, 1fr))', gap: sp(200) }}>
       <StatCard label="Devices" value={devicesCount} accent={color.borderBrand}>
-        <div style={muted}>{stats.devices} need action</div>
+        <div style={muted}>monitored for recalls</div>
       </StatCard>
       <StatCard label="Open recalls" value={stats.openRecalls} accent={stats.openRecalls ? color.borderDanger : color.borderSuccess}>
         <div style={muted}>By class</div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { token } from '@atlaskit/tokens';
 import { invoke } from '@forge/bridge';
 import DynamicTable from '@atlaskit/dynamic-table';
 import Select from '@atlaskit/select';
@@ -70,7 +71,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
       cells: [
         { key: 'w', content: <strong>{ward}</strong> },
         { key: 'n', content: n ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>{`${n} ${n === 1 ? 'device' : 'devices'}`}{needs[ward].classI ? <Lozenge appearance="removed">Class I</Lozenge> : null}</span>) : <span style={muted}>None</span> },
-        { key: 't', content: (<div style={{ maxWidth: '320px' }}><Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" appearance="subtle" isDisabled={busy === ward} isLoading={teams === null || busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" /></div>) },
+        { key: 't', content: (<div style={{ maxWidth: '240px' }}><Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" appearance="subtle" styles={mapping ? undefined : { singleValue: (base) => ({ ...base, color: token('color.text.subtle') }) }} isDisabled={busy === ward} isLoading={teams === null || busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" /></div>) },
       ],
     };
   });
@@ -78,7 +79,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
   return (
     <div style={{ paddingTop: sp(200) }}>
       <p style={{ ...muted, fontSize: '14px', maxWidth: '720px' }}>
-        Choose the team for each ward. We suggest assignees from it, and nobody is assigned unless you choose. Wards with a Class I recall come first.
+        Choose the team for each ward. We suggest assignees from it, and nobody is assigned unless you choose. {wardInfo.mappings.length} of {wardInfo.wards.length} wards have a team; wards with a Class I recall come first.
       </p>
       <div role="status" aria-live="polite">
         {loadError && <SectionMessage appearance="error" title="Could not load teams">{loadError}</SectionMessage>}

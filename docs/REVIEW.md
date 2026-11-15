@@ -70,3 +70,17 @@ Written 15 November 2026 by the assistant, scored hard on purpose. Evidence is i
 - README: judge quick start, prerequisites, expected results, safe-try and cleanup note, glossary, data-and-trust section, dashboard and import documented, first-person phrasing removed.
 - Panel moved to design tokens (dark mode); dashboard polish (skeletons, focus, hover, responsive, accessible table, success state); a browser-free UI smoke test.
 - Marketplace listing, privacy, terms and MCP demo guides written.
+
+## Design score history (fresh screenshot-only reviewer each round)
+
+| Round | Score | Main changes after it |
+| --- | --- | --- |
+| 1 | 6.5 | Clearer units, one primary action, consistent buttons |
+| 2 | 7.2 | Links as links, wider actions column, new screenshots |
+| 3 | 7.4 | Quieter hero and cards, stronger drawer scrim |
+| 4 | 7.5 | Aligned lozenge columns, one date format, compact drawer facts |
+| 5 | 8.3 | Partial-list note, calmer ward tab, sticky drawer header |
+| 6 | 8.0 | Matching loading skeleton, three stat cards, capitalised names |
+| 7 | not scored | Tab label constant, no loading layout shift, 240 px team selects |
+
+Target is 9.5. Not reached: reviewer scores vary by about 0.5 between rounds and keep finding new points. Dark mode, the issue panel and phone width have not been re-captured for the latest build.
