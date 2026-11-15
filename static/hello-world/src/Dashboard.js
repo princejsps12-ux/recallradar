@@ -58,7 +58,7 @@ export default function Dashboard() {
   const canCreate = Boolean(d.projectKey);
 
   const page = (children) => (
-    <main style={{ maxWidth: '1200px', margin: '0 auto', padding: sp(300), color: color.text }}>
+    <main style={{ maxWidth: '1200px', margin: '0 auto', padding: `${sp(300)} 0`, color: color.text }}>
       {children}
       <ImportModal isOpen={importOpen} onClose={() => setImportOpen(false)} onImported={d.afterDevicesChanged} />
     </main>

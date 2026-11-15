@@ -30,7 +30,7 @@ export function Hero({ stats }) {
             <Heading size="large">{stats.devices === 1 ? 'device needs action' : 'devices need action'}</Heading>
             <div style={{ marginTop: sp(50) }}>
               {stats.classIDevices > 0 ? (
-                <span style={{ color: color.danger, fontWeight: 600 }}>
+                <span style={{ fontWeight: 600 }}>
                   {stats.classIDevices} {stats.classIDevices === 1 ? 'device has' : 'devices have'} a Class I recall, the most serious.
                 </span>
               ) : (
@@ -110,7 +110,7 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
 
 function StatCard({ label, value, children, accent }) {
   return (
-    <div style={{ ...card, borderTop: `4px solid ${accent || color.borderBold}`, minHeight: '132px' }} role="group" aria-label={label}>
+    <div style={{ ...card, minHeight: '132px' }} role="group" aria-label={label}>
       <div style={muted}>{label}</div>
       <div style={{ fontSize: '32px', fontWeight: 600, lineHeight: 1.2 }}>{value}</div>
       {children}

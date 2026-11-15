@@ -86,7 +86,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
     <ExitingPersistence appear>
       {first && (
         <div key="drawer" style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', justifyContent: 'flex-end' }}>
-          <div onClick={onClose} aria-hidden="true" style={{ position: 'absolute', inset: 0, background: token('color.blanket') }} />
+          <div onClick={onClose} aria-hidden="true" style={{ position: 'absolute', inset: 0, background: token('color.blanket') }}><div style={{ position: 'absolute', inset: 0, background: token('color.blanket') }} /></div>
           <SlideIn enterFrom="right" fade="none" duration="medium">
             {(motion) => (
               <aside
@@ -98,7 +98,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Details for ${first.deviceName}`}
-                style={{ position: 'relative', width: 'min(520px, 100%)', height: '100%', overflowY: 'auto', boxSizing: 'border-box', background: token('elevation.surface.overlay'), boxShadow: token('elevation.shadow.overlay'), color: color.text }}
+                style={{ position: 'relative', width: 'min(520px, 100%)', height: '100%', overflowY: 'auto', boxSizing: 'border-box', background: token('elevation.surface.overlay'), boxShadow: token('elevation.shadow.overlay'), borderLeft: `1px solid ${color.border}`, color: color.text }}
               >
                 <div style={{ padding: sp(300) }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: sp(100) }}>

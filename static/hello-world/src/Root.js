@@ -13,6 +13,7 @@ export default function Root() {
     view.theme.enable().catch(() => {});
     document.body.style.background = token('elevation.surface');
     document.body.style.color = token('color.text');
+    document.body.style.margin = '0';
     view
       .getContext()
       .then((context) => setType((context && context.extension && context.extension.type) || 'jira:issuePanel'))

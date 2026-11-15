@@ -3,7 +3,6 @@ import { invoke } from '@forge/bridge';
 import DynamicTable from '@atlaskit/dynamic-table';
 import Select from '@atlaskit/select';
 import SectionMessage from '@atlaskit/section-message';
-import Spinner from '@atlaskit/spinner';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import { sp, muted, color } from '../ui/kit';
 import Lozenge from '@atlaskit/lozenge';
@@ -70,7 +69,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
       key: ward,
       cells: [
         { key: 'w', content: <strong>{ward}</strong> },
-        { key: 'n', content: n ? <Lozenge appearance={needs[ward].classI ? 'removed' : 'moved'} isBold>{`${n} ${n === 1 ? 'device needs' : 'devices need'} action`}</Lozenge> : <span style={muted}>None need action</span> },
+        { key: 'n', content: n ? <Lozenge appearance={needs[ward].classI ? 'removed' : 'moved'}>{`${n} ${n === 1 ? 'device needs' : 'devices need'} action`}</Lozenge> : <span style={muted}>None need action</span> },
         { key: 't', content: (<div style={{ maxWidth: '320px' }}><Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" isDisabled={teams === null || busy === ward} isLoading={busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" /></div>) },
       ],
     };
@@ -87,7 +86,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
         {teams && teams.length === 0 && <SectionMessage appearance="information" title="No teams yet">You are not in any team in your Atlassian directory, so there is nothing to choose from.</SectionMessage>}
       </div>
       {teams === null && !loadError ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: sp(100) }}><Spinner size="small" label="Loading teams" /> Loading teams…</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: sp(100) }}><span role="status">Loading teams…</span></div>
       ) : null}
       {wardInfo.wards.length === 0 ? (
         <SectionMessage appearance="information" title="No wards yet">Load the demo hospital or import your devices; their wards appear here.</SectionMessage>
