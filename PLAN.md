@@ -28,7 +28,7 @@ Turned "RecallRadar Assistant" into a real agent: four reusable `action` modules
 
 - [x] **Probed first.** Full findings: [`docs/teamwork-graph-findings.md`](docs/teamwork-graph-findings.md). The probe and every temporary artifact (connector, web triggers, action, graph scopes) were removed; the app is back to the Step B state (10.0.0).
 - [x] **Reading works, but there is no team owner.** Teams (20 on the demo site) and members are readable as a user via `requestTeamworkGraph` (needs a `company_operation` operation name; `asApp` does not have it). The team and user types have no owner, manager or role field.
-- [ ] **Writing recalls to the graph is blocked on your consent.** Creating the connection shows a legal dialog (data ingested, shared with MCP clients, visible to every workspace user). I did not accept it. Also, the object types are a fixed list (a recall can only be an `atlassian:document`), links to Jira tasks are documented, and links to devices or teams are not.
+- [x] **Decision (15 Nov 2026): skip graph writes.** Writing recalls to the graph was blocked on a consent only the user can give, and was not wanted. Step D's Confluence pages cover the same visibility. Original blocker: Creating the connection shows a legal dialog (data ingested, shared with MCP clients, visible to every workspace user). I did not accept it. Also, the object types are a fixed list (a recall can only be an `atlassian:document`), links to Jira tasks are documented, and links to devices or teams are not.
 - Decisions needed from you are listed at the end of the findings document (accept the consent and what to ingest, how to choose an assignee without an owner, or skip graph writes).
 
 ## Step D: Confluence page per recall
