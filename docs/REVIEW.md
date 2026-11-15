@@ -5,7 +5,7 @@ Written 15 November 2026 by the assistant, scored hard on purpose. Evidence is i
 | Criterion | Score | One line |
 | --- | --- | --- |
 | Technical implementation | 8 / 10 | Deep, tested, safe; a few things unproven live |
-| Design | 7 / 10 | Polished dashboard with real states and keyboard focus; still hand-styled and not visually reviewed |
+| Design | 7.5 / 10 | Polished dashboard, seen live on desktop and phone width; still hand-styled, no dark-mode or screen-reader pass |
 | Potential impact | 7 / 10 | Real problem, honest scope, but data entry is thin |
 | Innovation (quality of idea) | 8 / 10 | Explained matching and trust rules are the differentiator |
 | Presentation | 5 / 10 | The weakest area: no video, no screenshots, install link and support contact still blank |
@@ -26,10 +26,12 @@ Written 15 November 2026 by the assistant, scored hard on purpose. Evidence is i
 **Strong:** the dashboard uses Atlassian design tokens (light and dark) with light fallbacks, summary cards, labelled badges (colour is never the only signal), filters with a live "Showing N of M" status, loading skeletons instead of a bare "Loading", a proper success state, first-run, error and import screens, a visible keyboard focus ring, hover and disabled states, a sticky table header with an accessible caption, reasons shown in the table, reduced-motion support, and a narrow-screen layout that hides secondary columns. The panel uses the same tokens. `npm run test:ui` clicks these flows in a simulated browser.
 
 **Why not 8 yet (honest)**
-1. **Not visually verified after the polish.** The browser tool was offline, so the new look has been built and smoke-tested but not seen on a real screen, in dark mode or at phone width. *Do this first: open the dashboard in light and dark and at 400 px.*
+1. **Seen live on desktop and at 430 px wide** (the phone layout hides the Team column and the table fits), but **not in dark mode**.
 2. Built from plain HTML elements, not Atlaskit components, so it is close to but not exactly Atlassian's look. *The step that would most raise the score.*
 3. The issue panel is still dense (several buttons per match row); the ward-to-team mapping is 14 native dropdowns in the panel and is not on the dashboard.
 4. No screen-reader pass and no designer review.
+
+**Found by looking at the live page, and fixed:** the shared stylesheet was not being applied at all, because Jira's iframe ignores a `<style>` element (only `style="..."` attributes and constructable stylesheets work). That made the hidden table caption visible and switched off the focus ring, hover, shimmer and responsive rules. The CSS is now installed through `adoptedStyleSheets` (`Root.js`). Lesson: judge looks on the real page, not only in a simulated browser.
 
 ## Potential impact: 7
 

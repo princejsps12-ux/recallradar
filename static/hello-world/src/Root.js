@@ -20,11 +20,31 @@ const GLOBAL_CSS = `
 @media (max-width: 720px) { .rr .rr-hide-sm { display: none; } .rr table { font-size: 13px; } }
 `;
 
+// Jira's iframe does not apply a <style> element (the page's content security policy blocks inline style
+// elements; only style="..." attributes work). A constructable stylesheet is not blocked, so the CSS goes in
+// that way, with the <style> element only as a fallback for browsers without it.
+function installStyles() {
+  try {
+    if (typeof CSSStyleSheet !== 'undefined' && 'adoptedStyleSheets' in document) {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(GLOBAL_CSS);
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+      return;
+    }
+  } catch (error) {
+    // fall through to the <style> element
+  }
+  const element = document.createElement('style');
+  element.textContent = GLOBAL_CSS;
+  document.head.appendChild(element);
+}
+
 // One bundle serves two modules: the issue panel (App) and the full-page dashboard. The module type
 // says which. view.theme.enable() switches on Atlassian design tokens (light and dark).
 export default function Root() {
   const [type, setType] = useState(null);
   useEffect(() => {
+    installStyles();
     view.theme.enable().catch(() => {});
     view
       .getContext()
@@ -34,7 +54,6 @@ export default function Root() {
   if (type === null) return null;
   return (
     <div className="rr">
-      <style>{GLOBAL_CSS}</style>
       {type === 'jira:globalPage' ? <Dashboard /> : <App />}
     </div>
   );

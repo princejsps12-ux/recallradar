@@ -114,6 +114,8 @@ Only **exact** and **likely** matches get a task. Due date is calendar days from
 
 ## Gotchas learned the hard way
 
+- **Jira's Custom UI iframe ignores a `<style>` element** (CSP). Only inline `style="..."` attributes work, plus constructable stylesheets (`document.adoptedStyleSheets`), which `Root.js` uses for hover, focus, media queries and animation. Anything that needs a pseudo-class or media query must go through that sheet; visually-hidden text must be inline-styled. The jsdom smoke test cannot see this: look at the live page.
+
 - **`route` template**: only interpolate single path *segments* (ids). Interpolating a value that contains `/` throws "Disallowing path manipulation attempt".
 - **`@forge/api` has no `storage`** in this version: use `@forge/kvs` (`kvs.get/set/delete/query`), scope `storage:app`.
 - **Queue consumer events** carry data in `event.body` (not `payload`); `queue.push({ body })` wraps the data.
