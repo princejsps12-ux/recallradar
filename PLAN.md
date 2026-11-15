@@ -41,11 +41,11 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 - [x] Agent and MCP: `who_handles_ward` (read-only); the agent's task preview can propose assignees (`assignSuggested`) and confirming assigns exactly those people.
 - [x] README lists **exactly the two Teamwork Graph calls** made.
 - [x] Deployed (14.x); installs upgraded in Jira and Confluence. Rovo chat: `who_handles_ward` answered "no team mapped" without guessing.
-- [ ] **Live panel check pending**: the test machine's DNS refuses `*.cdn.prod.atlassian-dev.net` (Forge's CDN), so the panel iframe cannot load there. Needs: switch the Mac's DNS (for example to 1.1.1.1 / 8.8.8.8) or another network, then map ICU to a team, create a task with "Create & assign", and ask the agent "Who handles the ICU?".
+- [x] Live panel check (after the user fixed DNS): team list, mapping, team line, suggestion count and the off-by-default checkbox all work. Found and fixed: the graph API caps `first` at 25. [ ] Not clicked live: a real assignment (it would notify people).
 
 ## Step E: Panel button for the Confluence page
 
-- [x] **Create Confluence recall page** in the panel: space chooser (read from Confluence, never guessed), recall chooser (all open or one), result links. Resolvers `listSpaces` and `createRecallPage` reuse the agent action's service. Checked in a simulated panel; the live click is pending for the same DNS reason as above.
+- [x] **Create Confluence recall page** in the panel: space chooser (read from Confluence, never guessed), recall chooser (all open or one), result links. Resolvers `listSpaces` and `createRecallPage` reuse the agent action's service. Verified live: updated the Z-0208-2027 page in Mobile Development and showed its link.
 
 ## Step D: Confluence page per recall
 

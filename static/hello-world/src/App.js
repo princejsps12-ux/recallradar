@@ -320,7 +320,10 @@ function RecallPages({ result }) {
       const response = await invoke('createRecallPage', { spaceKey, recallNumber });
       if (response && response.ok && response.state === 'done') {
         setPages(response.pages);
-        const parts = [response.message];
+        // Our own wording: response.message is written for the Rovo agent, not for a person.
+        const made = response.pages.filter((p) => p.action === 'created').length;
+        const updated = response.pages.filter((p) => p.action === 'updated').length;
+        const parts = [`${made} page${made === 1 ? '' : 's'} created and ${updated} updated in the ${response.space.name} space.`];
         if (response.failed.length) parts.push(`${response.failed.length} failed (${response.failed[0].error})`);
         if (response.notIncluded) parts.push(`${response.notIncluded} more recalls were not included: choose them one at a time.`);
         setMessage(parts.join(' '));

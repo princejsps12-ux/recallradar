@@ -179,7 +179,7 @@ query recallradar_myteams($userId: ID!, $first: Int) {
 }
 ```
 
-Variables: `userId` = `ari:cloud:identity::user/<the signed-in person's account id>`, `first` = 50. Runs when you open **Ward teams** in the panel (to fill the team dropdown) and when a ward-to-team choice is saved (the server checks that the team really is in this list, and takes the team's **name from the graph**, not from the browser).
+Variables: `userId` = `ari:cloud:identity::user/<the signed-in person's account id>`, `first` = 25. Runs when you open **Ward teams** in the panel (to fill the team dropdown) and when a ward-to-team choice is saved (the server checks that the team really is in this list, and takes the team's **name from the graph**, not from the browser).
 
 **Call 2: the members of one team** (operation `recallradar_teammembers`)
 
@@ -191,7 +191,7 @@ query recallradar_teammembers($teamAri: ID!, $first: Int) {
 }
 ```
 
-Variables: `teamAri` = a saved team's ARI (`ari:cloud:identity::team/<id>`), `first` = 50. Runs when the panel suggests an assignee, when a chosen assignee is checked before creating tasks, and when the agent or an MCP client asks `who_handles_ward`. A team is read once per request, however many tasks use it.
+Variables: `teamAri` = a saved team's ARI (`ari:cloud:identity::team/<id>`), `first` = 25. Runs when the panel suggests an assignee, when a chosen assignee is checked before creating tasks, and when the agent or an MCP client asks `who_handles_ward`. A team is read once per request, however many tasks use it.
 
 That is all: **two read queries**. Scopes: `read:graph:team:atlassian` and `read:graph:user:atlassian`.
 
@@ -219,15 +219,15 @@ The rule (written once, in `SUGGESTION_RULE` in [`src/teamService.js`](src/teamS
 
 - **Verified against the live API** (earlier probe on the demo site): both queries return data in exactly the shape the code parses (20 teams for the demo user; members with account ids and names).
 - **Verified in unit tests** with a fake graph: query text, variables, parsing, the suggestion rule, balancing across a team, refusing someone who is not in the team, and the agent's preview-then-confirm with assignees.
-- **Verified on the demo site**: the agent's `who_handles_ward` runs; for a ward with no team it says so and points to the panel instead of guessing.
-- **Verified in a simulated panel** (the real React code run in jsdom with a stubbed bridge): team line, suggestion, the two buttons, and the `assignees` sent to the server.
-- **Not yet verified end to end in the live panel**: choosing a team, then creating a task with an assignee in Jira. The panel could not be opened from the test machine at that moment (its network refused to resolve Forge's CDN host).
+- **Verified live on the demo site** (panel and agent): the team list loads from the graph; ICU and Cath Lab were mapped to a team and the choice is saved ("1 of 14 wards mapped"); the Cath Lab row shows **Team: Team Atlas (from Teamwork Graph)**; the "create all" confirmation offers **Also assign the suggested team member (7 of 29)**, unchecked by default; the agent's `who_handles_ward` says "no team" for an unmapped ward without guessing. The live check found one real bug: the API refuses `first` above 25, so both calls now ask for 25.
+- **Verified live, Confluence button**: choosing Mobile Development and recall Z-0208-2027 updated the existing page and returned its link.
+- **Not clicked live**: an actual assignment ("Create & assign" or the checked box), because it would assign and notify real people on the demo site. The request it sends was checked in a simulated panel and the server rules in unit tests.
 
 ### Limits
 
 - Only people and teams the **signed-in person** can see in the graph are shown (the calls run as them).
 - A person who is in the team but cannot be assigned in the Jira project makes Jira refuse that task; it is reported as failed with Jira's reason and can be retried unassigned.
-- Only the first 50 teams and 50 members are read.
+- Only the first 25 teams and 25 members are read (the API refuses a larger page).
 
 ## The Rovo agent
 

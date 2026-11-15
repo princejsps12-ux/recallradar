@@ -18,10 +18,11 @@
 // `request(query, variables, operationName)` is requestTeamworkGraph as the user, injected so the
 // parsing here is unit tested without Forge. No Forge imports.
 
-// How many teams / members to ask for per call. A hospital's wards are few; this is the API's page size
-// and a generous ceiling for one person's teams or one team's members.
-export const TEAM_PAGE_SIZE = 50;
-export const MEMBER_PAGE_SIZE = 50;
+// How many teams / members to ask for per call. The API REJECTS anything above 25 ("The 'first' argument
+// must not exceed 25", found on the live site), so 25 is its maximum page size. A hospital's wards are
+// few, so one page is enough; the README states this limit.
+export const TEAM_PAGE_SIZE = 25;
+export const MEMBER_PAGE_SIZE = 25;
 
 export const OPERATIONS = Object.freeze({
   MY_TEAMS: 'recallradar_myteams',

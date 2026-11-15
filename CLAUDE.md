@@ -90,7 +90,7 @@ The feature (all pure and unit tested, Forge only in `runtime.js`/`index.js`/`ro
 - `src/teamService.js`: `SUGGESTION_RULE` (fewest open RecallRadar tasks, then first name), `setWardTeam` (team must be in the caller's graph teams; the **name comes from the graph**), `assigneesForMatches`, `checkExplicitAssignees`, `whoHandlesWard`.
 - **Ask before assigning**: nothing is assigned by default. The panel sends only account ids; the server re-checks each against the ward's team (`checkExplicitAssignees`) before `createTasks({ assignees })`. Graph down means tasks are created **unassigned** with a note, never blocked.
 - Resolvers: `getWardTeams` (storage only, no graph call), `listTeams`, `setWardTeam`, `suggestAssignees`, `createTasks` with `assignees`.
-- Verified live: probe shapes and `who_handles_ward` in Rovo chat (unmapped ward). **Not yet verified live**: mapping a team and assigning a task in the panel (see the DNS gotcha below).
+- Verified live: mapping, team line, suggestions, `who_handles_ward`. The API **rejects `first` above 25** (page size is 25). **Not clicked live**: a real assignment (it notifies people; ask first).
 
 ### Jira tasks for matches
 
