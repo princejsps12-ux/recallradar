@@ -4,9 +4,10 @@ import Modal, { ModalBody, ModalFooter, ModalHeader, ModalTitle, ModalTransition
 import Button from '@atlaskit/button/new';
 import Textarea from '@atlaskit/textarea';
 import Select from '@atlaskit/select';
+import Checkbox from '@atlaskit/checkbox';
 import SectionMessage from '@atlaskit/section-message';
 import Spinner from '@atlaskit/spinner';
-import { sp, muted } from '../ui/kit';
+import { sp, color, muted } from '../ui/kit';
 import { affectedMatches } from '../dashboardData.mjs';
 
 const EXAMPLE = 'Name\tManufacturer\tModel\tSerial\tWard\nSigma Spectrum pump\tBaxter Healthcare\t35700BAX2\tSP-30977\tMed-Surg 4E';
@@ -62,7 +63,7 @@ export function ImportModal({ isOpen, onClose, onImported }) {
           <ModalBody>
             <p style={{ marginTop: 0, marginBottom: sp(200) }}>Copy rows from a spreadsheet (or a .csv) and paste them here. The first row names the columns: <strong>Manufacturer</strong> and <strong>Model</strong> are required; Name, Type, Serial (or Lot) and Ward are optional. Up to 200 devices at a time. Importing replaces the devices you imported before and leaves the demo hospital alone. <strong>Do not include patient data.</strong></p>
             <Textarea aria-label="Devices to import" placeholder={EXAMPLE} minimumRows={8} resize="vertical" value={text} onChange={(e) => setText(e.target.value)} />
-            <div role="status" aria-live="polite" style={{ marginTop: sp(100), minHeight: '72px' }}>
+            <div role="status" aria-live="polite" style={{ marginTop: sp(150), minHeight: '48px' }}>
               {problems.length > 0 && (
                 <SectionMessage appearance="error" title="Nothing was imported">
                   <ul style={{ margin: 0, paddingLeft: '20px' }}>{problems.map((p) => <li key={p}>{p}</li>)}</ul>
@@ -70,23 +71,53 @@ export function ImportModal({ isOpen, onClose, onImported }) {
               )}
               {done && <SectionMessage appearance="success">{done}</SectionMessage>}
             </div>
+            <section aria-label="Remove devices" style={{ borderTop: `1px solid ${color.border}`, marginTop: sp(200), paddingTop: sp(200) }}>
+              <div style={{ fontWeight: 600 }}>Remove devices</div>
+              {removeAsk ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'center', marginTop: sp(100) }}>
+                  <span>{removeAsk === 'all' ? 'Remove ALL devices, including the demo hospital?' : 'Remove all devices you imported?'} This cannot be undone.</span>
+                  <Button appearance="danger" spacing="compact" isLoading={busy} onClick={remove}>Yes, remove them</Button>
+                  <Button appearance="subtle" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('')}>Keep them</Button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center', marginTop: sp(100) }}>
+                  <Button appearance="danger" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('imported')}>Remove imported devices</Button>
+                  <Button appearance="danger" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('all')}>Remove all devices</Button>
+                </div>
+              )}
+            </section>
           </ModalBody>
           <ModalFooter>
-            {removeAsk ? (
-              <>
-                <span style={{ marginRight: 'auto' }}>{removeAsk === 'all' ? 'Remove ALL devices, including the demo hospital?' : 'Remove all devices you imported?'}</span>
-                <Button appearance="danger" isDisabled={busy} onClick={remove}>Yes, remove them</Button>
-                <Button appearance="subtle" onClick={() => setRemoveAsk('')}>Keep them</Button>
-              </>
-            ) : (
-              <>
-                <Button appearance="subtle" isDisabled={busy} onClick={() => setRemoveAsk('imported')}>Remove imported devices</Button>
-                <Button appearance="subtle" isDisabled={busy} onClick={() => setRemoveAsk('all')}>Remove all devices</Button>
-                <span style={{ marginRight: 'auto' }} />
-                <Button appearance="subtle" onClick={onClose}>Cancel</Button>
-                <Button appearance="primary" isLoading={busy} isDisabled={!text.trim()} onClick={submit}>Import devices</Button>
-              </>
+            <Button appearance="subtle" onClick={onClose}>Cancel</Button>
+            <Button appearance="primary" isLoading={busy && !removeAsk} isDisabled={!text.trim()} onClick={submit}>Import devices</Button>
+          </ModalFooter>
+        </Modal>
+      )}
+    </ModalTransition>
+  );
+}
+
+// "Create all": one confirmation for every device and recall that still has no task, with the optional
+// assignment (off by default). Tasks go in the project chosen on the dashboard.
+export function CreateAllModal({ isOpen, onClose, count, suggestedCount, projectName, onConfirm, running }) {
+  const [assign, setAssign] = useState(false);
+  return (
+    <ModalTransition>
+      {isOpen && (
+        <Modal onClose={onClose} width="small" label="Create all tasks">
+          <ModalHeader hasCloseButton><ModalTitle>{`Create ${count} task${count === 1 ? '' : 's'}?`}</ModalTitle></ModalHeader>
+          <ModalBody>
+            <p style={{ marginTop: 0 }}>One Jira task for each device and recall that has none yet, in <strong>{projectName}</strong>. Each has the ward, the reason, a link to the FDA recall and a due date from the recall class. A task is never created twice.</p>
+            {suggestedCount > 0 && (
+              <Checkbox label={`Also assign the suggested team member (${suggestedCount} of ${count}, spread across each ward's team). Nobody is assigned unless you tick this.`} isChecked={assign} onChange={(e) => setAssign(e.target.checked)} />
             )}
+            <div role="status" aria-live="polite" style={{ marginTop: sp(150), minHeight: '24px' }}>
+              {running && <span style={muted}>Creating tasks… this takes a moment.</span>}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button appearance="subtle" isDisabled={running} onClick={onClose}>Cancel</Button>
+            <Button appearance="primary" isLoading={running} onClick={() => onConfirm(assign)}>{`Create ${count}`}</Button>
           </ModalFooter>
         </Modal>
       )}
@@ -163,7 +194,7 @@ export function ConfluenceModal({ isOpen, onClose, result }) {
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button appearance="subtle" onClick={onClose}>Close</Button>
+            <Button appearance="subtle" onClick={onClose}>{outcome && outcome.kind === 'success' ? 'Close' : 'Cancel'}</Button>
             <Button appearance="primary" isLoading={busy} isDisabled={!space} onClick={create}>Create page</Button>
           </ModalFooter>
         </Modal>

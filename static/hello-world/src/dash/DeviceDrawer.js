@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { token } from '@atlaskit/tokens';
 import { SlideIn, ExitingPersistence } from '@atlaskit/motion';
 import Heading from '@atlaskit/heading';
@@ -7,6 +7,7 @@ import Lozenge from '@atlaskit/lozenge';
 import Avatar from '@atlaskit/avatar';
 import SectionMessage from '@atlaskit/section-message';
 import CrossIcon from '@atlaskit/icon/core/cross';
+import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import { router } from '@forge/bridge';
 import { sp, color, muted, ClassLozenge, MatchLozenge } from '../ui/kit';
 import { matchesForDevice } from '../dashboardData.mjs';
@@ -14,6 +15,21 @@ import { pairOf } from '../data/tasks';
 import { openIssue } from './DevicesTable';
 
 const recallUrl = (n) => `https://api.fda.gov/device/enforcement.json?search=recall_number:%22${encodeURIComponent(n)}%22`;
+// Long FDA text starts collapsed: a dense block of 600 characters is hard to scan.
+const SHORT = 220;
+function ExpandableText({ text }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > SHORT;
+  return (
+    <p style={{ margin: 0 }}>
+      {long && !open ? `${text.slice(0, SHORT).trimEnd()}…` : text}{' '}
+      {long && (
+        <Button appearance="link" spacing="none" onClick={() => setOpen(!open)}>{open ? 'Show less' : 'Show more'}</Button>
+      )}
+    </p>
+  );
+}
+
 const FOCUSABLE = 'button, a[href], select, input, textarea, [tabindex]:not([tabindex="-1"])';
 
 function Field({ label, children }) {
@@ -113,12 +129,12 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                           {details.status && <Lozenge>{details.status}</Lozenge>}
                         </div>
                         <div style={muted}>{m.firm}{m.date ? ` · reported ${m.date}` : ''}{details.initiated ? ` · started ${details.initiated}` : ''}</div>
-                        <h3 style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall">Why we think it matches</Heading></h3>
+                        <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">Why we think it matches</Heading></div>
                         <p style={{ margin: 0 }}>{m.reason}</p>
                         {details.reason && (
                           <>
-                            <h3 style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall">What the FDA says is wrong</Heading></h3>
-                            <p style={{ margin: 0 }}>{details.reason}</p>
+                            <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">What the FDA says is wrong</Heading></div>
+                            <ExpandableText text={details.reason} />
                           </>
                         )}
                         <div style={{ marginTop: sp(150), display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center' }}>
@@ -140,7 +156,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                               )}
                             </>
                           )}
-                          <Button appearance="subtle" spacing="compact" onClick={() => router.open(recallUrl(m.recallNumber))}>FDA record</Button>
+                          <Button appearance="link" spacing="compact" iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</Button>
                         </div>
                         {!key && !canCreate && <div style={{ ...muted, marginTop: sp(50) }}>Choose a project on the Overview tab first.</div>}
                         {suggestion && <div style={{ ...muted, marginTop: sp(50) }}>Suggested because they have the fewest open RecallRadar tasks in {suggestion.teamName}. Nobody is assigned unless you choose it.</div>}

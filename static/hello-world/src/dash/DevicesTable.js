@@ -6,7 +6,7 @@ import Lozenge from '@atlaskit/lozenge';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import EmptyState from '@atlaskit/empty-state';
 import { router } from '@forge/bridge';
-import { sp, color, muted, ClassLozenge, MatchLozenge, useNarrow, card } from '../ui/kit';
+import { sp, color, muted, noBreak, ClassLozenge, MatchLozenge, useNarrow, DetailsButton } from '../ui/kit';
 import { CLASSES, UNKNOWN_CLASS, filterMatches, wardsOf, urgencyRank } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 
@@ -41,12 +41,12 @@ export default function DevicesTable({ matches, tasks, teams, onOpen }) {
       onClick: () => onOpen(m.deviceId),
       cells: [
         { key: m.deviceName.toLowerCase(), content: (<div><strong>{m.deviceName}</strong><div style={muted}>{m.deviceManufacturer} {m.deviceModel}</div></div>) },
-        { key: (m.ward || '').toLowerCase(), content: (<div>{m.ward || 'No ward'}{m.ward && teams[m.ward] ? <div style={muted}>{teams[m.ward]}</div> : null}</div>) },
-        { key: m.recallNumber, content: (<div>{m.recallNumber}<div style={muted}>{m.firm}</div></div>) },
+        { key: (m.ward || '').toLowerCase(), content: (<div>{m.ward || 'No ward'}<div style={muted}>{m.ward && teams[m.ward] ? teams[m.ward] : 'No team yet'}</div></div>) },
+        { key: m.recallNumber, content: (<div><span style={noBreak}>{m.recallNumber}</span><div style={muted}>{m.firm}</div></div>) },
         { key: urgencyRank({ ...m, confidence: 'exact' }), content: <ClassLozenge recallClass={m.recallClass} /> },
         { key: m.confidence, content: <MatchLozenge confidence={m.confidence} /> },
         { key: key || '~', content: key ? (<Button appearance="link" spacing="none" onClick={(e) => { e.stopPropagation(); openIssue(key); }}>{key}</Button>) : (<Lozenge>No task</Lozenge>) },
-        { key: 'a', content: (<Button spacing="compact" appearance="subtle" onClick={(e) => { e.stopPropagation(); onOpen(m.deviceId); }}>Details</Button>) },
+        { key: 'a', content: <DetailsButton onClick={(e) => { e.stopPropagation(); onOpen(m.deviceId); }} /> },
       ],
     };
   });
@@ -63,7 +63,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen }) {
           <Select inputId="rr-class-filter" aria-label="Filter by recall class" spacing="compact" options={classOptions} value={classOptions.find((o) => o.value === filters.recallClass)} onChange={(o) => setFilters({ ...filters, recallClass: o.value })} menuPosition="fixed" />
         </div>
         {filtered && (<Button appearance="subtle" onClick={() => setFilters({ ward: '', recallClass: '' })}>Clear filters</Button>)}
-        <span style={muted} role="status" aria-live="polite">Showing {shown.length} of {matches.length}</span>
+        <span style={muted} role="status" aria-live="polite">Showing {shown.length} of {matches.length} device and recall matches</span>
       </div>
       {narrow ? (
         <div>
@@ -77,13 +77,13 @@ export default function DevicesTable({ matches, tasks, teams, onOpen }) {
                   <li key={pairOf(m)} style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: sp(150), background: color.raised }}>
                     <strong>{m.deviceName}</strong>
                     <div style={muted}>{m.deviceManufacturer} {m.deviceModel}</div>
-                    <div style={muted}>{m.ward || 'No ward'}{m.ward && teams[m.ward] ? ` · ${teams[m.ward]}` : ''} · {m.recallNumber}</div>
+                    <div style={muted}>{m.ward || 'No ward'} · {m.ward && teams[m.ward] ? teams[m.ward] : 'No team yet'} · <span style={noBreak}>{m.recallNumber}</span></div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), margin: `${sp(100)} 0`, alignItems: 'center' }}>
                       <ClassLozenge recallClass={m.recallClass} />
                       <MatchLozenge confidence={m.confidence} />
                       {key ? (<Button appearance="link" spacing="none" onClick={() => openIssue(key)}>{key}</Button>) : (<Lozenge>No task</Lozenge>)}
                     </div>
-                    <Button spacing="compact" onClick={() => onOpen(m.deviceId)}>Details</Button>
+                    <DetailsButton onClick={() => onOpen(m.deviceId)} />
                   </li>
                 );
               })}
@@ -96,6 +96,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen }) {
           )}
         </div>
       ) : (
+        <div style={{ marginTop: `calc(-1 * ${sp(300)})` }}>
         <DynamicTable
           caption={<VisuallyHidden id="rr-affected">Devices affected by an open FDA recall</VisuallyHidden>}
           head={head}
@@ -107,6 +108,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen }) {
           emptyView={<EmptyState header="No devices match these filters" description="Try another ward or class, or clear the filters." primaryAction={<Button onClick={() => setFilters({ ward: '', recallClass: '' })}>Clear filters</Button>} />}
           label="Affected devices"
         />
+        </div>
       )}
     </section>
   );

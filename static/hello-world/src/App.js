@@ -3,13 +3,12 @@ import { router } from '@forge/bridge';
 import Button from '@atlaskit/button/new';
 import Spinner from '@atlaskit/spinner';
 import Checkbox from '@atlaskit/checkbox';
-import ProgressBar from '@atlaskit/progress-bar';
 import SectionMessage, { SectionMessageAction } from '@atlaskit/section-message';
 import Avatar from '@atlaskit/avatar';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
-import { sp, color, muted, ClassLozenge, MatchLozenge } from './ui/kit';
+import { sp, color, muted, noBreak, ClassLozenge, MatchLozenge, Progress } from './ui/kit';
 import { affectedMatches, heroStats, sortByUrgency } from './dashboardData.mjs';
 
 const PANEL_ROWS = 5; // the panel stays compact: the rest lives in the dashboard
@@ -52,7 +51,7 @@ export default function App() {
       <div style={{ minHeight: '88px' }}>
         {d.error && <SectionMessage appearance="error">{d.error}</SectionMessage>}
         {running ? (
-          <div role="status" aria-live="polite"><ProgressBar ariaLabel="Checking FDA recalls" value={d.progress.total ? d.progress.done / d.progress.total : 0} isIndeterminate={!d.progress.total} /><span style={muted}>Checking {d.devicesCount} devices against FDA recalls in the background…</span></div>
+          <Progress done={d.progress.done} total={d.progress.total} label="Checking FDA recalls" />
         ) : (
           <div style={{ display: 'flex', gap: sp(100), alignItems: 'center', flexWrap: 'wrap' }}>
             <Button appearance="primary" onClick={() => d.begin(false)}>Check devices for recalls</Button>
@@ -78,7 +77,7 @@ export default function App() {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center', justifyContent: 'space-between', minHeight: '40px' }}>
         <div>
           <strong style={{ fontSize: '16px' }}>{stats.devices} {stats.devices === 1 ? 'device needs' : 'devices need'} action</strong>
-          {stats.classIDevices > 0 && <span style={{ color: color.danger, fontWeight: 600 }}> · {stats.classIDevices} in Class I</span>}
+          {stats.classIDevices > 0 && <span style={{ color: color.danger, fontWeight: 600 }}> · {stats.classIDevices} with a Class I recall</span>}
           <div style={muted}>Checked {new Date(d.result.checkedAt).toLocaleString()}{d.result.stale ? ' (older than 6 hours)' : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: sp(50) }}>
@@ -86,8 +85,8 @@ export default function App() {
           {link}
         </div>
       </div>
-      <div style={{ minHeight: '8px' }} role="status" aria-live="polite">
-        {running && <ProgressBar ariaLabel="Checking FDA recalls" value={d.progress.total ? d.progress.done / d.progress.total : 0} isIndeterminate={!d.progress.total} />}
+      <div style={{ minHeight: '8px' }}>
+        {running && <Progress done={d.progress.done} total={d.progress.total} label="Checking FDA recalls" />}
       </div>
       {d.error && <SectionMessage appearance="error">{d.error}</SectionMessage>}
       {d.note && <SectionMessage appearance={d.note.kind === 'success' ? 'success' : 'warning'} actions={<SectionMessageAction onClick={() => d.setNote(null)}>Dismiss</SectionMessageAction>}>{d.note.text}</SectionMessage>}
@@ -105,7 +104,7 @@ export default function App() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center' }}>
                   <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                     <strong>{m.deviceName}</strong>
-                    <div style={muted}>{m.ward || 'No ward'} · {m.recallNumber}{team ? ` · Team: ${team.teamName} (from Teamwork Graph)` : ''}</div>
+                    <div style={muted}>{m.ward || 'No ward'} · <span style={noBreak}>{m.recallNumber}</span>{team ? ` · Team: ${team.teamName} (from Teamwork Graph)` : ''}</div>
                   </div>
                   <ClassLozenge recallClass={m.recallClass} />
                   <MatchLozenge confidence={m.confidence} />
@@ -115,7 +114,7 @@ export default function App() {
                     <><span style={muted}>Task:</span><Button appearance="link" spacing="none" onClick={() => openIssue(key)}>{key}</Button></>
                   ) : (
                     <>
-                      <Button appearance="primary" spacing="compact" isDisabled={d.creating.active} onClick={() => d.createTasks([m], false)}>Create task</Button>
+                      <Button spacing="compact" isDisabled={d.creating.active} onClick={() => d.createTasks([m], false)}>Create task</Button>
                       {suggestion && (
                         <Button spacing="compact" isDisabled={d.creating.active} onClick={() => d.createTasks([m], true)}>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(75) }}><Avatar size="xsmall" name={suggestion.name} />Create and assign to {suggestion.name}</span>
@@ -144,7 +143,7 @@ export default function App() {
               {d.creating.active && <div role="status" style={muted}>Creating tasks… {d.creating.done} of {d.creating.total} done.</div>}
             </SectionMessage>
           ) : (
-            missing.length > 0 && <div><Button spacing="compact" onClick={() => setConfirmAll(true)}>Create tasks for all ({missing.length})</Button></div>
+            missing.length > 0 && <div><Button appearance="primary" spacing="compact" onClick={() => setConfirmAll(true)}>{`Create all ${missing.length} tasks…`}</Button></div>
           )}
           <div style={muted}>
             {all.length > top.length ? `Showing the ${top.length} most urgent of ${stats.devices} devices. ` : ''}

@@ -4,20 +4,19 @@ import Button from '@atlaskit/button/new';
 import Spinner from '@atlaskit/spinner';
 import Skeleton from '@atlaskit/skeleton';
 import SectionMessage, { SectionMessageAction } from '@atlaskit/section-message';
-import ProgressBar from '@atlaskit/progress-bar';
 import Heading from '@atlaskit/heading';
 import DynamicTable from '@atlaskit/dynamic-table';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
-import { sp, color, card, muted, useNarrow } from './ui/kit';
+import { sp, color, card, muted, useNarrow, Progress } from './ui/kit';
 import { affectedMatches, heroStats, urgentMatches, taskProgress, screenFor } from './dashboardData.mjs';
 import { Hero, UrgentList, SummaryCards } from './dash/Hero';
 import DevicesTable from './dash/DevicesTable';
 import DeviceDrawer from './dash/DeviceDrawer';
 import WardTeamsTab from './dash/WardTeamsTab';
 import FirstRun from './dash/FirstRun';
-import { ImportModal, ConfluenceModal } from './dash/Modals';
+import { ImportModal, ConfluenceModal, CreateAllModal } from './dash/Modals';
 
 // Reserved heights so nothing jumps when the data arrives.
 function LoadingScreen({ quiet }) {
@@ -44,6 +43,7 @@ export default function Dashboard() {
   const [importOpen, setImportOpen] = useState(false);
   const [confluenceOpen, setConfluenceOpen] = useState(false);
   const narrow = useNarrow();
+  const [createAllOpen, setCreateAllOpen] = useState(false);
 
   const screen = screenFor({ devicesCount: d.devicesCount, result: d.result, error: d.devicesCount === null ? d.error : '', loading: false });
   const running = d.progress !== null;
@@ -67,6 +67,7 @@ export default function Dashboard() {
   if (screen === 'loading') return page(<LoadingScreen />);
   if (screen === 'first-run') return page(<FirstRun onLoadDemo={d.loadDemo} onImport={() => setImportOpen(true)} error={d.error} />);
 
+  const ready = screen === 'ready';
   const header = (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'center', justifyContent: 'space-between', marginBottom: sp(100) }}>
       <div style={{ ...muted, fontSize: '14px' }}>
@@ -74,21 +75,16 @@ export default function Dashboard() {
         {d.result && <> Last checked {new Date(d.result.checkedAt).toLocaleString()}{d.result.stale ? ' (older than 6 hours)' : ''}.</>}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100) }}>
-        {screen === 'ready' && <Button onClick={() => d.begin(true)} isDisabled={running}>{running ? 'Checking…' : 'Refresh'}</Button>}
-        {screen === 'ready' && <Button onClick={() => setConfluenceOpen(true)}>Confluence recall page</Button>}
+        <Button onClick={() => d.begin(true)} isDisabled={!ready || running}>{running ? 'Checking…' : 'Refresh'}</Button>
+        <Button onClick={() => setConfluenceOpen(true)} isDisabled={!ready}>Confluence recall page</Button>
         <Button onClick={() => setImportOpen(true)}>Import devices</Button>
       </div>
     </div>
   );
   // The progress and message area always takes the same room, so the page below does not jump.
   const status = (
-    <div style={{ minHeight: '20px', marginBottom: sp(100) }} role="status" aria-live="polite">
-      {running && (
-        <div>
-          <ProgressBar ariaLabel="Checking FDA recalls" value={d.progress.total ? d.progress.done / d.progress.total : 0} isIndeterminate={!d.progress.total} />
-          <span style={muted}>{d.progress.total ? `Checked ${d.progress.done} of ${d.progress.total} FDA searches…` : 'Starting the background check…'} It runs in the background.</span>
-        </div>
-      )}
+    <div style={{ minHeight: '28px', marginBottom: sp(100) }}>
+      {running && <Progress done={d.progress.done} total={d.progress.total} label="Checking FDA recalls" />}
     </div>
   );
   const messages = (
@@ -122,6 +118,13 @@ export default function Dashboard() {
   const urgent = urgentMatches(d.result, d.tasks, 5);
   const progressTasks = taskProgress(d.summary);
   const createOne = (m, assign = false) => d.createTasks([m], assign);
+  const missing = all.filter((m) => !d.tasks[pairOf(m)]);
+  const suggestedCount = missing.filter((m) => d.suggestions[pairOf(m)]).length;
+  const projectName = (d.projects.find((p) => p.key === d.projectKey) || {}).name || d.projectKey;
+  const createAll = async (assign) => {
+    await d.createTasks(missing, assign);
+    setCreateAllOpen(false);
+  };
 
   const recentRows = (d.recent.recalls || []).slice(0, 10).map((r) => ({
     key: r.recallNumber,
@@ -147,14 +150,14 @@ export default function Dashboard() {
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300) }}>
             <Hero stats={stats} />
-            <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} />
+            <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} />
             <SummaryCards devicesCount={d.devicesCount} stats={stats} result={d.result} summary={d.summary} progressTasks={progressTasks} />
             <section style={card} aria-labelledby="rr-affected-h">
-              <h2 id="rr-affected-h" style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium">Affected devices</Heading></h2>
+              <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-affected-h">Affected devices</Heading></div>
               <DevicesTable matches={all} tasks={d.tasks} teams={teams} onOpen={setDrawerDevice} />
             </section>
             <section style={card} aria-labelledby="rr-recent-h">
-              <h2 id="rr-recent-h" style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium">Recent FDA device recalls</Heading></h2>
+              <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-recent-h">Recent FDA device recalls</Heading></div>
               {d.recent.state === 'error' ? (
                 <SectionMessage appearance="warning" title="Could not load recent recalls">The public FDA service did not answer. Try again later.</SectionMessage>
               ) : narrow ? (
@@ -178,6 +181,7 @@ export default function Dashboard() {
         </TabPanel>
       </Tabs>
       <DeviceDrawer deviceId={drawerDevice} result={d.result} tasks={d.tasks} suggestions={d.suggestions} teams={teams} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onClose={() => setDrawerDevice(null)} />
+      <CreateAllModal isOpen={createAllOpen} onClose={() => setCreateAllOpen(false)} count={missing.length} suggestedCount={suggestedCount} projectName={projectName} onConfirm={createAll} running={d.creating.active} />
       <ConfluenceModal isOpen={confluenceOpen} onClose={() => setConfluenceOpen(false)} result={d.result} />
     </>,
   );

@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { token } from '@atlaskit/tokens';
 import Lozenge from '@atlaskit/lozenge';
+import Button from '@atlaskit/button/new';
+import Spinner from '@atlaskit/spinner';
+import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
 
 // Spacing and colours come ONLY from Atlassian design tokens (they follow light and dark mode and meet
 // contrast rules). No hex colours anywhere in the UI code.
-export const sp = (n) => token(`space.${n}`);
+// Token names are zero-padded to three digits: sp(50) is space.050 (4 px), sp(200) is space.200 (16 px).
+export const sp = (n) => token(`space.${String(n).padStart(3, '0')}`);
 export const color = {
   text: token('color.text'),
   subtle: token('color.text.subtle'),
@@ -17,6 +21,9 @@ export const color = {
   borderDanger: token('color.border.danger'),
   borderSuccess: token('color.border.success'),
   borderBrand: token('color.border.brand'),
+  borderBold: token('color.border.bold'),
+  fillBrand: token('color.background.brand.bold'),
+  track: token('color.background.neutral'),
   link: token('color.link'),
 };
 
@@ -28,7 +35,9 @@ export const card = {
   boxSizing: 'border-box',
 };
 
-export const muted = { color: color.subtle, fontSize: '12px', lineHeight: '16px' };
+export const muted = { color: color.subtle, fontSize: '13px', lineHeight: '20px' };
+// Recall numbers such as Z-0208-2027 must never break at their hyphens.
+export const noBreak = { whiteSpace: 'nowrap' };
 
 const CLASS_APPEARANCE = { I: 'removed', II: 'moved', III: 'default' };
 // Text AND colour, so the meaning never depends on colour alone.
@@ -70,4 +79,30 @@ export function useNarrow(maxWidth = 720) {
     return () => media.removeEventListener('change', onChange);
   }, [query]);
   return narrow;
+}
+
+// One look for every "Details" button, on desktop and on a phone.
+export function DetailsButton({ onClick, label = 'Details' }) {
+  return (
+    <Button spacing="compact" iconAfter={ChevronRightIcon} onClick={onClick}>
+      {label}
+    </Button>
+  );
+}
+
+// Check progress in the brand colour (tokens only): a filled bar when the total is known, a spinner when not.
+export function Progress({ done, total, label }) {
+  const known = Boolean(total);
+  return (
+    <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: sp(150), minHeight: '24px' }}>
+      {known ? (
+        <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} style={{ flex: '0 0 160px', height: '6px', borderRadius: '3px', background: color.track, overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(100, Math.round((done / total) * 100))}%`, height: '100%', background: color.fillBrand }} />
+        </div>
+      ) : (
+        <Spinner size="small" label="" />
+      )}
+      <span style={muted}>{known ? `Checked ${done} of ${total} FDA searches` : 'Starting the check'}. You can keep working.</span>
+    </div>
+  );
 }
