@@ -45,7 +45,7 @@ const s = {
   card: { background: color.raised, border: `1px solid ${color.border}`, borderRadius: '8px', padding: space(200) },
   big: { fontSize: '28px', fontWeight: 600, lineHeight: 1.2 },
   section: { background: color.raised, border: `1px solid ${color.border}`, borderRadius: '8px', padding: space(200), marginBottom: space(300) },
-  button: { padding: `${space(100)} ${space(200)}`, borderRadius: '4px', border: `1px solid ${color.border}`, background: color.sunken, color: color.text, cursor: 'pointer', font: 'inherit' },
+  button: { minHeight: '32px', padding: `${space(100)} ${space(200)}`, borderRadius: '4px', border: `1px solid ${color.border}`, background: color.sunken, color: color.text, cursor: 'pointer', font: 'inherit' },
   primary: { padding: `${space(100)} ${space(200)}`, borderRadius: '4px', border: 'none', background: color.brand, color: color.onBrand, cursor: 'pointer', font: 'inherit', fontWeight: 600 },
   hero: { padding: `${space(300)} ${space(200)}`, textAlign: 'center' },
   heroButton: { padding: `${space(200)} ${space(400)}`, fontSize: '18px', borderRadius: '6px', border: 'none', background: color.brand, color: color.onBrand, cursor: 'pointer', fontWeight: 600 },
@@ -97,6 +97,9 @@ function ImportDevices({ onImported, startOpen }) {
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState([]);
   const [done, setDone] = useState('');
+  // A successful import changes the whole screen, which removes this form: do not touch its state after that.
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
   const submit = async () => {
     setBusy(true);
@@ -112,9 +115,9 @@ function ImportDevices({ onImported, startOpen }) {
         setProblems((response && response.errors) || ['Could not import the devices.']);
       }
     } catch (e) {
-      setProblems(['Could not reach RecallRadar. Check your connection and try again.']);
+      if (mounted.current) setProblems(['Could not reach RecallRadar. Check your connection and try again.']);
     }
-    setBusy(false);
+    if (mounted.current) setBusy(false);
   };
 
   if (!open) {
@@ -352,9 +355,14 @@ export default function Dashboard() {
   }
   if (screen === 'loading') {
     return (
-      <div style={s.page} role="status" aria-live="polite">
-        <h1 style={s.h1}>RecallRadar</h1>
-        <p style={s.muted}>Loading your devices and recalls…</p>
+      <div style={s.page} role="status" aria-live="polite" aria-busy="true">
+        <span className="rr-sr-only">Loading your devices and recalls…</span>
+        <div style={s.grid} aria-hidden="true">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="rr-skeleton" style={{ height: '110px' }} />
+          ))}
+        </div>
+        <div className="rr-skeleton" style={{ height: '320px' }} aria-hidden="true" />
       </div>
     );
   }
@@ -504,23 +512,31 @@ export default function Dashboard() {
               Clear filters
             </button>
           )}
-          <span style={s.muted}>
+          <span style={s.muted} role="status" aria-live="polite">
             Showing {shown.length} of {all.length}
           </span>
         </div>
         {all.length === 0 ? (
-          <p style={{ ...s.muted, fontSize: '14px' }}>
-            Good news: none of your {devicesCount} devices match an open recall with an exact or likely match.
-          </p>
+          <div style={{ display: 'flex', gap: space(150), alignItems: 'center', padding: space(200), background: color.successSubtle, borderRadius: '6px' }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="11" fill={color.success} />
+              <path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <div>
+              <strong>No open recalls match your devices.</strong>
+              <div style={s.muted}>None of your {devicesCount} devices match an open recall with an exact or likely match.</div>
+            </div>
+          </div>
         ) : shown.length === 0 ? (
           <p style={{ ...s.muted, fontSize: '14px' }}>No affected devices match these filters.</p>
         ) : (
           <div style={s.tableWrap}>
             <table style={s.table}>
+              <caption className="rr-sr-only">Devices affected by an open FDA recall</caption>
               <thead>
                 <tr>
                   {['Device', 'Ward', 'Team', 'Recall', 'Class', 'Match', 'Task'].map((h) => (
-                    <th key={h} style={s.th} scope="col">
+                    <th key={h} style={s.th} scope="col" className={h === 'Team' ? 'rr-hide-sm' : undefined}>
                       {h}
                     </th>
                   ))}
@@ -538,10 +554,11 @@ export default function Dashboard() {
                         </div>
                       </td>
                       <td style={s.td}>{m.ward || 'No ward'}</td>
-                      <td style={s.td}>{(m.ward && teams[m.ward]) || <span style={s.muted}>not mapped</span>}</td>
-                      <td style={s.td} title={m.reason}>
+                      <td style={s.td} className="rr-hide-sm">{(m.ward && teams[m.ward]) || <span style={s.muted}>not mapped</span>}</td>
+                      <td style={s.td}>
                         {m.recallNumber}
                         <div style={s.muted}>{m.firm}</div>
+                        <div style={{ ...s.muted, maxWidth: '360px' }}>{m.reason}</div>
                       </td>
                       <td style={s.td}>
                         <Badge background={CLASS_COLOR[m.recallClass] || CLASS_COLOR[UNKNOWN_CLASS]}>{m.recallClass ? `CLASS ${m.recallClass}` : 'CLASS ?'}</Badge>

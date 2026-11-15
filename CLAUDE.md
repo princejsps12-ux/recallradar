@@ -126,7 +126,7 @@ Only **exact** and **likely** matches get a task. Due date is calendar days from
 - Rovo agent "RecallRadar Assistant" is only a hello-world test (`hello-action`); a free developer site has no Rovo chat, the demo site does.
 
 - **Forge panel (Custom UI) will not load if the machine's DNS refuses Forge's CDN host.** Symptom: the panel stays a grey skeleton and the console says `Failed to open iframe bridge ... Handshake timeout`. Check: `dig <host>.cdn.prod.atlassian-dev.net` (host from the iframe `src`) returns `status: REFUSED` on the system resolver but resolves via `@1.1.1.1`. Not an app bug (an old bundle failed identically); fix is the user's network or DNS. Rovo chat and resolvers still work.
-- **A jsdom harness is a good panel check when the live panel is unreachable**: transpile `static/hello-world/src/App.js` with the `@babel/core` that react-scripts installs, stub `@forge/bridge`, render with `react-dom` and `act`. It caught nothing here but proves the click-to-request flow.
+- **UI smoke test without a browser**: `npm run test:ui` (`scripts/ui-smoke.cjs`) renders the real panel and dashboard in jsdom with a stubbed `@forge/bridge`, clicks the main flows (first run, filters, import, errors) and exits non-zero on a failure. Use it when the Chrome tool or the live panel is unreachable. It cannot judge looks.
 
 ## Conventions
 

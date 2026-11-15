@@ -5,7 +5,8 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "test:ui": "node scripts/ui-smoke.cjs"
   },
   "devDependencies": {
     "eslint": "^8.56.0",
