@@ -23,7 +23,7 @@ export function Hero({ stats }) {
         </>
       ) : (
         <>
-          <div style={{ fontSize: '56px', fontWeight: 700, lineHeight: 1, color: stats.classIDevices ? color.danger : color.text, flex: '0 0 auto' }} aria-hidden="true">
+          <div style={{ fontSize: '56px', fontWeight: 700, lineHeight: 1, color: color.text, flex: '0 0 auto' }} aria-hidden="true">
             {stats.devices}
           </div>
           <div style={{ minWidth: 0 }}>
@@ -103,6 +103,9 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
           ))}
         </ol>
       )}
+      {!loading && deviceCount > matches.length && matches.length > 0 && (
+        <div style={{ ...muted, marginTop: sp(100) }}>Showing the {matches.length} most urgent of {deviceCount} devices without a task. All of them are in the list below.</div>
+      )}
       {!canCreate && matches.length > 0 && <div style={{ ...muted, marginTop: sp(100) }}>Choose a project above to create tasks.</div>}
     </section>
   );
@@ -125,7 +128,7 @@ export function SummaryCards({ devicesCount, stats, result, summary, summaryStat
   return (
     <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(auto-fit, minmax(210px, 1fr))', gap: sp(200) }}>
       <StatCard label="Devices" value={devicesCount} accent={color.borderBrand}>
-        <div style={muted}>{stats.devices} of them need action</div>
+        <div style={muted}>in your hospital</div>
       </StatCard>
       <StatCard label="Open recalls" value={stats.openRecalls} accent={stats.openRecalls ? color.borderDanger : color.borderSuccess}>
         <div style={muted}>By class</div>
@@ -141,7 +144,7 @@ export function SummaryCards({ devicesCount, stats, result, summary, summaryStat
       </StatCard>
       <StatCard label="Tasks open" value={summaryState === 'loading' ? <Skeleton height="32px" width="48px" isShimmering /> : progressTasks ? progressTasks.open : '–'}>
         <div style={muted}>
-          {summaryState === 'loading' ? ' ' : summaryState === 'error' ? 'Could not read the task counts.' : none ? 'No tasks yet. Start with Do this first.' : `of ${progressTasks.total}${summary && summary.capped ? '+' : ''} RecallRadar tasks`}
+          {summaryState === 'loading' ? ' ' : summaryState === 'error' ? 'Could not read the task counts.' : none ? 'None created yet.' : `of ${progressTasks.total}${summary && summary.capped ? '+' : ''} RecallRadar tasks`}
         </div>
       </StatCard>
       <StatCard label="Tasks done" value={summaryState === 'loading' ? <Skeleton height="32px" width="48px" isShimmering /> : progressTasks ? progressTasks.done : '–'}>

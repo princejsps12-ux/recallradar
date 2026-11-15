@@ -69,7 +69,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
       key: ward,
       cells: [
         { key: 'w', content: <strong>{ward}</strong> },
-        { key: 'n', content: n ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>{`${n} ${n === 1 ? 'device' : 'devices'}`}{needs[ward].classI ? <Lozenge appearance="removed">Class I</Lozenge> : null}</span>) : <span style={muted}>–</span> },
+        { key: 'n', content: n ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>{`${n} ${n === 1 ? 'device' : 'devices'}`}{needs[ward].classI ? <Lozenge appearance="removed">Class I</Lozenge> : null}</span>) : <span style={muted}>None</span> },
         { key: 't', content: (<div><Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" isDisabled={busy === ward} isLoading={teams === null || busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" /></div>) },
       ],
     };
@@ -77,7 +77,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
 
   return (
     <div style={{ paddingTop: sp(200) }}>
-      <p style={{ ...muted, fontSize: '14px', maxWidth: '640px' }}>
+      <p style={{ ...muted, fontSize: '14px', maxWidth: '720px' }}>
         Choose the team for each ward. We suggest assignees from it, and nobody is assigned unless you choose.
       </p>
       <div role="status" aria-live="polite">
@@ -88,10 +88,10 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
       {wardInfo.wards.length === 0 ? (
         <SectionMessage appearance="information" title="No wards yet">Load the demo hospital or import your devices; their wards appear here.</SectionMessage>
       ) : (
-        <DynamicTable caption={<VisuallyHidden>Ward to team mapping</VisuallyHidden>} label="Ward teams" head={{ cells: [{ key: 'w', content: 'Ward', width: 22 }, { key: 'n', content: 'Devices needing action', width: 28 }, { key: 't', content: 'Team' }] }} rows={rows} rowsPerPage={20} isFixedSize />
+        <div style={{ maxWidth: '900px' }}><DynamicTable caption={<VisuallyHidden>Ward to team mapping</VisuallyHidden>} label="Ward teams" head={{ cells: [{ key: 'w', content: 'Ward', width: 22 }, { key: 'n', content: 'Devices needing action', width: 28 }, { key: 't', content: 'Team', width: 40 }] }} rows={rows} rowsPerPage={20} isFixedSize /></div>
       )}
       {wardInfo.wards.length > 0 && (
-        <p style={{ ...muted, marginTop: sp(150) }}>{wardInfo.mappings.length} of {wardInfo.wards.length} wards have a team. Wards with a Class I recall come first. Teams are read from the Teamwork Graph (read-only) and are the ones you belong to.</p>
+        <p style={{ ...muted, marginTop: sp(150) }}>Wards with a Class I recall come first. Teams are read from the Teamwork Graph (read-only) and are the ones you belong to.</p>
       )}
     </div>
   );

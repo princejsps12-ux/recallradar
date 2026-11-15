@@ -101,7 +101,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                 style={{ position: 'relative', width: 'min(520px, 100%)', height: '100%', overflowY: 'auto', boxSizing: 'border-box', background: token('elevation.surface.overlay'), boxShadow: token('elevation.shadow.overlay'), borderLeft: `1px solid ${color.border}`, color: color.text }}
               >
                 <div style={{ padding: sp(300) }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: sp(100) }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: sp(100), position: 'sticky', top: 0, zIndex: 1, background: token('elevation.surface.overlay'), margin: `-${sp(300)} -${sp(300)} 0`, padding: `${sp(300)} ${sp(300)} 0` }}>
                     <div>
                       <Heading size="large">{first.deviceName}</Heading>
                       <div style={{ ...muted, marginBottom: sp(200) }}>{first.deviceManufacturer} {first.deviceModel}</div>
@@ -128,7 +128,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                           <MatchLozenge confidence={m.confidence} />
                           {details.status && <Lozenge>{details.status}</Lozenge>}
                         </div>
-                        <div style={muted}>{m.firm}{m.date ? ` · reported ${formatDay(m.date)}` : ''}{details.initiated ? ` · started ${formatDay(details.initiated)}` : ''}</div>
+                        <div style={muted}>{m.firm}{details.initiated ? ` · started ${formatDay(details.initiated)}` : ''}{m.date ? ` · reported ${formatDay(m.date)}` : ''}</div>
                         <div style={{ marginTop: sp(50) }}><LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike></div>
                         <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">Why we think it matches</Heading></div>
                         <p style={{ margin: 0 }}>{m.reason}</p>
