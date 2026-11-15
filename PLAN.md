@@ -38,7 +38,7 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 - [x] Pure modules with tests: `src/teamGraph.js` (the two read calls), `src/wardTeams.js` (ward-to-team mapping in Forge storage), `src/teamService.js` (the assignee rule, ward lookups, checks before assigning). 63 new tests.
 - [x] Tasks can carry an assignee (`taskRules`, `taskService`); `jiraClient.openTaskCounts()` feeds the "fewest open tasks" rule.
 - [x] Panel: **Ward teams** mapping (team list read from the graph), **Team: <name> (from Teamwork Graph)** on match rows, suggested assignee with **Create & assign** (asks first), and an off-by-default checkbox for "create all".
-- [x] Agent and MCP: `who_handles_ward` (read-only); the agent's task preview can propose assignees (`assignSuggested`) and confirming assigns exactly those people.
+- [x] Agent and MCP: `who_handles_ward` (read-only); the agent's task preview can propose assignees (`assignSuggested`) and confirming looks the people up again (the preview stores no person).
 - [x] README lists **exactly the two Teamwork Graph calls** made.
 - [x] Deployed (14.x); installs upgraded in Jira and Confluence. Rovo chat: `who_handles_ward` answered "no team mapped" without guessing.
 - [x] Live panel check (after the user fixed DNS): team list, mapping, team line, suggestion count and the off-by-default checkbox all work. Found and fixed: the graph API caps `first` at 25. One real assignment verified live (MOBL-99 assigned to the suggested team member); the "create all" checkbox was not clicked.
@@ -80,3 +80,10 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 - A change that adds scopes or egress needs `--approve MAJOR_VERSION_RULE` and `forge install --upgrade`.
 - Never leave temporary test settings behind (for example a 5-minute scheduled trigger).
 - Real data only: never invent recall numbers, device IDs or links.
+
+## Step J: Privacy hardening (done)
+
+- [x] Previews store no accountId or name (flag only; people are looked up again at confirm time).
+- [x] Expired previews and task guards are deleted (on read, on write, and by the daily cleanup).
+- [x] Saved check result and finished-job copy never kept longer than 24 hours.
+- [x] `.claude/` kept out of the repository; repository published on GitHub (main only).

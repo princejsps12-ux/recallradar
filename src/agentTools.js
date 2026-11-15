@@ -28,7 +28,7 @@ import {
   FDA_RECALL_DATABASE_URL,
 } from './taskRules.js';
 import { createTasks, getTaskStates, selectMatches } from './taskService.js';
-import { assigneesForMatches, checkExplicitAssignees, SUGGESTION_RULE } from './teamService.js';
+import { assigneesForMatches, SUGGESTION_RULE } from './teamService.js';
 
 // --- Limits (each with its reason) ------------------------------------------------------------------
 
@@ -397,6 +397,7 @@ export function createPreviewStore(kv, nowMs = () => Date.now(), makeToken = () 
   const key = (token) => `rovo-preview:${token}`;
 
   async function save(entry) {
+    await purgeExpired().catch(() => {}); // keep the store small: expired previews are deleted, not left behind
     const token = `${nowMs().toString(36)}${makeToken()}`;
     await kv.set(key(token), { ...entry, at: nowMs() });
     return token;
@@ -417,7 +418,21 @@ export function createPreviewStore(kv, nowMs = () => Date.now(), makeToken = () 
     return age >= 0 && age < PREVIEW_TTL_MS ? entry : null;
   }
 
-  return { save, take };
+  // Delete every preview that has expired (or is damaged). Returns how many were deleted.
+  async function purgeExpired() {
+    if (typeof kv.listByPrefix !== 'function') return 0;
+    let deleted = 0;
+    for (const { key: storedKey, value } of await kv.listByPrefix('rovo-preview:')) {
+      const age = value && typeof value.at === 'number' ? nowMs() - value.at : Infinity;
+      if (!(age >= 0 && age < PREVIEW_TTL_MS)) {
+        await kv.delete(storedKey);
+        deleted += 1;
+      }
+    }
+    return deleted;
+  }
+
+  return { save, take, purgeExpired };
 }
 
 // Jira project keys: letters, digits and underscores, starting with a letter (e.g. MOBL).
@@ -429,8 +444,10 @@ function parseProjectKey(value) {
 // inputs: recallNumber, deviceId, ward, recallClass, confidence ("exact"|"likely") choose the matches
 // (at least one is required); projectKey; confirmed (true/false); confirmationToken.
 // Without confirmed=true it only PREVIEWS. deps: { jira, guard, previewStore, now(), defaultProjectKey, team }.
-// assignSuggested=true (preview only) also proposes, for each task, a member of the ward's Teamwork Graph team,
-// shown in the preview; confirming then assigns exactly those people (re-checked against the team first).
+// assignSuggested=true (preview only) also proposes, for each task, a member of the ward's Teamwork Graph team.
+// The preview RECORD keeps no person at all (no account id, no name): it stores only the flag. At confirm
+// time the people are looked up again from the ward's team with the same rule, so they are always current
+// members of the team, and the answer says who was assigned.
 // `team` is { store, graph, openCounts() } (see teamService.js); without it nobody is ever assigned.
 export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
   const { result } = snapshot;
@@ -448,13 +465,12 @@ export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
       return { ok: false, error: 'Nothing was created: that confirmation token is unknown, already used, or older than 10 minutes. Ask for a new preview and confirm again.' };
     }
     const { matches, notFound } = selectMatches(result.matches, entry.pairs);
-    // Only people the user saw in the preview, and only if they are still in the ward's team.
+    // People are looked up NOW (nothing about a person was stored in the preview), from the ward's team.
     let assignees = new Map();
     let assignNote;
-    if (entry.assignees && Object.keys(entry.assignees).length > 0 && deps.team) {
+    if (entry.assignSuggested && deps.team) {
       try {
-        const explicit = Object.fromEntries(Object.entries(entry.assignees).map(([pair, a]) => [pair, a.accountId]));
-        ({ assignees } = await checkExplicitAssignees({ explicit, matches, store: deps.team.store, graph: deps.team.graph }));
+        ({ assignees } = await assigneesForMatches({ matches, store: deps.team.store, graph: deps.team.graph, openCounts: await deps.team.openCounts() }));
       } catch (error) {
         assignNote = 'The Teamwork Graph could not be reached, so the tasks were created without an assignee.';
       }
@@ -549,7 +565,7 @@ export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
   const token = await deps.previewStore.save({
     projectKey,
     pairs: batch.map((m) => ({ recallNumber: m.recallNumber, deviceId: m.deviceId })),
-    ...(proposed.size ? { assignees: Object.fromEntries(proposed) } : {}),
+    ...(wantAssignees && deps.team ? { assignSuggested: true } : {}),
   });
   return {
     ok: true,
@@ -581,7 +597,7 @@ export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
       ? {
           assignment: {
             rule: SUGGESTION_RULE,
-            note: assignNote || (proposed.size ? 'These people are only proposed: they are assigned only if the user confirms.' : 'No one could be proposed.'),
+            note: assignNote || (proposed.size ? 'These people are only proposed. Nothing about them is stored: if the user confirms, the people are looked up again from the ward team with the same rule (so a change in team or workload in between can change who is chosen), and the answer says who was assigned.' : 'No one could be proposed.'),
             noAssignee: assignSkipped.map((s) => ({ pair: s.pair, reason: s.reason })),
           },
         }

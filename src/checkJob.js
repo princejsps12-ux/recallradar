@@ -10,11 +10,11 @@
 // A check that stops reporting (the function crashed or was cut off) must not look "running"
 // forever, so a running record not updated for STALE_JOB_MS counts as failed.
 //
-// `kv` is any object with get(key) and set(key, value) (see kvAdapter.js). There is no atomic
+// `kv` is any object with get(key), set(key, value) and delete(key) (see kvAdapter.js). There is no atomic
 // compare-and-set in Forge storage, so two clicks at the very same moment could both start a
 // job; that only costs a duplicate check, and every step is safe to repeat.
 // No Forge imports here, so everything is unit tested with plain Node.
-import { MAX_CACHE_BYTES } from './matchCache.js';
+import { MAX_CACHE_BYTES, MAX_RETENTION_MS } from './matchCache.js';
 
 export const JOB_KEY = 'job:check';
 
@@ -52,7 +52,25 @@ export function createCheckJobs(kv, nowMs = () => Date.now(), makeId = defaultId
     if (job.status === JOB_STATUS.RUNNING && nowMs() - job.updatedAt >= STALE_JOB_MS) {
       return { ...job, status: JOB_STATUS.FAILED, error: STALE_MESSAGE, finishedAt: job.updatedAt };
     }
+    // A finished job holds a copy of the result, so it obeys the same 24-hour limit as the saved result.
+    if (job.status !== JOB_STATUS.RUNNING && isTooOld(job)) {
+      await kv.delete(JOB_KEY).catch(() => {});
+      return null;
+    }
     return job;
+  }
+
+  const isTooOld = (job) => {
+    const finished = typeof job.finishedAt === 'number' ? job.finishedAt : job.updatedAt;
+    return typeof finished !== 'number' || nowMs() - finished >= MAX_RETENTION_MS;
+  };
+
+  // Delete a finished job record that is older than MAX_RETENTION_MS. Returns true if deleted.
+  async function purgeExpired() {
+    const job = await load();
+    if (!job || job.status === JOB_STATUS.RUNNING || !isTooOld(job)) return false;
+    await kv.delete(JOB_KEY);
+    return true;
   }
 
   // Begin a new job unless one is already running. Returns { started, job }.
@@ -112,5 +130,5 @@ export function createCheckJobs(kv, nowMs = () => Date.now(), makeId = defaultId
     return updateRunning(jobId, () => ({ status: JOB_STATUS.FAILED, error: message, finishedAt: nowMs() }));
   }
 
-  return { current, start, progress, complete, fail };
+  return { current, start, progress, complete, fail, purgeExpired };
 }

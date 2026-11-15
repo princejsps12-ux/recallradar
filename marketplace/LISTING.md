@@ -68,7 +68,7 @@ Try it in a minute: open the dashboard and click **Load demo hospital** (30 devi
 
 ## Data and security notes (for the listing's security questionnaire)
 
-- **What is stored** (Forge storage, `storage:app`, inside Atlassian's infrastructure): the device list (name, type, manufacturer, model, serial/lot, ward), the latest saved check result, the ward-to-team mapping, short-lived task and preview guards. **No patient data is stored or needed.**
+- **What is stored** (Forge storage, `storage:app`, inside Atlassian's infrastructure): the device list (name, type, manufacturer, model, serial/lot, ward), the latest saved check result (deleted after at most 24 hours), the ward-to-team mapping (team id and name), and short-lived task and preview guards (deleted when they expire). **No patient data and no Atlassian account ids, names or emails are stored.**
 - **What leaves Atlassian**: only searches to `api.fda.gov` containing manufacturer and model names from the device list. Nothing else is sent anywhere.
 - **Teamwork Graph**: read-only; two queries (a user's teams, a team's members), run as the signed-in person. Nothing is written to the graph.
 - **Permissions and why**: see the "Permissions" table in the README. Jira work and Confluence page scopes act as the signed-in person. No unused scopes are declared (the Assets scopes were removed until an Assets import exists).

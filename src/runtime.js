@@ -118,3 +118,24 @@ export function taskKeyLookup(snapshot) {
     return getTaskStates({ matches, jira: jiraAsUser, guard: taskGuard });
   };
 }
+
+// Housekeeping: delete everything that has outlived its purpose. Previews and task guards after they expire;
+// the saved check result and the finished job (which holds a copy of it) after 24 hours. Run by the daily
+// trigger before it refreshes the check; reads and writes enforce the same limits on their own.
+export async function cleanupStorage() {
+  const counts = { previews: 0, guards: 0, cache: 0, job: 0 };
+  const steps = [
+    ['previews', () => previewStore.purgeExpired()],
+    ['guards', () => taskGuard.purgeExpired()],
+    ['cache', async () => ((await matchCache.purgeExpired()) ? 1 : 0)],
+    ['job', async () => ((await checkJobs.purgeExpired()) ? 1 : 0)],
+  ];
+  for (const [name, step] of steps) {
+    try {
+      counts[name] = await step();
+    } catch (error) {
+      console.error(`Cleanup of ${name} failed`, error);
+    }
+  }
+  return counts;
+}

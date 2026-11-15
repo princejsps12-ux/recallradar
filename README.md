@@ -112,7 +112,7 @@ A check makes about two dozen openFDA requests and a cold one takes 10 to 14 sec
 
 1. **Clicking "Check devices" starts a background job and returns at once.** The resolver records a job and puts a message on a Forge queue (async events). A queue consumer ([`src/consumer.js`](src/consumer.js), allowed to run for up to 300 seconds) does the work.
 2. **The panel shows progress.** It asks for the job's status every 2 seconds and shows "Checked 14 of 24 FDA searches". If you reload the page mid-check, it picks the running job back up.
-3. **Results are saved for 6 hours** in Forge storage, with a "last checked" time and a **Refresh** button. A saved result is used only while it is under 6 hours old and the device list is unchanged (a fingerprint of the devices). When the panel opens on an **expired** result, it shows that result flagged "older than 6 hours" and refreshes it in the background, so the panel is never empty.
+3. **Results are saved for 6 hours** in Forge storage (an older one is shown flagged as old while a refresh runs, but **nothing is kept longer than 24 hours**), with a "last checked" time and a **Refresh** button. A saved result is used only while it is under 6 hours old and the device list is unchanged (a fingerprint of the devices). When the panel opens on an **expired** result, it shows that result flagged "older than 6 hours" and refreshes it in the background, so the panel is never empty.
 4. **A daily trigger refreshes the saved result** ([`src/scheduled.js`](src/scheduled.js)), so it is usually already there before anyone clicks.
 
 The rules that keep it correct (each has unit tests): a check with failed lookups is shown but **not** saved; only the running job with the right id may be updated, so late or duplicate queue deliveries are skipped; a job that stops reporting for 6 minutes counts as failed; a result too large for storage is reported as a failure, not lost; the search has its own 240-second deadline inside the 300-second limit. The pieces are [`src/checkJob.js`](src/checkJob.js) (job record), [`src/matchService.js`](src/matchService.js) (start / run / status) and [`src/matchCache.js`](src/matchCache.js) (saved result).
@@ -232,8 +232,8 @@ The rule (written once, in `SUGGESTION_RULE` in [`src/teamService.js`](src/teamS
 
 - **Panel, one task**: two buttons, **Create task** (unassigned) and **Create & assign to <name>**.
 - **Panel, all tasks**: a checkbox in the confirmation, off by default.
-- **Agent**: assigning is only proposed when you ask for it (`assignSuggested`); the preview shows each **proposedAssignee**, and confirming assigns **exactly those people**.
-- **Checked again on the server**: the browser (or the preview) only names an account id; before creating, the server re-reads the ward's team and keeps the assignee only if that person is **still in the team**. A made-up request cannot assign anyone else. If the graph cannot be reached, tasks are created **unassigned** and the answer says so.
+- **Agent**: assigning is only proposed when you ask for it (`assignSuggested`); the preview shows each **proposedAssignee**. The preview record stores **no person** (no account id, no name), only the flag: when you confirm, the people are **looked up again** from the ward's team with the same rule and the answer says who was assigned. The rule is deterministic, so you normally get the people you saw, unless the team or the open-task counts changed in between.
+- **Checked on the server**: the panel names an account id only for the one click, and the server re-reads the ward's team and keeps the assignee only if that person is **in the team**. The agent's confirm step looks people up fresh, so it can only ever pick **current** members. A made-up request cannot assign anyone else. If the graph cannot be reached, tasks are created **unassigned** and the answer says so.
 - A ward with no team, or a team with no members you can see, simply gets no suggestion.
 
 ### What was and was not verified
@@ -279,7 +279,7 @@ Forge has no built-in "ask first" setting for an action, so the action itself en
 2. The agent shows that preview and asks "Shall I create these N tasks?"
 3. Only after you say yes does it call the action again with `confirmed=true` and the token. The server creates **exactly the previewed tasks**, whatever else the call asks for. The token works once and expires after 10 minutes.
 
-Assigning is optional: with `assignSuggested` the preview also shows a **proposedAssignee** per task (from the ward's Teamwork Graph team) and the rule used; confirming assigns exactly those people, after re-checking that each is still in the team. See "Teamwork Graph (read-only)".
+Assigning is optional: with `assignSuggested` the preview also shows a **proposedAssignee** per task (from the ward's Teamwork Graph team) and the rule used; confirming looks the people up again from the ward's team (nothing about a person is stored in the preview), that each is still in the team. See "Teamwork Graph (read-only)".
 
 So the agent cannot create a task it has not previewed, and a made-up or reused token creates nothing. Whether the agent actually *asks you* is enforced by its prompt, and was checked in Rovo chat. Rovo also shows its own "Please review" card for any `CREATE` action, so you approve twice (in chat, then on the card). Tasks are created **as you** (the reporter is the person chatting), and at most 20 per confirmation; a larger selection says how many were left out.
 
@@ -466,7 +466,9 @@ forge install --upgrade -e development     # only when scopes or permissions cha
 ## Data and trust
 
 - **No patient data.** The app stores equipment information only: device name, type, manufacturer, model, serial or lot, ward, the saved check, and the ward-to-team mapping. Do not enter patient data.
-- **Where it lives.** Forge app storage, inside Atlassian's infrastructure and scoped to the site. Uninstalling removes it. Jira tasks and Confluence pages are your content and stay.
+- **Where it lives.** Forge app storage, inside Atlassian's infrastructure and scoped to the site. Uninstalling removes it.
+- **No personal data in storage.** The app never saves an Atlassian account id, name or email. Account ids and names are read from the Teamwork Graph only while you use the feature, and the Rovo task preview stores just ids of devices, recalls and the project, not people.
+- **Retention.** The saved check result and the finished-job copy of it are deleted after **24 hours**; task previews are deleted when used or after 10 minutes; task duplicate-guards after 2 minutes. A daily clean-up job deletes anything left over. The device list and ward-to-team mapping stay until you remove them or uninstall. Jira tasks and Confluence pages are your content and stay.
 - **What leaves Atlassian.** Only searches to `api.fda.gov` that contain manufacturer and model names. For that reason the app is **not** eligible for "Runs on Atlassian".
 - **Acts as the person.** Tasks, pages and Teamwork Graph reads run as the signed-in user, so their permissions apply. The Teamwork Graph is only read, never written.
 - **No certification claims.** This README does not claim HIPAA or any other certification.

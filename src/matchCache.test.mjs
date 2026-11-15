@@ -4,6 +4,8 @@ import {
   MATCH_CACHE_KEY,
   CACHE_TTL_HOURS,
   CACHE_TTL_MS,
+  MAX_RETENTION_MS,
+  MAX_RETENTION_HOURS,
   MAX_CACHE_BYTES,
   fingerprintDevices,
   createMatchCache,
@@ -186,4 +188,49 @@ test('clear removes the saved result', async () => {
   await cache.write(devices, result);
   await cache.clear();
   assert.equal(await cache.read(devices), null);
+});
+
+// --- Never kept longer than 24 hours --------------------------------------------------------------------
+
+test('the retention limit is 24 hours and longer than the freshness window', () => {
+  assert.equal(MAX_RETENTION_HOURS, 24);
+  assert.ok(MAX_RETENTION_MS > CACHE_TTL_MS);
+});
+
+test('an expired result is still shown as old, up to the retention limit', async () => {
+  const kv = fakeKv();
+  const clock = { now: T0 };
+  const cache = cacheAt(kv, clock);
+  await cache.write(devices, result);
+  clock.now = T0 + MAX_RETENTION_MS - 1;
+  const found = await cache.peek(devices);
+  assert.equal(found.fresh, false);
+  assert.ok(found.entry);
+});
+
+test('at 24 hours the result is gone and is deleted from storage', async () => {
+  const kv = fakeKv();
+  const clock = { now: T0 };
+  const cache = cacheAt(kv, clock);
+  await cache.write(devices, result);
+  clock.now = T0 + MAX_RETENTION_MS;
+  assert.equal(await cache.peek(devices), null);
+  assert.equal(await cache.read(devices), null);
+  assert.equal(kv.data.has(MATCH_CACHE_KEY), false);
+});
+
+test('purgeExpired deletes only a result that is too old or damaged', async () => {
+  const kv = fakeKv();
+  const clock = { now: T0 };
+  const cache = cacheAt(kv, clock);
+  assert.equal(await cache.purgeExpired(), false); // nothing saved
+  await cache.write(devices, result);
+  clock.now = T0 + MAX_RETENTION_MS - 1;
+  assert.equal(await cache.purgeExpired(), false);
+  assert.equal(kv.data.has(MATCH_CACHE_KEY), true);
+  clock.now = T0 + MAX_RETENTION_MS;
+  assert.equal(await cache.purgeExpired(), true);
+  assert.equal(kv.data.has(MATCH_CACHE_KEY), false);
+  kv.data.set(MATCH_CACHE_KEY, 'garbage');
+  assert.equal(await cache.purgeExpired(), true);
 });

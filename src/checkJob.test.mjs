@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JOB_KEY, JOB_STATUS, STALE_JOB_MS, createCheckJobs } from './checkJob.js';
-import { MAX_CACHE_BYTES } from './matchCache.js';
+import { MAX_CACHE_BYTES, MAX_RETENTION_MS } from './matchCache.js';
 import { fakeKv } from './fakeKv.mjs';
 
 const T0 = Date.UTC(2026, 10, 14, 12, 0, 0);
@@ -168,4 +168,48 @@ test('a storage error while reading is treated as no job', async () => {
     throw new Error('storage down');
   };
   assert.equal(await setup(kv).jobs.current(), null);
+});
+
+// --- A finished job holds a copy of the result, so it is kept at most 24 hours ----------------------------------
+
+async function finishedJob() {
+  const s = setup();
+  const { job } = await s.jobs.start('user');
+  await s.jobs.complete(job.id, { matches: [] });
+  return s;
+}
+
+test('a finished job is returned until 24 hours after it finished', async () => {
+  const s = await finishedJob();
+  s.clock.now += MAX_RETENTION_MS - 1;
+  assert.equal((await s.jobs.current()).status, JOB_STATUS.DONE);
+});
+
+test('after 24 hours the finished job (and its result) is gone and deleted', async () => {
+  const s = await finishedJob();
+  s.clock.now += MAX_RETENTION_MS;
+  assert.equal(await s.jobs.current(), null);
+  assert.equal(s.kv.data.has(JOB_KEY), false);
+});
+
+test('a failed job also goes after 24 hours', async () => {
+  const s = setup();
+  const { job } = await s.jobs.start('user');
+  await s.jobs.fail(job.id, 'boom');
+  s.clock.now += MAX_RETENTION_MS;
+  assert.equal(await s.jobs.current(), null);
+});
+
+test('a running job is never deleted by the retention rule', async () => {
+  const s = setup();
+  await s.jobs.start('user');
+  assert.equal(await s.jobs.purgeExpired(), false);
+});
+
+test('purgeExpired deletes an old finished job and keeps a recent one', async () => {
+  const s = await finishedJob();
+  assert.equal(await s.jobs.purgeExpired(), false);
+  s.clock.now += MAX_RETENTION_MS;
+  assert.equal(await s.jobs.purgeExpired(), true);
+  assert.equal(s.kv.data.has(JOB_KEY), false);
 });

@@ -38,8 +38,8 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 | `src/matching.js` | The six match rules (exact / likely / possible), every threshold a named constant with its reason |
 | `src/openfda.js`, `src/recallSearch.js`, `src/text.js` | openFDA URLs and parsing; which searches to run (per manufacturer + per model, 1-year window); tokenizing |
 | `src/deviceStore.js` | Device list interface (Forge storage today; a read-only Assets import can plug in later) |
-| `src/matchCache.js` | Saved result, 6-hour freshness, fingerprint of the device list; `peek()` also returns expired entries as stale |
-| `src/checkJob.js` | The background job record (running / done / failed, progress, stale-job detection) |
+| `src/matchCache.js` | Saved result, 6-hour freshness, fingerprint of the device list; `peek()` also returns expired entries as stale, but **never past 24 hours** (`MAX_RETENTION_MS`, deleted on read and by the daily cleanup) |
+| `src/checkJob.js` | The background job record (running / done / failed, progress, stale-job detection); a finished job holds a copy of the result, so it also obeys the 24-hour limit |
 | `src/matchService.js` | `requestCheck`, `performCheck`, `getCheckStatus`, `getSavedMatches` |
 | `src/taskRules.js`, `src/taskService.js`, `src/jiraClient.js` | Jira tasks for matches: due-date rule, title/labels/description; duplicate-free creation; the three Jira calls (as the user) |
 | `src/demoHospital.js` | 30 demo devices using real manufacturer/model names and serials from actual recalls |
@@ -66,7 +66,7 @@ Six actions (`list_open_recalls`, `check_device`, `create_remediation_tasks`, `r
 
 - **Saved results only**: tools read `loadSnapshot()` (devices + latest saved check, fresh or expired); they never call openFDA. Saved results carry `recallDetails` (status, initiated, reason per recall) for explanations: a check saved before that change has none until refreshed.
 - **Every answer has `citations`** (the only recall numbers / device ids the agent may quote). Keep that: the "never invent" promise rests on it plus the agent prompt in `manifest.yml`.
-- **Preview then confirm** for task creation: no confirmed flag means preview only and a one-use, 10-minute `confirmationToken`; confirming creates exactly the previewed pairs. Rovo also shows its own "Please review" card for any `actionVerb: CREATE` action (two approvals in practice). Tasks are created as the chatting user. Optional `assignSuggested` (preview only) stores the proposed assignees in the preview; confirming re-checks each is still in the ward's team, then assigns exactly those.
+- **Preview then confirm** for task creation: no confirmed flag means preview only and a one-use, 10-minute `confirmationToken`; confirming creates exactly the previewed pairs. Rovo also shows its own "Please review" card for any `actionVerb: CREATE` action (two approvals in practice). Tasks are created as the chatting user. Optional `assignSuggested` (preview only) stores ONLY the flag in the preview record; at confirm time `assigneesForMatches` looks the people up again. **Never store an accountId or a name in Forge storage** (a privacy promise in the README and PRIVACY.md: previews, guards and caches hold ids of devices/recalls only).
 - Rovo action quirks: inputs are **primitives only** (string, integer, number, boolean); an action `description` is **max 255 characters** and must be **quoted in YAML if it contains `: `**; function keys must be short (`create-remediation-tasks-fn` was rejected as too long, keep to about 20 characters); inputs arrive directly on the payload (with `context`, `orgId`, `contextToken` beside them).
 - Testing the agent: **Ask Rovo**, open the agent picker, search "RecallRadar". The skill shows up in the agent's steps as "Read Skills for agents".
 
@@ -106,6 +106,11 @@ Only **exact** and **likely** matches get a task. Due date is calendar days from
 - Tasks are created **as the clicking user** (`asUser`, scope `write:jira-work`) in the project of the issue the panel is open on, via Jira's bulk endpoint (max 50 per call).
 - **Request size**: about 0.6 s per task and a UI function dies at 25 s (34 tasks took ~20 s). The server caps a request at 25 pairs (`MAX_PAIRS_PER_REQUEST`) and the panel sends batches of 10. Do not raise either without re-measuring.
 - Links: the openFDA record URL for the recall number is the only per-recall link that was verified. FDA's own pages (`ires`, `res.cfm`) return 200 but could not be shown to display the specific recall.
+
+### Privacy rules the code must keep
+
+- **No personal data in Forge storage**: no accountId, name or email anywhere (`ward-teams` holds team ARI and team name only).
+- **Retention**: the saved check and the finished job (it holds a copy) at most **24 hours**; previews 10 minutes and task guards 2 minutes, **deleted** (not just ignored) when they expire: on read, on the next write, and by `cleanupStorage()` in the daily trigger. If you add a new stored record, give it an expiry and add it to `cleanupStorage()`, the tests, README "Data and trust" and `marketplace/PRIVACY.md`.
 
 ## Gotchas learned the hard way
 

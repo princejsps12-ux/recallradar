@@ -37,14 +37,30 @@ export function createTaskGuard(kv, nowMs = () => Date.now()) {
     }
     if (!entry || typeof entry.at !== 'number') return null;
     const age = nowMs() - entry.at;
-    return age >= 0 && age < GUARD_TTL_MS ? entry : null;
+    if (age >= 0 && age < GUARD_TTL_MS) return entry;
+    kv.delete(storageKey(label)).catch(() => {}); // expired: delete it instead of leaving it behind
+    return null;
   }
 
   const reserve = (label) => kv.set(storageKey(label), { at: nowMs() });
   const record = (label, key) => kv.set(storageKey(label), { at: nowMs(), key });
   const release = (label) => kv.delete(storageKey(label));
 
-  return { read, reserve, record, release };
+  // Delete every guard that has expired (or is damaged). Returns how many were deleted.
+  async function purgeExpired() {
+    if (typeof kv.listByPrefix !== 'function') return 0;
+    let deleted = 0;
+    for (const { key, value } of await kv.listByPrefix('task-guard:')) {
+      const age = value && typeof value.at === 'number' ? nowMs() - value.at : Infinity;
+      if (!(age >= 0 && age < GUARD_TTL_MS)) {
+        await kv.delete(key);
+        deleted += 1;
+      }
+    }
+    return deleted;
+  }
+
+  return { read, reserve, record, release, purgeExpired };
 }
 
 // The most pairs one request may ask for. Measured on the demo site: creating 34 tasks in one
@@ -162,6 +178,7 @@ export async function createTasks({ matches, jira, guard, projectKey, today, ass
   }
   if (items.length === 0) return result;
 
+  if (guard.purgeExpired) await guard.purgeExpired().catch(() => {}); // housekeeping, never blocks a task
   const { existing, inProgress } = await findExisting(items, jira, guard);
   const toCreate = [];
   for (const item of items) {

@@ -18,6 +18,12 @@ export const MATCH_CACHE_KEY = 'cache:matches';
 export const CACHE_TTL_HOURS = 6;
 export const CACHE_TTL_MS = CACHE_TTL_HOURS * 60 * 60 * 1000;
 
+// A saved result is NEVER kept longer than this, even as an "old result" shown while a new check runs.
+// Older than this it is treated as not there and deleted. (Privacy: nothing about the hospital is
+// retained for more than a day without being refreshed.)
+export const MAX_RETENTION_HOURS = 24;
+export const MAX_RETENTION_MS = MAX_RETENTION_HOURS * 60 * 60 * 1000;
+
 // Forge storage rejects values above 240 KiB. Stay well under it so a larger hospital's result
 // is skipped (and simply recomputed next time) instead of failing the check.
 export const MAX_CACHE_BYTES = 200 * 1024;
@@ -70,7 +76,26 @@ export function createMatchCache(kv, nowMs = () => Date.now()) {
     if (entry.fingerprint !== fingerprintDevices(devices)) return null;
     const age = nowMs() - Date.parse(entry.checkedAt);
     if (!Number.isFinite(age) || age < 0) return null;
+    if (age >= MAX_RETENTION_MS) {
+      await kv.delete(MATCH_CACHE_KEY).catch(() => {}); // too old to keep, even as an old result
+      return null;
+    }
     return { entry, fresh: age < CACHE_TTL_MS };
+  }
+
+  // Delete the saved result if it is older than MAX_RETENTION_MS (or damaged). Returns true if deleted.
+  async function purgeExpired() {
+    let entry;
+    try {
+      entry = await kv.get(MATCH_CACHE_KEY);
+    } catch (error) {
+      return false;
+    }
+    if (entry === undefined || entry === null) return false;
+    const age = entry && typeof entry.checkedAt === 'string' ? nowMs() - Date.parse(entry.checkedAt) : NaN;
+    if (Number.isFinite(age) && age >= 0 && age < MAX_RETENTION_MS) return false;
+    await kv.delete(MATCH_CACHE_KEY);
+    return true;
   }
 
   // The saved entry only while it is still fresh, otherwise null.
@@ -95,5 +120,5 @@ export function createMatchCache(kv, nowMs = () => Date.now()) {
     await kv.delete(MATCH_CACHE_KEY);
   }
 
-  return { peek, read, write, clear };
+  return { peek, read, write, clear, purgeExpired };
 }

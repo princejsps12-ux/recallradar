@@ -384,3 +384,34 @@ test('an assignee for a task that already exists changes nothing', async () => {
   assert.equal(out.created.length, 0);
   assert.equal(s.state.bulkCalls.length, 0);
 });
+
+// --- Cleanup of guards --------------------------------------------------------------------------------------------
+
+test('guards: purgeExpired deletes expired and damaged guards and keeps fresh ones and other keys', async () => {
+  const kv = fakeKv();
+  const clock = { now: T0 };
+  const guard = createTaskGuard(kv, () => clock.now);
+  await guard.reserve('recallradar-Z-1-a');
+  kv.data.set('task-guard:old', { at: T0 - GUARD_TTL_MS - 1, key: 'P-1' });
+  kv.data.set('task-guard:broken', 'text');
+  kv.data.set('device:other', { at: 0 });
+  assert.equal(await guard.purgeExpired(), 2);
+  assert.deepEqual([...kv.data.keys()].sort(), ['device:other', 'task-guard:recallradar-Z-1-a']);
+  clock.now += GUARD_TTL_MS;
+  assert.equal(await guard.purgeExpired(), 1);
+});
+
+test('guards: reading an expired guard deletes it', async () => {
+  const kv = fakeKv({ 'task-guard:x': { at: T0 - GUARD_TTL_MS - 1 } });
+  const guard = createTaskGuard(kv, () => T0);
+  assert.equal(await guard.read('x'), null);
+  await new Promise((r) => setImmediate(r));
+  assert.equal(kv.data.has('task-guard:x'), false);
+});
+
+test('creating tasks clears out expired guards on the way', async () => {
+  const s = setup();
+  s.kv.data.set('task-guard:stale', { at: T0 - GUARD_TTL_MS - 1 });
+  await run(s, [match(1)]);
+  assert.equal(s.kv.data.has('task-guard:stale'), false);
+});

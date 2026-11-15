@@ -799,15 +799,62 @@ test('assign: confirming assigns exactly the people shown in the preview', async
   assert.equal(done.created[0].assignedTo, 'Person acc-a');
 });
 
-test('assign: a person who left the team since the preview is not assigned (the task is still created)', async () => {
+test('assign: the preview record holds NO person: no account id, no name', async () => {
+  const s = await setupAssign();
+  await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: true });
+  const stored = [...s.kv.data.entries()].filter(([k]) => k.startsWith('rovo-preview:'));
+  assert.equal(stored.length, 1);
+  const text = JSON.stringify(stored[0][1]);
+  assert.ok(!text.includes('acc-a') && !text.includes('acc-b'), text);
+  assert.ok(!text.includes('Person'), text);
+  assert.equal(stored[0][1].assignSuggested, true);
+  assert.ok(!('assignees' in stored[0][1]));
+});
+
+test('assign: people are looked up again at confirm time, so someone who left the team is not assigned', async () => {
   const s = await setupAssign();
   const preview = await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: true });
-  s.deps.team.graph.listMembers = async () => [{ accountId: 'acc-z', name: 'Someone Else' }];
+  s.deps.team.graph.listMembers = async () => [{ accountId: 'acc-z', name: 'Someone New' }]; // acc-a and acc-b left
+  const done = await run(s, { confirmed: true, confirmationToken: preview.confirmationToken });
+  assert.equal(done.state, 'created');
+  assert.deepEqual(s.state.created[0].fields.assignee, { accountId: 'acc-z' }); // the CURRENT member, not the one previewed
+  assert.equal(done.created[0].assignedTo, 'Someone New');
+});
+
+test('assign: if the graph is down at confirm time the tasks are still created, unassigned, with a note', async () => {
+  const s = await setupAssign();
+  const preview = await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: true });
+  s.deps.team.graph.listMembers = async () => {
+    throw new Error('down');
+  };
   const done = await run(s, { confirmed: true, confirmationToken: preview.confirmationToken });
   assert.equal(done.state, 'created');
   assert.equal('assignee' in s.state.created[0].fields, false);
+  assert.match(done.assignNote, /could not be reached/);
 });
 
+// --- Cleanup of previews ------------------------------------------------------------------------------------------------
+
+test('previews: purgeExpired deletes expired and damaged previews and keeps live ones', async () => {
+  const kv = fakeKv();
+  let now = T0;
+  const store = createPreviewStore(kv, () => now, () => 'x');
+  const live = await store.save({ projectKey: 'MOBL', pairs: [] });
+  kv.data.set('rovo-preview:old', { at: T0 - PREVIEW_TTL_MS - 1 });
+  kv.data.set('rovo-preview:broken', { nope: true });
+  kv.data.set('device:keep-me', { at: 0 }); // other keys are never touched
+  assert.equal(await store.purgeExpired(), 2);
+  assert.deepEqual([...kv.data.keys()].sort(), ['device:keep-me', `rovo-preview:${live}`].sort());
+  now += PREVIEW_TTL_MS + 1;
+  assert.equal(await store.purgeExpired(), 1); // the live one has now expired too
+});
+
+test('previews: saving a new preview also clears out expired ones', async () => {
+  const kv = fakeKv({ 'rovo-preview:stale': { at: T0 - PREVIEW_TTL_MS - 5 } });
+  const store = createPreviewStore(kv, () => T0, () => 'y');
+  await store.save({ projectKey: 'MOBL', pairs: [] });
+  assert.equal(kv.data.has('rovo-preview:stale'), false);
+});
 test('assign: a preview made without assignSuggested never assigns, even on a team ward', async () => {
   const s = await setupAssign();
   const preview = await run(s, { ward: 'ICU', recallClass: 'I' });
