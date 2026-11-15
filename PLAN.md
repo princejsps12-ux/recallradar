@@ -41,7 +41,7 @@ Skip writes; build what only **reads** the graph (the bonus also counts read-onl
 - [x] Agent and MCP: `who_handles_ward` (read-only); the agent's task preview can propose assignees (`assignSuggested`) and confirming assigns exactly those people.
 - [x] README lists **exactly the two Teamwork Graph calls** made.
 - [x] Deployed (14.x); installs upgraded in Jira and Confluence. Rovo chat: `who_handles_ward` answered "no team mapped" without guessing.
-- [x] Live panel check (after the user fixed DNS): team list, mapping, team line, suggestion count and the off-by-default checkbox all work. Found and fixed: the graph API caps `first` at 25. [ ] Not clicked live: a real assignment (it would notify people).
+- [x] Live panel check (after the user fixed DNS): team list, mapping, team line, suggestion count and the off-by-default checkbox all work. Found and fixed: the graph API caps `first` at 25. One real assignment verified live (MOBL-99 assigned to the suggested team member); the "create all" checkbox was not clicked.
 
 ## Step E: Panel button for the Confluence page
 

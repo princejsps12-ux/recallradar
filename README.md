@@ -221,7 +221,7 @@ The rule (written once, in `SUGGESTION_RULE` in [`src/teamService.js`](src/teamS
 - **Verified in unit tests** with a fake graph: query text, variables, parsing, the suggestion rule, balancing across a team, refusing someone who is not in the team, and the agent's preview-then-confirm with assignees.
 - **Verified live on the demo site** (panel and agent): the team list loads from the graph; ICU and Cath Lab were mapped to a team and the choice is saved ("1 of 14 wards mapped"); the Cath Lab row shows **Team: Team Atlas (from Teamwork Graph)**; the "create all" confirmation offers **Also assign the suggested team member (7 of 29)**, unchecked by default; the agent's `who_handles_ward` says "no team" for an unmapped ward without guessing. The live check found one real bug: the API refuses `first` above 25, so both calls now ask for 25.
 - **Verified live, Confluence button**: choosing Mobile Development and recall Z-0208-2027 updated the existing page and returned its link.
-- **Not clicked live**: an actual assignment ("Create & assign" or the checked box), because it would assign and notify real people on the demo site. The request it sends was checked in a simulated panel and the server rules in unit tests.
+- **Verified live, an assignment**: on an ICU row the panel showed *Team: Team Atlas (from Teamwork Graph) · Suggested assignee: Casey Morgan*; clicking **Create & assign to Casey Morgan** created MOBL-99 with Casey Morgan as assignee. The checkbox path for "create all" was not clicked live (it would assign and notify many people); it sends the same per-task `assignees` request.
 
 ### Limits
 
