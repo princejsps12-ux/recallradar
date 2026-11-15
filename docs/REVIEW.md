@@ -60,7 +60,7 @@ Written 15 November 2026 by the assistant, scored hard on purpose. Evidence is i
 3. **No support contact** in the README, privacy policy or terms. *You.*
 4. The README is long and still mixes internals (matching constants, job measurements) with the first-time path; the quick start helps, but an "Under the hood" split into `docs/` would help more.
 5. Some numbers vary between sections because they came from different test runs (check times, task counts). *Label or unify.*
-6. Marketplace icon needs a 144 x 144 PNG export from `marketplace/icon.svg`.
+6. ~~Marketplace icon needs a 144 x 144 PNG~~ Done: `marketplace/icon-144.png`.
 
 ## Fixed during this review
 
