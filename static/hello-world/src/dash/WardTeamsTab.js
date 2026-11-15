@@ -93,7 +93,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
       {wardInfo.wards.length === 0 ? (
         <SectionMessage appearance="information" title="No wards yet">Load the demo hospital or import your devices; their wards appear here.</SectionMessage>
       ) : narrow ? (
-        <ul aria-label="Ward to team mapping" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <ul aria-label="Ward to team mapping" style={{ listStyle: 'none', margin: `${sp(150)} 0 0`, padding: 0 }}>
           {ordered.map((ward, i) => {
             const mapping = wardInfo.byKey[String(ward).toLowerCase().replace(/[^a-z0-9]/g, '')];
             const value = mapping ? { label: mapping.teamName, value: mapping.teamAri } : null;

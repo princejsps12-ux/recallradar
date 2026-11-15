@@ -12,7 +12,7 @@ import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import { router } from '@forge/bridge';
-import { sp, cap, color, muted, ClassLozenge, MatchLozenge, LinkLike, formatDay } from '../ui/kit';
+import { sp, cap, useNarrow, color, muted, ClassLozenge, MatchLozenge, LinkLike, formatDay } from '../ui/kit';
 import { matchesForDevice } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 import { openIssue } from './DevicesTable';
@@ -54,6 +54,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
   const panel = useRef(null);
   const closeWrap = useRef(null);
   const opener = useRef(null);
+  const narrow = useNarrow();
   const [openCards, setOpenCards] = useState({});
   useEffect(() => setOpenCards({}), [deviceId]);
   const missing = matches.filter((m) => !tasks[pairOf(m)]);
@@ -142,7 +143,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                             <VisuallyHidden>{isOpen ? 'Hide details' : 'Show details'}</VisuallyHidden>
                           </button>
                           <ClassLozenge recallClass={m.recallClass} />
-                          <MatchLozenge confidence={m.confidence} />
+                          {!narrow && <MatchLozenge confidence={m.confidence} />}
                           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>
                             {key ? (
                               <>
@@ -156,6 +157,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                         </div>
                         {isOpen && (
                           <div id={bodyId} style={{ marginTop: sp(100) }}>
+                            {narrow && <div style={{ marginBottom: sp(50) }}><MatchLozenge confidence={m.confidence} /></div>}
                             <div style={muted}>{m.firm}{details.status ? ` · ${details.status}` : ''}{details.initiated ? ` · started ${formatDay(details.initiated)}` : ''}{m.date ? ` · reported ${formatDay(m.date)}` : ''}</div>
                             <div style={{ marginTop: sp(50) }}><LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike></div>
                             <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">Why we think it matches</Heading></div>

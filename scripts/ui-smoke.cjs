@@ -117,7 +117,7 @@ const typeInto = async (node, value, proto) => {
   await run('jira:globalPage', imp, async (el) => {
     await click(el, /^Import your own devices/);
     const body = document.body.textContent.replace(/\s+/g, ' ');
-    check('the import dialog opens with its options', /Import your own devices/.test(body) && /Remove imported devices/.test(body) && /Remove all devices/.test(body) && /Do not include patient data/.test(body));
+    check('the import dialog opens with its options', /Import your own devices/.test(body) && /Do not include patient data/.test(body));
     check('the import button is disabled until something is pasted', [...document.querySelectorAll('button')].find((b) => b.textContent === 'Import devices').disabled);
   });
   // 5. the issue panel still renders, with its dashboard link

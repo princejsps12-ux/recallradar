@@ -11,6 +11,8 @@ import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
 export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 // FDA firm names often come in capitals ("PHILIPS MEDICAL SYSTEMS"): show those in normal case.
 export const niceFirm = (s) => (s && s === s.toUpperCase() && /[A-Z]{4}/.test(s) ? s.toLowerCase().replace(/(^|[\s(/-])([a-z])/g, (m, a, b) => a + b.toUpperCase()) : s);
+// All-capital product text from the FDA: show it as a sentence (only when the whole text is capitals).
+export const sentenceCase = (s) => (s && s === s.toUpperCase() && /[A-Z]{4}/.test(s) ? s.charAt(0) + s.slice(1).toLowerCase() : s);
 // "3 h ago" style age, for the panel header.
 export function ago(iso, now = Date.now()) {
   const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));

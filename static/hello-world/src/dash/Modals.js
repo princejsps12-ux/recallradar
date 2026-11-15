@@ -14,7 +14,8 @@ const EXAMPLE = 'Name\tManufacturer\tModel\tSerial\tWard\nSigma Spectrum pump\tB
 
 // Paste rows from a spreadsheet; the first row names the columns. All or nothing: a bad row is listed and
 // nothing is imported.
-export function ImportModal({ isOpen, onClose, onImported }) {
+export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
+  const removing = mode === 'remove';
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState([]);
@@ -58,11 +59,13 @@ export function ImportModal({ isOpen, onClose, onImported }) {
   return (
     <ModalTransition>
       {isOpen && (
-        <Modal onClose={onClose} width="medium" label="Import your own devices">
-          <ModalHeader hasCloseButton><ModalTitle>Import your own devices</ModalTitle></ModalHeader>
+        <Modal onClose={onClose} width="medium" label={removing ? 'Remove devices' : 'Import your own devices'}>
+          <ModalHeader hasCloseButton><ModalTitle>{removing ? 'Remove devices' : 'Import your own devices'}</ModalTitle></ModalHeader>
           <ModalBody>
+            {!removing && (<>
             <p style={{ marginTop: 0, marginBottom: sp(200) }}>Copy rows from a spreadsheet (or a .csv) and paste them here. The first row names the columns: <strong>Manufacturer</strong> and <strong>Model</strong> are required; Name, Type, Serial (or Lot) and Ward are optional. Up to 200 devices at a time. Importing replaces the devices you imported before and leaves the demo hospital alone. <strong>Do not include patient data.</strong></p>
-            <Textarea aria-label="Devices to import" placeholder={EXAMPLE} minimumRows={8} resize="vertical" value={text} onChange={(e) => setText(e.target.value)} />
+            <Textarea isInvalid={problems.length > 0} aria-label="Devices to import" placeholder={EXAMPLE} minimumRows={8} resize="vertical" value={text} onChange={(e) => setText(e.target.value)} />
+            </>)}
             <div role="status" aria-live="polite" style={{ marginTop: sp(100) }}>
               {problems.length > 0 && (
                 <SectionMessage appearance="error" title="Nothing was imported">
@@ -71,8 +74,8 @@ export function ImportModal({ isOpen, onClose, onImported }) {
               )}
               {done && <SectionMessage appearance="success">{done}</SectionMessage>}
             </div>
-            <section aria-label="Remove devices" style={{ borderTop: `1px solid ${color.border}`, marginTop: sp(200), paddingTop: sp(200) }}>
-              <div style={{ fontWeight: 600 }}>Remove devices</div>
+            {removing && (<section aria-label="Remove devices">
+              <p style={{ marginTop: 0 }}>Removing devices cannot be undone. The saved recall result is rebuilt on the next check.</p>
               {removeAsk ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'center', marginTop: sp(100) }}>
                   <span>{removeAsk === 'all' ? 'Remove ALL devices, including the demo hospital?' : 'Remove all devices you imported?'} This cannot be undone.</span>
@@ -85,11 +88,11 @@ export function ImportModal({ isOpen, onClose, onImported }) {
                   <Button appearance="subtle" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('all')}><span style={{ color: color.danger }}>Remove all devices</span></Button>
                 </div>
               )}
-            </section>
+            </section>)}
           </ModalBody>
           <ModalFooter>
-            <Button appearance="subtle" onClick={onClose}>Cancel</Button>
-            <Button appearance="primary" isLoading={busy && !removeAsk} isDisabled={!text.trim()} onClick={submit}>Import devices</Button>
+            <Button appearance="subtle" onClick={onClose}>{removing ? 'Close' : 'Cancel'}</Button>
+            {!removing && <Button appearance="primary" isLoading={busy && !removeAsk} isDisabled={!text.trim()} onClick={submit}>Import devices</Button>}
           </ModalFooter>
         </Modal>
       )}

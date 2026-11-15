@@ -106,8 +106,10 @@ export default function App() {
                     <strong>{m.deviceName}</strong>
                     <div style={muted}>{m.ward || 'No ward'} · <span style={noBreak}>{m.recallNumber}</span>{team ? ` · ${team.teamName}` : ''}</div>
                   </div>
-                  <ClassLozenge recallClass={m.recallClass} />
-                  <MatchLozenge confidence={m.confidence} />
+                  <span style={{ display: 'inline-flex', gap: sp(100), flexWrap: 'nowrap' }}>
+                    <ClassLozenge recallClass={m.recallClass} />
+                    <MatchLozenge confidence={m.confidence} />
+                  </span>
                 </div>
                 <div style={{ marginTop: sp(75), display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center' }}>
                   {key ? (

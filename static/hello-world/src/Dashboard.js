@@ -19,7 +19,7 @@ import DynamicTable from '@atlaskit/dynamic-table';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
-import { sp, color, card, muted, useNarrow, Progress, formatWhen, ClassLozenge, niceFirm } from './ui/kit';
+import { sp, color, card, muted, useNarrow, Progress, formatWhen, ClassLozenge, niceFirm, sentenceCase, formatDay } from './ui/kit';
 import { affectedMatches, heroStats, urgentMatches, taskProgress, screenFor } from './dashboardData.mjs';
 import { Hero, UrgentList, SummaryCards } from './dash/Hero';
 import DevicesTable from './dash/DevicesTable';
@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState(0);
   const [drawerDevice, setDrawerDevice] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [confluenceOpen, setConfluenceOpen] = useState(false);
   const narrow = useNarrow();
   const [createAllOpen, setCreateAllOpen] = useState(false);
@@ -64,6 +65,7 @@ export default function Dashboard() {
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: `${sp(300)} 0`, color: color.text }}>
       {children}
       <ImportModal isOpen={importOpen} onClose={() => setImportOpen(false)} onImported={d.afterDevicesChanged} />
+      <ImportModal mode="remove" isOpen={removeOpen} onClose={() => setRemoveOpen(false)} onImported={d.afterDevicesChanged} />
     </main>
   );
 
@@ -97,6 +99,7 @@ export default function Dashboard() {
           <DropdownItemGroup>
             <DropdownItem elemBefore={<UploadIcon label="" />} onClick={() => setImportOpen(true)}>Import devices</DropdownItem>
             <DropdownItem elemBefore={<PageIcon label="" />} isDisabled={!ready} onClick={() => setConfluenceOpen(true)}>Create Confluence pages</DropdownItem>
+            <DropdownItem onClick={() => setRemoveOpen(true)}>Remove devices…</DropdownItem>
           </DropdownItemGroup>
         </DropdownMenu>
       </div>
@@ -147,8 +150,8 @@ export default function Dashboard() {
       { key: 'n', content: <span style={{ whiteSpace: 'nowrap' }}>{r.recallNumber}</span> },
       { key: 'c', content: <ClassLozenge recallClass={r.recallClass} /> },
       { key: 'f', content: niceFirm(r.firm) || 'Unknown firm' },
-      { key: 'p', content: <span style={clamp} title={r.product}>{r.product}</span> },
-      { key: 'd', content: <span style={{ whiteSpace: 'nowrap' }}>{r.date || '–'}</span> },
+      { key: 'p', content: <span style={clamp} title={r.product}>{sentenceCase(r.product)}</span> },
+      { key: 'd', content: <span style={{ whiteSpace: 'nowrap' }}>{r.date ? formatDay(r.date) : '–'}</span> },
     ],
   }));
 
@@ -171,16 +174,16 @@ export default function Dashboard() {
               <DevicesTable matches={all} tasks={d.tasks} teams={teams} onOpen={setDrawerDevice} tasksReady={d.tasksReady} />
             </section>
             <section style={card} aria-labelledby="rr-recent-h">
-              <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-recent-h">Recent FDA device recalls</Heading></div>
+              <div style={{ margin: `0 0 calc(-1 * ${sp(200)})` }}><Heading size="medium" as="h2" id="rr-recent-h">Recent FDA device recalls</Heading></div>
               {d.recent.state === 'error' ? (
                 <SectionMessage appearance="warning" title="Could not load recent recalls">The public FDA service did not answer. Try again later.</SectionMessage>
               ) : narrow ? (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: sp(100) }} aria-label="Recent FDA device recalls">
                   {(d.recent.recalls || []).slice(0, 6).map((r) => (
                     <li key={r.recallNumber} style={{ borderTop: `1px solid ${color.border}`, paddingTop: sp(100) }}>
-                      <strong>{r.recallNumber}</strong> <span style={muted}>{r.recallClass ? `Class ${r.recallClass}` : ''} · {r.date || ''}</span>
+                      <strong>{r.recallNumber}</strong> <span style={muted}>{r.recallClass ? `Class ${r.recallClass}` : ''} · {r.date ? formatDay(r.date) : ''}</span>
                       <div style={muted}>{niceFirm(r.firm) || 'Unknown firm'}</div>
-                      <div>{r.product}</div>
+                      <div>{sentenceCase(r.product)}</div>
                     </li>
                   ))}
                 </ul>
