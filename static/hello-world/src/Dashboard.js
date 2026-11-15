@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import DropdownMenu, { DropdownItemGroup, DropdownItem } from '@atlaskit/dropdown-menu';
 import Badge from '@atlaskit/badge';
+import DeleteIcon from '@atlaskit/icon/core/delete';
 import MoreIcon from '@atlaskit/icon/core/show-more-horizontal';
 import Tabs, { Tab, TabList, TabPanel } from '@atlaskit/tabs';
 import Button from '@atlaskit/button/new';
@@ -99,7 +100,7 @@ export default function Dashboard() {
           <DropdownItemGroup>
             <DropdownItem elemBefore={<UploadIcon label="" />} onClick={() => setImportOpen(true)}>Import devices</DropdownItem>
             <DropdownItem elemBefore={<PageIcon label="" />} isDisabled={!ready} onClick={() => setConfluenceOpen(true)}>Create Confluence pages</DropdownItem>
-            <DropdownItem onClick={() => setRemoveOpen(true)}>Remove devices…</DropdownItem>
+            <DropdownItem elemBefore={<DeleteIcon label="" />} onClick={() => setRemoveOpen(true)}>Remove devices…</DropdownItem>
           </DropdownItemGroup>
         </DropdownMenu>
       </div>

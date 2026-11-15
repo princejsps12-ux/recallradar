@@ -63,7 +63,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
   const classI = (w) => (needs[w] && needs[w].classI ? 1 : 0);
   const ordered = [...wardInfo.wards].sort((a, b) => classI(b) - classI(a) || count(b) - count(a) || a.localeCompare(b));
   const teamSelect = (ward, mapping, value) => (
-    <Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" appearance="subtle" placeholder="No team" isDisabled={busy === ward} isLoading={busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" />
+    <Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" placeholder="No team" isDisabled={busy === ward} isLoading={busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" />
   );
   const needsText = (ward, n) => (n ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>{`${n} ${n === 1 ? 'device' : 'devices'}`}{needs[ward].classI ? <Lozenge appearance="removed">Class I</Lozenge> : null}</span>) : <span style={muted}>None</span>);
   const rows = ordered.map((ward) => {

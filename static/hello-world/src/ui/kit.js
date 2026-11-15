@@ -12,7 +12,7 @@ export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 // FDA firm names often come in capitals ("PHILIPS MEDICAL SYSTEMS"): show those in normal case.
 export const niceFirm = (s) => (s && s === s.toUpperCase() && /[A-Z]{4}/.test(s) ? s.toLowerCase().replace(/(^|[\s(/-])([a-z])/g, (m, a, b) => a + b.toUpperCase()) : s);
 // All-capital product text from the FDA: show it as a sentence (only when the whole text is capitals).
-export const sentenceCase = (s) => (s && s === s.toUpperCase() && /[A-Z]{4}/.test(s) ? s.charAt(0) + s.slice(1).toLowerCase() : s);
+export const sentenceCase = (s) => s; // kept as-is: lower-casing would damage model and part numbers (infx-8000f)
 // "3 h ago" style age, for the panel header.
 export function ago(iso, now = Date.now()) {
   const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
@@ -98,7 +98,7 @@ export function useNarrow(maxWidth = 720) {
 // One look for every "Details" button, on desktop and on a phone.
 export function DetailsButton({ onClick, label = 'Details' }) {
   return (
-    <Button appearance="subtle" spacing="compact" iconAfter={ChevronRightIcon} onClick={onClick}>
+    <Button appearance="subtle" iconAfter={ChevronRightIcon} onClick={onClick}>
       {label}
     </Button>
   );

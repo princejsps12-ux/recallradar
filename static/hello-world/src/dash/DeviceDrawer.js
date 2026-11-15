@@ -155,9 +155,9 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                             )}
                           </span>
                         </div>
+                        {narrow && <div style={{ marginTop: sp(75), marginLeft: sp(250) }}><MatchLozenge confidence={m.confidence} /></div>}
                         {isOpen && (
                           <div id={bodyId} style={{ marginTop: sp(100) }}>
-                            {narrow && <div style={{ marginBottom: sp(50) }}><MatchLozenge confidence={m.confidence} /></div>}
                             <div style={muted}>{m.firm}{details.status ? ` · ${details.status}` : ''}{details.initiated ? ` · started ${formatDay(details.initiated)}` : ''}{m.date ? ` · reported ${formatDay(m.date)}` : ''}</div>
                             <div style={{ marginTop: sp(50) }}><LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike></div>
                             <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">Why we think it matches</Heading></div>

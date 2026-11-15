@@ -96,7 +96,7 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
                 <div style={{ minWidth: '96px' }}><MatchLozenge confidence={m.confidence} /></div>
               </div>
               <div style={{ display: 'flex', gap: sp(100) }}>
-                <Button spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreate(m)}>Create task</Button>
+                <Button isDisabled={!canCreate || busy} onClick={() => onCreate(m)}>Create task</Button>
                 <DetailsButton onClick={() => onOpen(m.deviceId)} />
               </div>
             </li>

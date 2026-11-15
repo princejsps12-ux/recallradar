@@ -45,6 +45,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
     setBusy(true);
     try {
       const r = await invoke(removeAsk === 'all' ? 'clearDevices' : 'removeImportedDevices');
+      if (r && r.ok && mounted.current && removing) onClose();
       if (r && r.ok) {
         setDone(removeAsk === 'all' ? 'Removed all devices.' : 'Removed the devices you imported.');
         setRemoveAsk('');
@@ -74,24 +75,21 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
               )}
               {done && <SectionMessage appearance="success">{done}</SectionMessage>}
             </div>
-            {removing && (<section aria-label="Remove devices">
-              <p style={{ marginTop: 0 }}>Removing devices cannot be undone. The saved recall result is rebuilt on the next check.</p>
-              {removeAsk ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'center', marginTop: sp(100) }}>
-                  <span>{removeAsk === 'all' ? 'Remove ALL devices, including the demo hospital?' : 'Remove all devices you imported?'} This cannot be undone.</span>
-                  <Button appearance="danger" spacing="compact" isLoading={busy} onClick={remove}>Yes, remove them</Button>
-                  <Button appearance="subtle" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('')}>Keep them</Button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center', marginTop: sp(100) }}>
-                  <Button appearance="subtle" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('imported')}><span style={{ color: color.danger }}>Remove imported devices</span></Button>
-                  <Button appearance="subtle" spacing="compact" isDisabled={busy} onClick={() => setRemoveAsk('all')}><span style={{ color: color.danger }}>Remove all devices</span></Button>
-                </div>
-              )}
-            </section>)}
+            {removing && (
+              <fieldset style={{ border: 0, margin: 0, padding: 0 }}>
+                <legend style={{ marginBottom: sp(100) }}>Removing devices cannot be undone. The saved recall result is rebuilt on the next check. Which devices do you want to remove?</legend>
+                {[['imported', 'Only the devices I imported'], ['all', 'All devices, including the demo hospital']].map(([value, label]) => (
+                  <label key={value} style={{ display: 'flex', gap: sp(100), alignItems: 'center', padding: `${sp(75)} 0` }}>
+                    <input type="radio" name="rr-remove" value={value} checked={(removeAsk || 'imported') === value} onChange={() => setRemoveAsk(value)} />
+                    {label}
+                  </label>
+                ))}
+              </fieldset>
+            )}
           </ModalBody>
           <ModalFooter>
-            <Button appearance="subtle" onClick={onClose}>{removing ? 'Close' : 'Cancel'}</Button>
+            <Button appearance="subtle" onClick={onClose}>Cancel</Button>
+            {removing && <Button appearance="danger" isLoading={busy} onClick={remove}>{(removeAsk || 'imported') === 'all' ? 'Remove all devices' : 'Remove imported devices'}</Button>}
             {!removing && <Button appearance="primary" isLoading={busy && !removeAsk} isDisabled={!text.trim()} onClick={submit}>Import devices</Button>}
           </ModalFooter>
         </Modal>
