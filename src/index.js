@@ -3,8 +3,15 @@ import { fetch } from '@forge/api';
 import { buildRecallsUrl, parseRecalls, DEFAULT_LIMIT } from './openfda';
 import { Queue } from '@forge/events';
 import { loadDemoHospital } from './demoHospital';
-import { getSavedMatches, requestCheck, getCheckStatus } from './matchService';
-import { deviceStore, matchCache, checkJobs, CHECK_QUEUE_KEY } from './runtime';
+import { getSavedMatches, requestCheck, getCheckStatus, getLatestResult } from './matchService';
+import {
+  createTasks,
+  getTaskStates,
+  validatePairs,
+  selectMatches,
+  MAX_STATE_PAIRS_PER_REQUEST,
+} from './taskService';
+import { deviceStore, matchCache, checkJobs, taskGuard, jiraAsUser, CHECK_QUEUE_KEY } from './runtime';
 
 const resolver = new Resolver();
 const checkQueue = new Queue({ key: CHECK_QUEUE_KEY });
@@ -90,6 +97,55 @@ resolver.define('getCheckStatus', async () => {
   } catch (error) {
     console.error('Failed to read the check status', error);
     return { ok: false, error: 'Could not read the check status.' };
+  }
+});
+
+// --- Jira tasks for matches (see taskService.js) ---------------------------------------------------------
+
+// Tasks are created in the project of the issue the panel is open on.
+function projectKeyFrom(context) {
+  const extension = (context && context.extension) || {};
+  if (extension.project && extension.project.key) return extension.project.key;
+  const issueKey = extension.issue && extension.issue.key;
+  return issueKey ? issueKey.slice(0, issueKey.lastIndexOf('-')) : null;
+}
+
+// The matches the browser asked about, taken from OUR saved result so nothing is trusted from the page.
+async function requestedMatches(pairsFromBrowser, max) {
+  const pairs = validatePairs(pairsFromBrowser, max);
+  const devices = await deviceStore.listDevices();
+  const latest = await getLatestResult({ devices, cache: matchCache, jobs: checkJobs });
+  return selectMatches(latest ? latest.matches : [], pairs);
+}
+
+// Which of these matches already have a task? Returns { tasks: { "recall|device": "MOBL-12" } }.
+resolver.define('getTaskStates', async ({ payload }) => {
+  try {
+    const { matches } = await requestedMatches(payload && payload.pairs, MAX_STATE_PAIRS_PER_REQUEST);
+    return { ok: true, tasks: await getTaskStates({ matches, jira: jiraAsUser, guard: taskGuard }) };
+  } catch (error) {
+    console.error('Failed to read task states', error);
+    return { ok: false, error: 'Could not look up existing tasks.' };
+  }
+});
+
+// "Create task" / "Create tasks for all": one task per recall + device that does not have one yet.
+resolver.define('createTasks', async ({ payload, context }) => {
+  try {
+    const projectKey = projectKeyFrom(context);
+    if (!projectKey) return { ok: false, error: 'Could not tell which project to create tasks in.' };
+    const { matches, notFound } = await requestedMatches(payload && payload.pairs);
+    const outcome = await createTasks({
+      matches,
+      jira: jiraAsUser,
+      guard: taskGuard,
+      projectKey,
+      today: new Date(),
+    });
+    return { ok: true, ...outcome, notFound };
+  } catch (error) {
+    console.error('Failed to create tasks', error);
+    return { ok: false, error: 'Could not create the tasks. Please try again.' };
   }
 });
 

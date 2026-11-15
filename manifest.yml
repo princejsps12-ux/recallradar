@@ -54,6 +54,7 @@ resources:
 permissions:
   scopes:
     - read:jira-work
+    - write:jira-work
     - read:servicedesk-request
     - read:cmdb-object:jira
     - read:cmdb-schema:jira

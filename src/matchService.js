@@ -22,6 +22,16 @@ export async function getSavedMatches({ devices, cache }) {
   return { ...found.entry.result, checkedAt: found.entry.checkedAt, fromCache: true, stale: !found.fresh };
 }
 
+// The newest result we have, for features that act on it (creating tasks): the saved result,
+// fresh or expired, else the result of the last finished job (which also covers a result that
+// had failed lookups and so was never saved). Null if there is none.
+export async function getLatestResult({ devices, cache, jobs }) {
+  const saved = await getSavedMatches({ devices, cache });
+  if (saved) return saved;
+  const job = await jobs.current();
+  return job && job.status === 'done' && job.result ? job.result : null;
+}
+
 // Start a check, or say why not. Never waits for the check itself.
 //   { state: 'no-devices' }
 //   { state: 'saved',   result }   a fresh saved result exists and `refresh` is false

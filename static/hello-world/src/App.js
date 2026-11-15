@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { invoke } from '@forge/bridge';
+import { invoke, router } from '@forge/bridge';
 
 const styles = {
   list: { listStyle: 'none', margin: 0, padding: 0 },
@@ -10,6 +10,7 @@ const styles = {
   bar: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0 10px' },
   button: { padding: '4px 10px', cursor: 'pointer' },
   section: { padding: '0 0 12px', borderBottom: '2px solid #dfe1e6', marginBottom: '12px' },
+  smallButton: { padding: '2px 8px', cursor: 'pointer', fontSize: '12px', marginTop: '2px' },
   badge: { color: '#fff', fontSize: '11px', fontWeight: 700, padding: '1px 6px', borderRadius: '3px' },
 };
 
@@ -84,7 +85,47 @@ function DevicesBar() {
 // Colour AND a text label, so the confidence never depends on colour alone.
 const BADGE_COLORS = { exact: '#c9372c', likely: '#b65c02', possible: '#5e6c84' };
 
-function Match({ match }) {
+// Only matches we are fairly sure about get a task. Keep in step with TASK_CONFIDENCES in src/taskRules.js.
+const TASK_CONFIDENCES = ['exact', 'likely'];
+const isTaskWorthy = (match) => TASK_CONFIDENCES.includes(match.confidence);
+
+// How many tasks to create per request. Keep at or below MAX_PAIRS_PER_REQUEST in src/taskService.js.
+const TASKS_PER_REQUEST = 10;
+
+// One key per recall + device, the same shape as pairKey() in src/taskRules.js.
+const pairOf = (match) => `${match.recallNumber}|${match.deviceId}`;
+const toRequest = (match) => ({ recallNumber: match.recallNumber, deviceId: match.deviceId });
+
+// The "Create task" button, or the link to the task that already exists.
+function TaskAction({ match, taskUi }) {
+  if (!isTaskWorthy(match)) return null;
+  const key = taskUi.tasks[pairOf(match)];
+  if (key) {
+    return (
+      <div style={styles.meta}>
+        Task:{' '}
+        <a
+          href={`/browse/${key}`}
+          onClick={(event) => {
+            event.preventDefault();
+            router.open(`/browse/${key}`);
+          }}
+        >
+          {key}
+        </a>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <button style={styles.smallButton} disabled={taskUi.busy} onClick={() => taskUi.onCreate([match])}>
+        Create task
+      </button>
+    </div>
+  );
+}
+
+function Match({ match, taskUi }) {
   return (
     <div style={styles.detail}>
       <span style={{ ...styles.badge, background: BADGE_COLORS[match.confidence] || '#5e6c84' }}>
@@ -92,6 +133,7 @@ function Match({ match }) {
       </span>{' '}
       <strong>{match.recallNumber}</strong> · Class {match.recallClass || '?'} · {match.firm} · {match.date}
       <div style={styles.meta}>{match.reason}</div>
+      <TaskAction match={match} taskUi={taskUi} />
     </div>
   );
 }
@@ -133,6 +175,12 @@ function MatchesSection() {
   const timer = useRef(null);
   const started = useRef(0);
 
+  // Jira tasks: which matches already have one ("recall|device" -> issue key), whether a request is
+  // running, a message about the last request, and whether "create for all" is waiting for a confirm.
+  const [tasks, setTasks] = useState({});
+  const [taskBusy, setTaskBusy] = useState(false);
+  const [taskNote, setTaskNote] = useState('');
+  const [confirmAll, setConfirmAll] = useState(false);
 
   const stopPolling = useCallback(() => {
     if (timer.current) clearInterval(timer.current);
@@ -229,6 +277,76 @@ function MatchesSection() {
   const result = state.result;
   const groups = result ? groupByDevice(result.matches) : [];
 
+  // When a result appears, find out which of its matches already have a task.
+  const checkedAt = result ? result.checkedAt : null;
+  const resultMatches = result ? result.matches : null;
+  useEffect(() => {
+    if (!resultMatches) return undefined;
+    const pairs = resultMatches.filter(isTaskWorthy).map(toRequest);
+    if (pairs.length === 0) return undefined;
+    let cancelled = false;
+    invoke('getTaskStates', { pairs })
+      .then((response) => {
+        if (!cancelled && response && response.ok) setTasks(response.tasks);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // Look again only when a different result arrives, not on every poll.
+  }, [checkedAt]);
+
+  // Create tasks for these matches (one or many), then remember what Jira says. Creating tasks is
+  // slow (about 0.6 s each), and a request is cut off after 25 s, so a long list goes in batches
+  // of TASKS_PER_REQUEST, one after another, with a running count.
+  const createTasks = async (matches) => {
+    setTaskBusy(true);
+    setTaskNote('');
+    setConfirmAll(false);
+    const total = { created: 0, existing: 0, inProgress: 0, failed: [], notFound: 0 };
+    let stopped = '';
+    for (let start = 0; start < matches.length; start += TASKS_PER_REQUEST) {
+      if (matches.length > TASKS_PER_REQUEST) {
+        setTaskNote(`Creating tasks… ${start} of ${matches.length} done.`);
+      }
+      try {
+        const response = await invoke('createTasks', {
+          pairs: matches.slice(start, start + TASKS_PER_REQUEST).map(toRequest),
+        });
+        if (!response || !response.ok) {
+          stopped = (response && response.error) || 'Could not create the tasks.';
+          break;
+        }
+        const known = {};
+        [...response.created, ...response.existing].forEach((t) => {
+          known[t.pair] = t.key;
+        });
+        setTasks((previous) => ({ ...previous, ...known }));
+        total.created += response.created.length;
+        total.existing += response.existing.length;
+        total.inProgress += response.inProgress.length;
+        total.failed.push(...response.failed);
+        total.notFound += response.notFound.length;
+      } catch (e) {
+        stopped = 'Could not reach RecallRadar.';
+        break;
+      }
+    }
+    const parts = [];
+    if (total.created) parts.push(`Created ${total.created} task${total.created === 1 ? '' : 's'}`);
+    if (total.existing) parts.push(`${total.existing} already had a task`);
+    if (total.inProgress) parts.push(`${total.inProgress} being created by another click`);
+    if (total.failed.length) parts.push(`${total.failed.length} failed (${total.failed[0].error})`);
+    if (total.notFound) parts.push(`${total.notFound} no longer in the result, try Refresh`);
+    if (stopped) parts.push(`Stopped: ${stopped} Click again to continue`);
+    setTaskNote(parts.length ? `${parts.join('. ')}.` : '');
+    setTaskBusy(false);
+  };
+
+  // The matches that could get a task and do not have one yet.
+  const missing = resultMatches ? resultMatches.filter((m) => isTaskWorthy(m) && !tasks[pairOf(m)]) : [];
+  const taskUi = { tasks, busy: taskBusy, onCreate: createTasks };
+
   return (
     <div style={styles.section}>
       <button
@@ -265,6 +383,24 @@ function MatchesSection() {
                 ` ${result.failedQueries} FDA lookups failed or timed out, so results may be incomplete (not saved). Try Refresh.`}
             </div>
           )}
+          {missing.length > 0 && (
+            <div style={styles.bar}>
+              {confirmAll ? (
+                <>
+                  <span>Create {missing.length} task{missing.length === 1 ? '' : 's'} in this project?</span>
+                  <button style={styles.button} disabled={taskBusy} onClick={() => createTasks(missing)}>
+                    Yes, create {missing.length}
+                  </button>
+                  <button style={styles.button} onClick={() => setConfirmAll(false)}>Cancel</button>
+                </>
+              ) : (
+                <button style={styles.button} disabled={taskBusy} onClick={() => setConfirmAll(true)}>
+                  {taskBusy ? 'Creating…' : `Create tasks for all (${missing.length})`}
+                </button>
+              )}
+            </div>
+          )}
+          {taskNote && <div style={styles.meta}>{taskNote}</div>}
           <ul style={styles.list}>
             {groups.map((matches) => {
               const best = matches[0];
@@ -276,12 +412,12 @@ function MatchesSection() {
                   <div style={styles.meta}>
                     {best.ward || 'No ward'} · serial/lot {best.lotOrSerial || 'not recorded'}
                   </div>
-                  <Match match={best} />
+                  <Match match={best} taskUi={taskUi} />
                   {matches.length > 1 && (
                     <details style={styles.detail}>
                       <summary>{matches.length - 1} other recall{matches.length === 2 ? '' : 's'} for this device</summary>
                       {matches.slice(1).map((m) => (
-                        <Match key={m.recallNumber} match={m} />
+                        <Match key={m.recallNumber} match={m} taskUi={taskUi} />
                       ))}
                     </details>
                   )}

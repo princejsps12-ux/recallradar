@@ -1,7 +1,7 @@
 // The Forge-specific wiring that the resolvers, the queue consumer and the daily trigger share.
 // Everything with real logic lives in the pure modules; this file only connects them to Forge
 // storage and to the network.
-import { fetch } from '@forge/api';
+import api, { fetch, route } from '@forge/api';
 import { createDeviceStore } from './deviceStore';
 import { forgeKv } from './kvAdapter';
 import { createMatchCache } from './matchCache';
@@ -9,10 +9,20 @@ import { createCheckJobs } from './checkJob';
 import { findRecallsForDevices } from './recallSearch';
 import { matchDevicesToRecalls } from './matching';
 import { performCheck } from './matchService';
+import { createJiraClient } from './jiraClient';
+import { createTaskGuard } from './taskService';
 
 export const deviceStore = createDeviceStore(forgeKv);
 export const matchCache = createMatchCache(forgeKv);
 export const checkJobs = createCheckJobs(forgeKv);
+export const taskGuard = createTaskGuard(forgeKv);
+
+// Jira as the person who clicked (asUser), so Jira applies THEIR permissions: someone who may not
+// create issues simply gets an error. Never asApp for this.
+export const jiraAsUser = createJiraClient({
+  request: (path, options) => api.asUser().requestJira(path, options),
+  route,
+});
 
 // Name of the queue in manifest.yml (the consumer module listens to the same name).
 export const CHECK_QUEUE_KEY = 'recall-check';

@@ -26,6 +26,7 @@ Minor deploys (code only) reach the installed site by themselves; only scope/egr
 
 - **Test on the Forge demo site only** (`--demo-site`; it has Rovo, Assets and sample Jira issues). The user's personal dev site is old and outdated: do not deploy to or test on it. Ask the user for an issue URL if you need one for a browser check.
 - Use Claude in Chrome (the user's real, signed-in browser) for the site, not the built-in browser. Jira may show a one-time "What kind of work do you do?" screen: that sets an account preference, so leave it to the user.
+- The demo site's MOBL project holds 35 RecallRadar test tasks from verifying task creation (find them with JQL `labels = recallradar`). Creating tasks again for the same recall + device is blocked by design, so to re-test creation the user must delete those first: ask, because deleting is theirs to approve.
 - The panel sits in an iframe with its own scroll area; scroll inside it to see long content. Browser waits are capped at 10 s per step.
 
 ## Architecture
@@ -40,8 +41,9 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 | `src/matchCache.js` | Saved result, 6-hour freshness, fingerprint of the device list; `peek()` also returns expired entries as stale |
 | `src/checkJob.js` | The background job record (running / done / failed, progress, stale-job detection) |
 | `src/matchService.js` | `requestCheck`, `performCheck`, `getCheckStatus`, `getSavedMatches` |
+| `src/taskRules.js`, `src/taskService.js`, `src/jiraClient.js` | Jira tasks for matches: due-date rule, title/labels/description; duplicate-free creation; the three Jira calls (as the user) |
 | `src/demoHospital.js` | 30 demo devices using real manufacturer/model names and serials from actual recalls |
-| `src/runtime.js` | **Forge wiring**: storage adapter, `fetch`, `runCheck()` shared by the consumer and the daily trigger |
+| `src/runtime.js` | **Forge wiring**: storage adapter, `fetch`, `runCheck()` shared by the consumer and the daily trigger, `jiraAsUser`, `taskGuard` |
 | `src/index.js`, `src/consumer.js`, `src/scheduled.js`, `src/kvAdapter.js` | **Forge entry points** (resolvers, queue consumer, daily trigger, storage adapter) |
 | `static/hello-world/src/App.js` | The panel |
 
@@ -57,11 +59,22 @@ A Forge **UI function is cut off at 25 s and cannot be given a longer timeout** 
 
 Rules that keep this correct: a result with failed lookups is shown but never saved; only the running job with the matching id may be updated (late or duplicate queue deliveries are skipped); a job with no update for 6 minutes counts as failed; the search has its own 240 s deadline inside the 300 s limit.
 
+### Jira tasks for matches
+
+Only **exact** and **likely** matches get a task. Due date is calendar days from creation (UTC): Class I 2, Class II/III 7, unknown class 2 (treated as Class I); the numbers and reasons live in `taskRules.js` and the README, so change them there and in the README together.
+
+- **Never a duplicate**: every task has a label `recallradar-<recall>-<device>`. Creation first searches Jira by label (Jira is the source of truth, so it survives cleared storage and other browsers), plus a 2-minute guard in Forge storage for Jira's search-index lag. Keep both layers.
+- **The server rebuilds each task from the saved check result**; the browser sends only `{ recallNumber, deviceId }`. Never accept task text or dates from the page.
+- Tasks are created **as the clicking user** (`asUser`, scope `write:jira-work`) in the project of the issue the panel is open on, via Jira's bulk endpoint (max 50 per call).
+- **Request size**: about 0.6 s per task and a UI function dies at 25 s (34 tasks took ~20 s). The server caps a request at 25 pairs (`MAX_PAIRS_PER_REQUEST`) and the panel sends batches of 10. Do not raise either without re-measuring.
+- Links: the openFDA record URL for the recall number is the only per-recall link that was verified. FDA's own pages (`ires`, `res.cfm`) return 200 but could not be shown to display the specific recall.
+
 ## Gotchas learned the hard way
 
 - **`route` template**: only interpolate single path *segments* (ids). Interpolating a value that contains `/` throws "Disallowing path manipulation attempt".
 - **`@forge/api` has no `storage`** in this version: use `@forge/kvs` (`kvs.get/set/delete/query`), scope `storage:app`.
 - **Queue consumer events** carry data in `event.body` (not `payload`); `queue.push({ body })` wraps the data.
+- **Scheduled triggers DO run in the development environment** (verified: with `interval: fiveMinute` the first run came about 3 minutes after the deploy, then every 5 minutes). The shortest interval is `fiveMinute`. If you ever test one that way, **restore `interval: day` before leaving it**: a 5-minute trigger makes ~24 openFDA requests per run and blows through the daily limit. Changing any scheduled trigger resets all start times.
 - **Scopes/egress changes make a major version** and need `--approve MAJOR_VERSION_RULE` plus `install --upgrade`. Adding the `api.fda.gov` egress made the app **ineligible for Runs on Atlassian** (a Codegeist bonus, if it applies: check the rules).
 - **openFDA**: use `/device/enforcement.json` (it has recall number, firm, product, `code_info`, `classification`, `report_date`; the `/device/recall` endpoint has no class). Dates are `YYYYMMDD`. A search with no hits returns **404** (treat as empty). `code_info` can hold thousands of serials; one record (Z-1645-2026) is 8.7 MB because of an unused `openfda` sub-object, and openFDA cannot omit fields. Anonymous limit is about 1,000 requests a day per IP (a full check is about 24), which is why results are saved. Newest 100 recalls span only about a week, so match by manufacturer/model within a date window, never by "latest N".
 - **Assets**: Forge can *read* Assets as the app (`read:cmdb-object:jira`, `read:cmdb-schema:jira`, workspace id from `/rest/servicedeskapi/assets/workspace`) but *creating* a schema returned 403 (Assets-administrator rights). Hence devices live in Forge storage; read-only scopes are kept for a planned import.
@@ -78,4 +91,4 @@ Rules that keep this correct: a result with failed lookups is shown but never sa
 
 ## Not built / ideas
 
-Read-only Assets import; adding/editing devices in the UI; Rovo agent that answers recall questions; skipping the duplicate download of the 8.7 MB record; per-search caching; serial-range parsing ("serial number < 2224").
+Read-only Assets import; adding/editing devices in the UI; choosing the project for tasks; showing whether a task is done; Rovo agent that answers recall questions; skipping the duplicate download of the 8.7 MB record; per-search caching; serial-range parsing ("serial number < 2224").

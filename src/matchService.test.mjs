@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getSavedMatches, requestCheck, getCheckStatus, performCheck } from './matchService.js';
+import { getSavedMatches, getLatestResult, requestCheck, getCheckStatus, performCheck } from './matchService.js';
 import { createMatchCache, CACHE_TTL_MS, MATCH_CACHE_KEY } from './matchCache.js';
 import { createCheckJobs, JOB_KEY, STALE_JOB_MS } from './checkJob.js';
 import { fakeKv } from './fakeKv.mjs';
@@ -295,4 +295,28 @@ test('damaged job data does not break requestCheck', async () => {
   s.kv.data.set(JOB_KEY, 'garbage');
   const out = await requestCheck({ devices, cache: s.cache, jobs: s.jobs, enqueue: s.enqueue });
   assert.equal(out.state, 'running');
+});
+
+// --- getLatestResult -----------------------------------------------------------------------------------
+
+test('getLatestResult prefers the saved result, even an expired one', async () => {
+  const s = setup();
+  await s.cache.write(devices, found({ recallCount: 7 }), new Date(T0).toISOString());
+  s.clock.now = T0 + CACHE_TTL_MS + 1;
+  assert.equal((await getLatestResult({ devices, cache: s.cache, jobs: s.jobs })).recallCount, 7);
+});
+
+test('getLatestResult falls back to the last finished job, which covers a result that was never saved', async () => {
+  const s = setup({ result: found({ failedQueries: 2, recallCount: 4 }) });
+  const { job } = await s.jobs.start('user');
+  await performCheck({ devices, search: s.search, cache: s.cache, jobs: s.jobs, trigger: 'user', jobId: job.id, nowMs: s.nowMs });
+  assert.equal(s.kv.data.has(MATCH_CACHE_KEY), false);
+  assert.equal((await getLatestResult({ devices, cache: s.cache, jobs: s.jobs })).recallCount, 4);
+});
+
+test('getLatestResult is null with no saved result and no finished job', async () => {
+  const s = setup();
+  assert.equal(await getLatestResult({ devices, cache: s.cache, jobs: s.jobs }), null);
+  await s.jobs.start('user'); // running, not finished
+  assert.equal(await getLatestResult({ devices, cache: s.cache, jobs: s.jobs }), null);
 });
