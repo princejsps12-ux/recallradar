@@ -9,7 +9,7 @@ import SectionMessage from '@atlaskit/section-message';
 import CrossIcon from '@atlaskit/icon/core/cross';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import { router } from '@forge/bridge';
-import { sp, color, muted, ClassLozenge, MatchLozenge, LinkLike } from '../ui/kit';
+import { sp, color, muted, ClassLozenge, MatchLozenge, LinkLike, formatDay } from '../ui/kit';
 import { matchesForDevice } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 import { openIssue } from './DevicesTable';
@@ -110,9 +110,9 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                       <Button appearance="subtle" spacing="compact" aria-label="Close details" onClick={onClose} iconBefore={CrossIcon} />
                     </span>
                   </div>
-                  <div role="group" aria-label="Device facts" style={{ margin: `0 0 ${sp(300)}` }}>
+                  <div role="group" aria-label="Device facts" style={{ margin: `0 0 ${sp(300)}`, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: sp(200) }}>
                     <Field label="Ward">{first.ward}</Field>
-                    <Field label="Team (Teamwork Graph)">{first.ward && teams[first.ward]}</Field>
+                    <Field label="Team">{first.ward && teams[first.ward]}</Field>
                     <Field label="Serial or lot">{first.lotOrSerial}</Field>
                   </div>
                   <Heading size="medium">Recalls that affect it ({matches.length})</Heading>
@@ -128,7 +128,8 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                           <MatchLozenge confidence={m.confidence} />
                           {details.status && <Lozenge>{details.status}</Lozenge>}
                         </div>
-                        <div style={muted}>{m.firm}{m.date ? ` · reported ${m.date}` : ''}{details.initiated ? ` · started ${details.initiated}` : ''}</div>
+                        <div style={muted}>{m.firm}{m.date ? ` · reported ${formatDay(m.date)}` : ''}{details.initiated ? ` · started ${formatDay(details.initiated)}` : ''}</div>
+                        <div style={{ marginTop: sp(50) }}><LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike></div>
                         <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">Why we think it matches</Heading></div>
                         <p style={{ margin: 0 }}>{m.reason}</p>
                         {details.reason && (
@@ -145,7 +146,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                             </>
                           ) : (
                             <>
-                              <Button appearance="primary" spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreate(m, false)}>Create task</Button>
+                              <Button spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreate(m, false)}>Create task</Button>
                               {suggestion && (
                                 <Button spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreate(m, true)}>
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(75) }}>
@@ -156,7 +157,6 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                               )}
                             </>
                           )}
-                          <LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike>
                         </div>
                         {!key && !canCreate && <div style={{ ...muted, marginTop: sp(50) }}>Choose a project on the Overview tab first.</div>}
                         {suggestion && <div style={{ ...muted, marginTop: sp(50) }}>Suggested because they have the fewest open RecallRadar tasks in {suggestion.teamName}. Nobody is assigned unless you choose it.</div>}

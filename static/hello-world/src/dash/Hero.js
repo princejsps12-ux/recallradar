@@ -92,8 +92,8 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
                 </div>
               </div>
               <div style={{ display: 'flex', gap: sp(100) }}>
-                <ClassLozenge recallClass={m.recallClass} />
-                <MatchLozenge confidence={m.confidence} />
+                <div style={{ minWidth: '64px' }}><ClassLozenge recallClass={m.recallClass} /></div>
+                <div style={{ minWidth: '96px' }}><MatchLozenge confidence={m.confidence} /></div>
               </div>
               <div style={{ display: 'flex', gap: sp(100) }}>
                 <Button spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreate(m)}>Create task</Button>

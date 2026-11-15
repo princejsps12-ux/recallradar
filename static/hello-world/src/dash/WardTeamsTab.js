@@ -69,8 +69,8 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
       key: ward,
       cells: [
         { key: 'w', content: <strong>{ward}</strong> },
-        { key: 'n', content: n ? <Lozenge appearance={needs[ward].classI ? 'removed' : 'moved'}>{`${n} ${n === 1 ? 'device needs' : 'devices need'} action`}</Lozenge> : <span style={muted}>None need action</span> },
-        { key: 't', content: (<div style={{ maxWidth: '320px' }}><Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" isDisabled={teams === null || busy === ward} isLoading={busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" /></div>) },
+        { key: 'n', content: n ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>{`${n} ${n === 1 ? 'device' : 'devices'}`}{needs[ward].classI ? <Lozenge appearance="removed">Class I</Lozenge> : null}</span>) : <span style={muted}>–</span> },
+        { key: 't', content: (<div><Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" isDisabled={busy === ward} isLoading={teams === null || busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" /></div>) },
       ],
     };
   });
@@ -78,23 +78,20 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
   return (
     <div style={{ paddingTop: sp(200) }}>
       <p style={{ ...muted, fontSize: '14px', maxWidth: '640px' }}>
-        Pick the team that handles each ward. The list of teams is read from the Teamwork Graph (read-only) and shows the teams you belong to; the choice is saved in RecallRadar and used to suggest who should get a task. Nobody is assigned without you choosing it.
+        Choose the team for each ward. We suggest assignees from it, and nobody is assigned unless you choose.
       </p>
       <div role="status" aria-live="polite">
         {loadError && <SectionMessage appearance="error" title="Could not load teams">{loadError}</SectionMessage>}
         {message && <SectionMessage appearance={message.kind}>{message.text}</SectionMessage>}
         {teams && teams.length === 0 && <SectionMessage appearance="information" title="No teams yet">You are not in any team in your Atlassian directory, so there is nothing to choose from.</SectionMessage>}
       </div>
-      {teams === null && !loadError ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: sp(100) }}><span role="status">Loading teams…</span></div>
-      ) : null}
       {wardInfo.wards.length === 0 ? (
         <SectionMessage appearance="information" title="No wards yet">Load the demo hospital or import your devices; their wards appear here.</SectionMessage>
       ) : (
-        <DynamicTable caption={<VisuallyHidden>Ward to team mapping</VisuallyHidden>} label="Ward teams" head={{ cells: [{ key: 'w', content: 'Ward', width: 22 }, { key: 'n', content: 'Needs action', width: 28 }, { key: 't', content: 'Team (from Teamwork Graph)' }] }} rows={rows} rowsPerPage={20} isFixedSize />
+        <DynamicTable caption={<VisuallyHidden>Ward to team mapping</VisuallyHidden>} label="Ward teams" head={{ cells: [{ key: 'w', content: 'Ward', width: 22 }, { key: 'n', content: 'Devices needing action', width: 28 }, { key: 't', content: 'Team' }] }} rows={rows} rowsPerPage={20} isFixedSize />
       )}
       {wardInfo.wards.length > 0 && (
-        <p style={{ ...muted, marginTop: sp(150) }}>{wardInfo.mappings.length} of {wardInfo.wards.length} wards have a team. Wards with a Class I recall come first, then the wards with the most devices to act on.</p>
+        <p style={{ ...muted, marginTop: sp(150) }}>{wardInfo.mappings.length} of {wardInfo.wards.length} wards have a team. Wards with a Class I recall come first. Teams are read from the Teamwork Graph (read-only) and are the ones you belong to.</p>
       )}
     </div>
   );

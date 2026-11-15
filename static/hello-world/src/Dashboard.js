@@ -90,7 +90,7 @@ export default function Dashboard() {
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100) }}>
         <Button iconBefore={RefreshIcon} onClick={() => d.begin(true)} isDisabled={!ready || running}>{running ? 'Checking…' : 'Refresh'}</Button>
-        <Button iconBefore={PageIcon} onClick={() => setConfluenceOpen(true)} isDisabled={!ready}>Confluence recall page</Button>
+        <Button iconBefore={PageIcon} onClick={() => setConfluenceOpen(true)} isDisabled={!ready}>Create Confluence pages</Button>
         <Button iconBefore={UploadIcon} onClick={() => setImportOpen(true)}>Import devices</Button>
       </div>
     </div>
@@ -152,7 +152,7 @@ export default function Dashboard() {
       <Tabs id="rr-tabs" selected={tab} onChange={setTab}>
         <TabList>
           <Tab>Overview</Tab>
-          <Tab>{d.wardLoaded ? `Ward teams (${d.wardInfo.mappings.length} of ${d.wardInfo.wards.length})` : 'Ward teams'}</Tab>
+          <Tab>{d.wardLoaded ? `Ward teams · ${d.wardInfo.mappings.length} of ${d.wardInfo.wards.length} set` : 'Ward teams'}</Tab>
         </TabList>
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300) }}>

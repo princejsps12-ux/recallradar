@@ -84,7 +84,7 @@ export function useNarrow(maxWidth = 720) {
 // One look for every "Details" button, on desktop and on a phone.
 export function DetailsButton({ onClick, label = 'Details' }) {
   return (
-    <Button spacing="compact" iconAfter={ChevronRightIcon} onClick={onClick}>
+    <Button appearance="subtle" spacing="compact" iconAfter={ChevronRightIcon} onClick={onClick}>
       {label}
     </Button>
   );
@@ -108,6 +108,15 @@ export function Progress({ done, total, label }) {
 }
 
 // "15 Nov 2026, 23:49" in the reader's own locale, never an ambiguous 15/11/2026.
+export function formatDay(day) {
+  try {
+    const d = new Date(`${String(day).slice(0, 10)}T00:00:00Z`);
+    return Number.isNaN(d.getTime()) ? String(day) : d.toLocaleDateString(undefined, { dateStyle: 'medium', timeZone: 'UTC' });
+  } catch (e) {
+    return String(day || '');
+  }
+}
+
 export function formatWhen(iso) {
   try {
     return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
