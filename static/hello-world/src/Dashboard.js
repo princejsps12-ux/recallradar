@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import DropdownMenu, { DropdownItemGroup, DropdownItem } from '@atlaskit/dropdown-menu';
+import Badge from '@atlaskit/badge';
+import MoreIcon from '@atlaskit/icon/core/show-more-horizontal';
 import Tabs, { Tab, TabList, TabPanel } from '@atlaskit/tabs';
 import Button from '@atlaskit/button/new';
 import Spinner from '@atlaskit/spinner';
@@ -16,7 +19,7 @@ import DynamicTable from '@atlaskit/dynamic-table';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
-import { sp, color, card, muted, useNarrow, Progress, formatWhen } from './ui/kit';
+import { sp, color, card, muted, useNarrow, Progress, formatWhen, ClassLozenge, niceFirm } from './ui/kit';
 import { affectedMatches, heroStats, urgentMatches, taskProgress, screenFor } from './dashboardData.mjs';
 import { Hero, UrgentList, SummaryCards } from './dash/Hero';
 import DevicesTable from './dash/DevicesTable';
@@ -90,8 +93,12 @@ export default function Dashboard() {
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100) }}>
         <Button iconBefore={RefreshIcon} onClick={() => d.begin(true)} isDisabled={!ready || running}>{running ? 'Checking…' : 'Refresh'}</Button>
-        <Button iconBefore={PageIcon} onClick={() => setConfluenceOpen(true)} isDisabled={!ready}>Create Confluence pages</Button>
-        <Button iconBefore={UploadIcon} onClick={() => setImportOpen(true)}>Import devices</Button>
+        <DropdownMenu shouldRenderToParent placement="bottom-end" trigger={({ triggerRef, ...props }) => (<Button {...props} ref={triggerRef} iconBefore={MoreIcon} aria-label="More actions" />)}>
+          <DropdownItemGroup>
+            <DropdownItem elemBefore={<UploadIcon label="" />} onClick={() => setImportOpen(true)}>Import devices</DropdownItem>
+            <DropdownItem elemBefore={<PageIcon label="" />} isDisabled={!ready} onClick={() => setConfluenceOpen(true)}>Create Confluence pages</DropdownItem>
+          </DropdownItemGroup>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -138,8 +145,8 @@ export default function Dashboard() {
     key: r.recallNumber,
     cells: [
       { key: 'n', content: <span style={{ whiteSpace: 'nowrap' }}>{r.recallNumber}</span> },
-      { key: 'c', content: r.recallClass ? `Class ${r.recallClass}` : '?' },
-      { key: 'f', content: r.firm || 'Unknown firm' },
+      { key: 'c', content: <ClassLozenge recallClass={r.recallClass} /> },
+      { key: 'f', content: niceFirm(r.firm) || 'Unknown firm' },
       { key: 'p', content: <span style={clamp} title={r.product}>{r.product}</span> },
       { key: 'd', content: <span style={{ whiteSpace: 'nowrap' }}>{r.date || '–'}</span> },
     ],
@@ -152,7 +159,7 @@ export default function Dashboard() {
       <Tabs id="rr-tabs" selected={tab} onChange={setTab}>
         <TabList>
           <Tab>Overview</Tab>
-          <Tab>{'Ward teams'}</Tab>
+          <Tab>{d.wardLoaded ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(75) }}>Ward teams <Badge>{`${d.wardInfo.mappings.length}/${d.wardInfo.wards.length}`}</Badge></span>) : 'Ward teams'}</Tab>
         </TabList>
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300) }}>
@@ -172,7 +179,7 @@ export default function Dashboard() {
                   {(d.recent.recalls || []).slice(0, 6).map((r) => (
                     <li key={r.recallNumber} style={{ borderTop: `1px solid ${color.border}`, paddingTop: sp(100) }}>
                       <strong>{r.recallNumber}</strong> <span style={muted}>{r.recallClass ? `Class ${r.recallClass}` : ''} · {r.date || ''}</span>
-                      <div style={muted}>{r.firm || 'Unknown firm'}</div>
+                      <div style={muted}>{niceFirm(r.firm) || 'Unknown firm'}</div>
                       <div>{r.product}</div>
                     </li>
                   ))}
@@ -187,7 +194,7 @@ export default function Dashboard() {
           <WardTeamsTab wardInfo={d.wardInfo} onChanged={d.loadWardInfo} result={d.result} />
         </TabPanel>
       </Tabs>
-      <DeviceDrawer deviceId={drawerDevice} result={d.result} tasks={d.tasks} suggestions={d.suggestions} teams={teams} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onClose={() => setDrawerDevice(null)} />
+      <DeviceDrawer deviceId={drawerDevice} result={d.result} tasks={d.tasks} suggestions={d.suggestions} teams={teams} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onCreateMany={(ms) => d.createTasks(ms, false)} onClose={() => setDrawerDevice(null)} />
       <CreateAllModal isOpen={createAllOpen} onClose={() => setCreateAllOpen(false)} count={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} suggestedCount={suggestedCount} projectName={projectName} onConfirm={createAll} running={d.creating.active} />
       <FlagGroup onDismissed={() => d.setNote(null)}>
         {d.note ? (

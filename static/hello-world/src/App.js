@@ -8,7 +8,7 @@ import Avatar from '@atlaskit/avatar';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
-import { sp, color, muted, noBreak, ClassLozenge, MatchLozenge, Progress, formatWhen, LinkLike } from './ui/kit';
+import { sp, color, muted, noBreak, ClassLozenge, MatchLozenge, Progress, formatWhen, ago, LinkLike } from './ui/kit';
 import { affectedMatches, heroStats, sortByUrgency } from './dashboardData.mjs';
 
 const PANEL_ROWS = 3; // the panel stays compact and fits its frame with the bulk button: the rest lives in the dashboard
@@ -78,7 +78,7 @@ export default function App() {
         <div>
           <strong style={{ fontSize: '16px' }}>{stats.devices} {stats.devices === 1 ? 'device needs' : 'devices need'} action</strong>
           {stats.classIDevices > 0 && <span style={{ color: color.danger, fontWeight: 600 }}> · {stats.classIDevices} with a Class I recall</span>}
-          <div style={muted}>Checked {formatWhen(d.result.checkedAt)}{d.result.stale ? ' (older than 6 hours)' : ''}</div>
+          <div style={muted}>Checked {ago(d.result.checkedAt)}{d.result.stale ? ' (older than 6 hours)' : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: sp(50) }}>
           <Button appearance="subtle" spacing="compact" isDisabled={running} onClick={() => d.begin(true)}>{running ? 'Checking…' : 'Refresh'}</Button>
@@ -102,9 +102,9 @@ export default function App() {
             return (
               <li key={m.deviceId} style={{ padding: `${sp(100)} 0`, borderTop: i ? `1px solid ${color.border}` : `1px solid ${color.border}` }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center' }}>
-                  <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                  <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                     <strong>{m.deviceName}</strong>
-                    <div style={muted}>{m.ward || 'No ward'} · <span style={noBreak}>{m.recallNumber}</span>{team ? ` · Team: ${team.teamName} (from Teamwork Graph)` : ''}</div>
+                    <div style={muted}>{m.ward || 'No ward'} · <span style={noBreak}>{m.recallNumber}</span>{team ? ` · ${team.teamName}` : ''}</div>
                   </div>
                   <ClassLozenge recallClass={m.recallClass} />
                   <MatchLozenge confidence={m.confidence} />

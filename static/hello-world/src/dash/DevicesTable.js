@@ -46,7 +46,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady
         { key: m.recallNumber, content: (<div><span style={noBreak}>{m.recallNumber}</span><div style={muted}>{m.firm}</div></div>) },
         { key: urgencyRank({ ...m, confidence: 'exact' }), content: <ClassLozenge recallClass={m.recallClass} /> },
         { key: m.confidence, content: <MatchLozenge confidence={m.confidence} /> },
-        { key: key || '~', content: !tasksReady ? (<Skeleton height="20px" width="64px" isShimmering />) : key ? (<LinkLike onClick={(e) => { e.stopPropagation(); openIssue(key); }}>{key}</LinkLike>) : (<span style={muted}><span aria-hidden="true">–</span><VisuallyHidden>No task</VisuallyHidden></span>) },
+        { key: key || '~', content: !tasksReady ? (<Skeleton height="20px" width="64px" isShimmering />) : key ? (<LinkLike onClick={(e) => { e.stopPropagation(); openIssue(key); }}>{key}</LinkLike>) : (<span style={muted}>No task</span>) },
         { key: 'a', content: <DetailsButton onClick={(e) => { e.stopPropagation(); onOpen(m.deviceId); }} /> },
       ],
     };
@@ -82,7 +82,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), margin: `${sp(100)} 0`, alignItems: 'center' }}>
                       <ClassLozenge recallClass={m.recallClass} />
                       <MatchLozenge confidence={m.confidence} />
-                      {key ? (<LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>) : (<span style={muted}><span aria-hidden="true">–</span><VisuallyHidden>No task</VisuallyHidden></span>)}
+                      {key ? (<LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>) : (<span style={muted}>No task</span>)}
                     </div>
                     <DetailsButton onClick={() => onOpen(m.deviceId)} />
                   </li>

@@ -7,6 +7,9 @@ import Lozenge from '@atlaskit/lozenge';
 import Avatar from '@atlaskit/avatar';
 import SectionMessage from '@atlaskit/section-message';
 import CrossIcon from '@atlaskit/icon/core/cross';
+import ChevronDownIcon from '@atlaskit/icon/core/chevron-down';
+import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
+import VisuallyHidden from '@atlaskit/visually-hidden';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import { router } from '@forge/bridge';
 import { sp, cap, color, muted, ClassLozenge, MatchLozenge, LinkLike, formatDay } from '../ui/kit';
@@ -45,12 +48,15 @@ function Field({ label, children }) {
 // FDA says is wrong, and the Jira task (or the buttons to create one). It slides in from the right (Atlaskit's own
 // Drawer is always left-anchored). Keyboard: focus moves in when it opens, Tab stays inside, Escape closes it,
 // and focus returns to what opened it.
-export default function DeviceDrawer({ deviceId, result, tasks, suggestions, teams, canCreate, busy, onCreate, onClose }) {
+export default function DeviceDrawer({ deviceId, result, tasks, suggestions, teams, canCreate, busy, onCreate, onCreateMany, onClose }) {
   const matches = deviceId ? matchesForDevice(result, deviceId) : [];
   const first = matches[0];
   const panel = useRef(null);
   const closeWrap = useRef(null);
   const opener = useRef(null);
+  const [openCards, setOpenCards] = useState({});
+  useEffect(() => setOpenCards({}), [deviceId]);
+  const missing = matches.filter((m) => !tasks[pairOf(m)]);
 
   useEffect(() => {
     if (!deviceId) return undefined;
@@ -100,11 +106,11 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                 aria-label={`Details for ${first.deviceName}`}
                 style={{ position: 'relative', width: 'min(520px, 100%)', height: '100%', overflowY: 'auto', boxSizing: 'border-box', background: token('elevation.surface.overlay'), boxShadow: token('elevation.shadow.overlay'), borderLeft: `1px solid ${color.border}`, color: color.text }}
               >
-                <div style={{ padding: sp(300) }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: sp(100), position: 'sticky', top: 0, zIndex: 1, background: token('elevation.surface.overlay'), margin: `-${sp(300)} -${sp(300)} 0`, padding: `${sp(300)} ${sp(300)} 0` }}>
-                    <div>
+                <div style={{ padding: `0 ${sp(300)} ${sp(300)}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: sp(100), position: 'sticky', top: 0, zIndex: 1, background: token('elevation.surface.overlay'), padding: `${sp(300)} 0 ${sp(150)}` }}>
+                    <div style={{ minWidth: 0 }}>
                       <Heading size="large">{cap(first.deviceName)}</Heading>
-                      <div style={{ ...muted, marginBottom: sp(200) }}>{first.deviceManufacturer} {first.deviceModel}</div>
+                      <div style={muted}>{first.deviceManufacturer} {first.deviceModel}</div>
                     </div>
                     <span ref={closeWrap}>
                       <Button appearance="subtle" spacing="compact" aria-label="Close details" onClick={onClose} iconBefore={CrossIcon} />
@@ -115,51 +121,65 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                     <Field label="Team">{first.ward && teams[first.ward]}</Field>
                     <Field label="Serial or lot">{first.lotOrSerial}</Field>
                   </div>
-                  <Heading size="medium">Recalls that affect it ({matches.length})</Heading>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: sp(100) }}>
+                    <Heading size="medium">Recalls that affect it ({matches.length})</Heading>
+                    {missing.length > 1 && (
+                      <Button appearance="primary" spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreateMany(missing)}>{`Create ${missing.length} tasks`}</Button>
+                    )}
+                  </div>
                   {matches.map((m) => {
                     const key = tasks[pairOf(m)];
                     const suggestion = suggestions[pairOf(m)];
                     const details = (result.recallDetails || {})[m.recallNumber] || {};
+                    const isOpen = Boolean(openCards[m.recallNumber]);
+                    const bodyId = `rr-card-${m.recallNumber}`;
                     return (
-                      <section key={m.recallNumber} aria-label={`Recall ${m.recallNumber}`} style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: sp(200), marginTop: sp(150), background: color.raised }}>
+                      <section key={m.recallNumber} aria-label={`Recall ${m.recallNumber}`} style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: `${sp(150)} ${sp(200)}`, marginTop: sp(100), background: color.raised }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center' }}>
-                          <strong>{m.recallNumber}</strong>
+                          <button type="button" aria-expanded={isOpen} aria-controls={bodyId} onClick={() => setOpenCards({ ...openCards, [m.recallNumber]: !isOpen })} style={{ background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: sp(50) }}>
+                            {isOpen ? <ChevronDownIcon label="" size="small" /> : <ChevronRightIcon label="" size="small" />}
+                            <strong>{m.recallNumber}</strong>
+                            <VisuallyHidden>{isOpen ? 'Hide details' : 'Show details'}</VisuallyHidden>
+                          </button>
                           <ClassLozenge recallClass={m.recallClass} />
                           <MatchLozenge confidence={m.confidence} />
-                          {details.status && <Lozenge>{details.status}</Lozenge>}
-                        </div>
-                        <div style={muted}>{m.firm}{details.initiated ? ` · started ${formatDay(details.initiated)}` : ''}{m.date ? ` · reported ${formatDay(m.date)}` : ''}</div>
-                        <div style={{ marginTop: sp(50) }}><LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike></div>
-                        <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">Why we think it matches</Heading></div>
-                        <p style={{ margin: 0 }}>{m.reason}</p>
-                        {details.reason && (
-                          <>
-                            <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">What the FDA says is wrong</Heading></div>
-                            <ExpandableText text={details.reason} />
-                          </>
-                        )}
-                        <div style={{ marginTop: sp(150), display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center' }}>
-                          {key ? (
-                            <>
-                              <span>Task:</span>
-                              <LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>
-                            </>
-                          ) : (
-                            <>
+                          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>
+                            {key ? (
+                              <>
+                                <span>Task:</span>
+                                <LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>
+                              </>
+                            ) : (
                               <Button spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreate(m, false)}>Create task</Button>
-                              {suggestion && (
+                            )}
+                          </span>
+                        </div>
+                        {isOpen && (
+                          <div id={bodyId} style={{ marginTop: sp(100) }}>
+                            <div style={muted}>{m.firm}{details.status ? ` · ${details.status}` : ''}{details.initiated ? ` · started ${formatDay(details.initiated)}` : ''}{m.date ? ` · reported ${formatDay(m.date)}` : ''}</div>
+                            <div style={{ marginTop: sp(50) }}><LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike></div>
+                            <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">Why we think it matches</Heading></div>
+                            <p style={{ margin: 0 }}>{m.reason}</p>
+                            {details.reason && (
+                              <>
+                                <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">What the FDA says is wrong</Heading></div>
+                                <ExpandableText text={details.reason} />
+                              </>
+                            )}
+                            {!key && suggestion && (
+                              <div style={{ marginTop: sp(150) }}>
                                 <Button spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreate(m, true)}>
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(75) }}>
                                     <Avatar size="xsmall" name={suggestion.name} />
                                     Create and assign to {suggestion.name}
                                   </span>
                                 </Button>
-                              )}
-                            </>
-                          )}
-                        </div>
+                                <div style={{ ...muted, marginTop: sp(50) }}>Suggested because they have the fewest open RecallRadar tasks in {suggestion.teamName}. Nobody is assigned unless you choose it.</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {!key && !canCreate && <div style={{ ...muted, marginTop: sp(50) }}>Choose a project on the Overview tab first.</div>}
-                        {suggestion && <div style={{ ...muted, marginTop: sp(50) }}>Suggested because they have the fewest open RecallRadar tasks in {suggestion.teamName}. Nobody is assigned unless you choose it.</div>}
                       </section>
                     );
                   })}

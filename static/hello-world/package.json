@@ -5,10 +5,12 @@
   "homepage": ".",
   "dependencies": {
     "@atlaskit/avatar": "^30.1.0",
+    "@atlaskit/badge": "^22.0.0",
     "@atlaskit/button": "^25.8.1",
     "@atlaskit/checkbox": "^19.3.2",
     "@atlaskit/css-reset": "^6.6.2",
     "@atlaskit/drawer": "^14.3.12",
+    "@atlaskit/dropdown-menu": "^21.3.2",
     "@atlaskit/dynamic-table": "^19.3.8",
     "@atlaskit/empty-state": "^12.2.4",
     "@atlaskit/flag": "^19.0.5",

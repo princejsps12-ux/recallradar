@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { token } from '@atlaskit/tokens';
 import { invoke } from '@forge/bridge';
 import DynamicTable from '@atlaskit/dynamic-table';
 import Select from '@atlaskit/select';
 import SectionMessage from '@atlaskit/section-message';
 import VisuallyHidden from '@atlaskit/visually-hidden';
-import { sp, muted, color } from '../ui/kit';
+import { sp, muted, color, useNarrow } from '../ui/kit';
 import Lozenge from '@atlaskit/lozenge';
 import { affectedMatches } from '../dashboardData.mjs';
 
@@ -16,6 +15,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState(null);
+  const narrow = useNarrow();
 
   useEffect(() => {
     let cancelled = false;
@@ -62,16 +62,20 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
   const count = (w) => (needs[w] ? needs[w].devices.size : 0);
   const classI = (w) => (needs[w] && needs[w].classI ? 1 : 0);
   const ordered = [...wardInfo.wards].sort((a, b) => classI(b) - classI(a) || count(b) - count(a) || a.localeCompare(b));
+  const teamSelect = (ward, mapping, value) => (
+    <Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" appearance="subtle" placeholder="No team" isDisabled={busy === ward} isLoading={teams === null || busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" />
+  );
+  const needsText = (ward, n) => (n ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>{`${n} ${n === 1 ? 'device' : 'devices'}`}{needs[ward].classI ? <Lozenge appearance="removed">Class I</Lozenge> : null}</span>) : <span style={muted}>None</span>);
   const rows = ordered.map((ward) => {
     const mapping = wardInfo.byKey[String(ward).toLowerCase().replace(/[^a-z0-9]/g, '')];
-    const value = mapping ? { label: mapping.teamName, value: mapping.teamAri } : options[0];
+    const value = mapping ? { label: mapping.teamName, value: mapping.teamAri } : null;
     const n = count(ward);
     return {
       key: ward,
       cells: [
         { key: 'w', content: <strong>{ward}</strong> },
-        { key: 'n', content: n ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>{`${n} ${n === 1 ? 'device' : 'devices'}`}{needs[ward].classI ? <Lozenge appearance="removed">Class I</Lozenge> : null}</span>) : <span style={muted}>None</span> },
-        { key: 't', content: (<div style={{ maxWidth: '240px' }}><Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" appearance="subtle" styles={mapping ? undefined : { singleValue: (base) => ({ ...base, color: token('color.text.subtle') }) }} isDisabled={busy === ward} isLoading={teams === null || busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" /></div>) },
+        { key: 'n', content: needsText(ward, n) },
+        { key: 't', content: (<div style={{ maxWidth: '240px' }}>{teamSelect(ward, mapping, value)}</div>) },
       ],
     };
   });
@@ -88,6 +92,22 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
       </div>
       {wardInfo.wards.length === 0 ? (
         <SectionMessage appearance="information" title="No wards yet">Load the demo hospital or import your devices; their wards appear here.</SectionMessage>
+      ) : narrow ? (
+        <ul aria-label="Ward to team mapping" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {ordered.map((ward, i) => {
+            const mapping = wardInfo.byKey[String(ward).toLowerCase().replace(/[^a-z0-9]/g, '')];
+            const value = mapping ? { label: mapping.teamName, value: mapping.teamAri } : null;
+            return (
+              <li key={ward} style={{ padding: `${sp(150)} 0`, borderTop: i ? `1px solid ${color.border}` : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: sp(100), marginBottom: sp(50) }}>
+                  <strong>{ward}</strong>
+                  {needsText(ward, count(ward))}
+                </div>
+                {teamSelect(ward, mapping, value)}
+              </li>
+            );
+          })}
+        </ul>
       ) : (
         <DynamicTable caption={<VisuallyHidden>Ward to team mapping</VisuallyHidden>} label="Ward teams" head={{ cells: [{ key: 'w', content: 'Ward', width: 22 }, { key: 'n', content: 'Devices needing action', width: 28 }, { key: 't', content: 'Team', width: 40 }] }} rows={rows} rowsPerPage={20} isFixedSize />
       )}

@@ -9,6 +9,17 @@ import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
 // contrast rules). No hex colours anywhere in the UI code.
 // Token names are zero-padded to three digits: sp(50) is space.050 (4 px), sp(200) is space.200 (16 px).
 export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+// FDA firm names often come in capitals ("PHILIPS MEDICAL SYSTEMS"): show those in normal case.
+export const niceFirm = (s) => (s && s === s.toUpperCase() && /[A-Z]{4}/.test(s) ? s.toLowerCase().replace(/(^|[\s(/-])([a-z])/g, (m, a, b) => a + b.toUpperCase()) : s);
+// "3 h ago" style age, for the panel header.
+export function ago(iso, now = Date.now()) {
+  const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
+  if (!Number.isFinite(mins)) return '';
+  if (mins < 2) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const h = Math.round(mins / 60);
+  return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
+}
 export const sp = (n) => token(`space.${String(n).padStart(3, '0')}`);
 export const color = {
   text: token('color.text'),
@@ -44,7 +55,7 @@ const CLASS_APPEARANCE = { I: 'removed', II: 'moved', III: 'default' };
 // Text AND colour, so the meaning never depends on colour alone.
 export function ClassLozenge({ recallClass }) {
   return (
-    <Lozenge isBold appearance={CLASS_APPEARANCE[recallClass] || 'default'}>
+    <Lozenge appearance={CLASS_APPEARANCE[recallClass] || 'default'}>
       {recallClass ? `Class ${recallClass}` : 'Class ?'}
     </Lozenge>
   );
@@ -52,7 +63,7 @@ export function ClassLozenge({ recallClass }) {
 
 export function MatchLozenge({ confidence }) {
   return (
-    <Lozenge appearance={confidence === 'exact' ? 'inprogress' : 'new'} isBold={confidence === 'exact'}>
+    <Lozenge appearance={confidence === 'exact' ? 'inprogress' : 'new'}>
       {confidence === 'exact' ? 'Exact match' : 'Likely match'}
     </Lozenge>
   );
@@ -109,13 +120,11 @@ export function Progress({ done, total, label }) {
 }
 
 // "15 Nov 2026, 23:49" in the reader's own locale, never an ambiguous 15/11/2026.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// "4 Nov 2026" for every date in the UI (a fixed table, so the month never comes out as "Sept").
 export function formatDay(day) {
-  try {
-    const d = new Date(`${String(day).slice(0, 10)}T00:00:00Z`);
-    return Number.isNaN(d.getTime()) ? String(day) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-  } catch (e) {
-    return String(day || '');
-  }
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(day || ''));
+  return m && MONTHS[Number(m[2]) - 1] ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : String(day || '');
 }
 
 export function formatWhen(iso) {

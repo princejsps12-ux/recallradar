@@ -58,7 +58,7 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
           <div style={{ margin: 0 }}>
             <Heading size="medium" as="h2" id="rr-urgent">Do this first</Heading>
           </div>
-          <div style={muted}>Most urgent first, one row per device. A task is one device and one recall, so {deviceCount} {deviceCount === 1 ? 'device needs' : 'devices need'} {pendingCount} {pendingCount === 1 ? 'task' : 'tasks'}.</div>
+          <div style={muted}>Most urgent first. {pendingCount} {pendingCount === 1 ? 'task' : 'tasks'} for {deviceCount} {deviceCount === 1 ? 'device' : 'devices'}, one per device and recall.</div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'flex-end' }}>
           <div style={{ minWidth: '240px' }}>
