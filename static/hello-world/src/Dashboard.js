@@ -5,7 +5,6 @@ import DeleteIcon from '@atlaskit/icon/core/delete';
 import MoreIcon from '@atlaskit/icon/core/show-more-horizontal';
 import Tabs, { Tab, TabList, TabPanel } from '@atlaskit/tabs';
 import Button from '@atlaskit/button/new';
-import Spinner from '@atlaskit/spinner';
 import Skeleton from '@atlaskit/skeleton';
 import SectionMessage, { SectionMessageAction } from '@atlaskit/section-message';
 import Heading from '@atlaskit/heading';
@@ -16,14 +15,14 @@ import WarningIcon from '@atlaskit/icon/core/warning';
 import RefreshIcon from '@atlaskit/icon/core/refresh';
 import PageIcon from '@atlaskit/icon/core/page';
 import UploadIcon from '@atlaskit/icon/core/upload';
-import DynamicTable from '@atlaskit/dynamic-table';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
-import { sp, color, card, muted, useNarrow, Progress, CheckedAt, ClassLozenge, niceFirm, softCase, formatDay } from './ui/kit';
+import { sp, color, card, muted, Progress, CheckedAt } from './ui/kit';
 import { affectedMatches, heroStats, urgentMatches, taskProgress, screenFor } from './dashboardData.mjs';
-import { Hero, UrgentList, SummaryCards } from './dash/Hero';
+import { Hero, UrgentList } from './dash/Hero';
 import DevicesTable from './dash/DevicesTable';
+import RecentRecalls from './dash/RecentRecalls';
 import DeviceDrawer from './dash/DeviceDrawer';
 import WardTeamsTab from './dash/WardTeamsTab';
 import FirstRun from './dash/FirstRun';
@@ -36,12 +35,10 @@ function LoadingScreen({ quiet }) {
       {!quiet && <VisuallyHidden>Loading your devices and recalls…</VisuallyHidden>}
       <div style={{ display: 'grid', gap: sp(200) }} aria-hidden="true">
         <Skeleton height="72px" width="100%" isShimmering />
-        <Skeleton height="96px" width="100%" isShimmering />
+        <Skeleton height="160px" width="100%" isShimmering />
         <Skeleton height="400px" width="100%" isShimmering />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: sp(200) }}>
-          {[0, 1, 2].map((i) => <Skeleton key={i} height="132px" width="100%" isShimmering />)}
-        </div>
         <Skeleton height="360px" width="100%" isShimmering />
+        <Skeleton height="84px" width="100%" isShimmering />
       </div>
     </div>
   );
@@ -54,7 +51,6 @@ export default function Dashboard() {
   const [importOpen, setImportOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [confluenceOpen, setConfluenceOpen] = useState(false);
-  const narrow = useNarrow();
   const [createAllOpen, setCreateAllOpen] = useState(false);
 
   const screen = screenFor({ devicesCount: d.devicesCount, result: d.result, error: d.devicesCount === null ? d.error : '', loading: false });
@@ -143,19 +139,6 @@ export default function Dashboard() {
     setCreateAllOpen(false);
   };
 
-  // Two lines at most, with the full text on hover: some FDA product names are 300 characters long.
-  const clamp = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
-  const recentRows = (d.recent.recalls || []).slice(0, 10).map((r) => ({
-    key: r.recallNumber,
-    cells: [
-      { key: 'n', content: <span style={{ whiteSpace: 'nowrap' }}>{r.recallNumber}</span> },
-      { key: 'c', content: <ClassLozenge recallClass={r.recallClass} /> },
-      { key: 'f', content: niceFirm(r.firm) || 'Unknown firm' },
-      { key: 'p', content: <span style={clamp} title={r.product}>{softCase(r.product)}</span> },
-      { key: 'd', content: <span style={{ whiteSpace: 'nowrap' }}>{r.date ? formatDay(r.date) : '–'}</span> },
-    ],
-  }));
-
   return page(
     <>
       {header}
@@ -167,31 +150,13 @@ export default function Dashboard() {
         </TabList>
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300) }}>
-            <Hero stats={stats} />
+            <Hero stats={stats} devicesCount={d.devicesCount} result={d.result} progressTasks={progressTasks} summaryState={d.summaryState} capped={Boolean(d.summary && d.summary.capped)} />
             <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} loading={!d.tasksReady} />
-            <SummaryCards devicesCount={d.devicesCount} stats={stats} result={d.result} summary={d.summary} summaryState={d.summaryState} progressTasks={progressTasks} />
             <section style={card} aria-labelledby="rr-affected-h">
               <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-affected-h">Affected devices</Heading></div>
               <DevicesTable matches={all} tasks={d.tasks} teams={teams} onOpen={setDrawerDevice} tasksReady={d.tasksReady} />
             </section>
-            <section style={card} aria-labelledby="rr-recent-h">
-              <div style={{ margin: `0 0 calc(-1 * ${sp(200)})` }}><Heading size="medium" as="h2" id="rr-recent-h">Recent FDA device recalls</Heading></div>
-              {d.recent.state === 'error' ? (
-                <SectionMessage appearance="warning" title="Could not load recent recalls">The public FDA service did not answer. Try again later.</SectionMessage>
-              ) : narrow ? (
-                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: sp(100) }} aria-label="Recent FDA device recalls">
-                  {(d.recent.recalls || []).slice(0, 6).map((r) => (
-                    <li key={r.recallNumber} style={{ borderTop: `1px solid ${color.border}`, paddingTop: sp(100) }}>
-                      <strong>{r.recallNumber}</strong> <span style={muted}>{r.recallClass ? `Class ${r.recallClass}` : ''} · {r.date ? formatDay(r.date) : ''}</span>
-                      <div style={muted}>{niceFirm(r.firm) || 'Unknown firm'}</div>
-                      <div>{softCase(r.product)}</div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <DynamicTable caption={<VisuallyHidden>The newest FDA device recalls</VisuallyHidden>} label="Recent FDA device recalls" isLoading={d.recent.state === 'loading'} head={{ cells: [{ key: 'n', content: 'Recall', width: 14 }, { key: 'c', content: 'Class', width: 10 }, { key: 'f', content: 'Firm', width: 22 }, { key: 'p', content: 'Product', width: 44 }, { key: 'd', content: 'Date', width: 10 }] }} rows={recentRows} rowsPerPage={10} isFixedSize />
-              )}
-            </section>
+            <RecentRecalls recent={d.recent} onOpen={d.loadRecent} />
           </div>
         </TabPanel>
         <TabPanel>

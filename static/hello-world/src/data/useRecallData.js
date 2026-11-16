@@ -17,9 +17,10 @@ const remembered = () => {
 
 // Everything the dashboard and the panel share: the device count, the saved check and its background
 // refresh, which matches already have tasks, suggested assignees, ward-team mappings, projects, and creating tasks.
-// `light` is for the issue panel (it shows on every issue, so it asks for as little as possible): no recent FDA
-// recalls, no task counts, and no ward teams or assignee suggestions (those call the Teamwork Graph) unless
-// `withSuggestions` says so. `projectKey` fixes the project for tasks (the create-all pop-up gets it from the panel).
+// `light` is for the issue panel (it shows on every issue, so it asks for as little as possible): no task counts, and
+// no ward teams or assignee suggestions (those call the Teamwork Graph) unless `withSuggestions` says so. The newest FDA
+// recalls load only when the dashboard calls `loadRecent`. `projectKey` fixes the project for tasks (the create-all
+// pop-up gets it from the panel).
 export default function useRecallData({ withProjects = false, light = false, withSuggestions, projectKey: fixedProjectKey } = {}) {
   const wantSuggestions = withSuggestions === undefined ? !light : withSuggestions;
   const wantWards = !light || wantSuggestions;
@@ -34,7 +35,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
   const [wardLoaded, setWardLoaded] = useState(false);
   const [suggestions, setSuggestions] = useState({});
   const [wardInfo, setWardInfo] = useState({ mappings: [], wards: [], byKey: {} });
-  const [recent, setRecent] = useState({ state: 'loading', recalls: [] });
+  const [recent, setRecent] = useState({ state: 'idle', recalls: [] }); // 'idle' until the person opens the list
   const [projects, setProjects] = useState([]);
   const [projectKey, setProjectKeyState] = useState(fixedProjectKey || remembered());
   const [creating, setCreating] = useState({ active: false, done: 0, total: 0 });
@@ -145,11 +146,6 @@ export default function useRecallData({ withProjects = false, light = false, wit
       setError('Could not load RecallRadar. Check your connection and try again.');
     }
     if (wantWards) loadWardInfo();
-    if (!light) {
-      invoke('fetchRecalls')
-        .then((response) => setRecent(response && response.ok ? { state: 'done', recalls: response.recalls } : { state: 'error', recalls: [] }))
-        .catch(() => setRecent({ state: 'error', recalls: [] }));
-    }
     if (withProjects) {
       invoke('listProjects')
         .then((response) => {
@@ -164,12 +160,21 @@ export default function useRecallData({ withProjects = false, light = false, wit
         })
         .catch(() => {});
     }
-  }, [begin, poll, loadWardInfo, withProjects, light, wantWards]);
+  }, [begin, poll, loadWardInfo, withProjects, wantWards]);
 
   useEffect(() => {
     load();
     return stopPolling;
   }, [load, stopPolling]);
+
+  // The newest FDA recalls are only context, and every load is a request to the public FDA service, so they are
+  // fetched when the person opens the list on the dashboard, not on every page view. Asking again after an error is allowed.
+  const loadRecent = useCallback(() => {
+    setRecent((current) => (current.state === 'idle' || current.state === 'error' ? { state: 'loading', recalls: [] } : current));
+    invoke('fetchRecalls')
+      .then((response) => setRecent(response && response.ok ? { state: 'done', recalls: response.recalls } : { state: 'error', recalls: [] }))
+      .catch(() => setRecent({ state: 'error', recalls: [] }));
+  }, []);
 
   // Task state, counts and assignee suggestions whenever a result (or the ward teams) change.
   const checkedAt = result ? result.checkedAt : null;
@@ -277,7 +282,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
   };
 
   return {
-    devicesCount, result, error, progress, tasks, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, projects, projectKey, creating, note,
+    devicesCount, result, error, progress, tasks, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, loadRecent, projects, projectKey, creating, note,
     setProjectKey, setNote, load, begin, createTasks, loadDemo, loadWardInfo, afterDevicesChanged,
   };
 }

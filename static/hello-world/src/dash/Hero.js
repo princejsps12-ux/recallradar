@@ -2,53 +2,87 @@ import React from 'react';
 import Heading from '@atlaskit/heading';
 import Button from '@atlaskit/button/new';
 import Select from '@atlaskit/select';
-import ProgressBar from '@atlaskit/progress-bar';
 import Skeleton from '@atlaskit/skeleton';
 import CheckCircleIcon from '@atlaskit/icon/core/check-circle';
-import { sp, cap, color, card, muted, noBreak, ClassLozenge, MatchLozenge, DetailsButton, useNarrow } from '../ui/kit';
-import { openRecallsByClass, UNKNOWN_CLASS, CLASSES } from '../dashboardData.mjs';
+import { sp, cap, color, card, muted, noBreak, ClassLozenge, MatchLozenge, NameLink } from '../ui/kit';
+import { openRecallsByClass, UNKNOWN_CLASS, CLASSES, taskSummaryParts } from '../dashboardData.mjs';
 
-// The one big number: how many devices need action, with Class I called out in red. Every number says what it counts.
-export function Hero({ stats }) {
+// One line of facts under the big number. It replaces three separate stat cards: devices monitored, open recalls by
+// class (the class is text AND colour) and the Jira task counts. Each number says what it counts.
+function SummaryLine({ devicesCount, stats, result, progressTasks, summaryState, capped }) {
+  const byClass = openRecallsByClass(result);
+  const tasks = taskSummaryParts(progressTasks, summaryState, capped);
+  const item = { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: sp(75) };
+  return (
+    <ul aria-label="Summary" style={{ listStyle: 'none', margin: `${sp(200)} 0 0`, padding: `${sp(150)} 0 0`, borderTop: `1px solid ${color.border}`, display: 'flex', flexWrap: 'wrap', gap: `${sp(100)} ${sp(400)}` }}>
+      <li style={item}>
+        <strong>{devicesCount}</strong> {devicesCount === 1 ? 'device' : 'devices'} monitored
+      </li>
+      <li style={item}>
+        <span><strong>{stats.openRecalls}</strong> open {stats.openRecalls === 1 ? 'recall' : 'recalls'}</span>
+        {CLASSES.filter((cls) => byClass[cls] > 0).map((cls) => (
+          <span key={cls} style={{ display: 'inline-flex', alignItems: 'center', gap: sp(50), ...noBreak }}>
+            <ClassLozenge recallClass={cls} />
+            <strong>{byClass[cls]}</strong>
+          </span>
+        ))}
+        {byClass[UNKNOWN_CLASS] > 0 && <span style={muted}>+{byClass[UNKNOWN_CLASS]} unknown class</span>}
+      </li>
+      <li style={item}>
+        {tasks === null ? (
+          <Skeleton height="20px" width="150px" isShimmering />
+        ) : (
+          <>
+            {tasks.lead && <strong>{tasks.lead}</strong>} {tasks.rest}
+          </>
+        )}
+      </li>
+    </ul>
+  );
+}
+
+// The one big number: how many devices need action, with Class I called out in red, then the summary line.
+// Every number says what it counts.
+export function Hero({ stats, devicesCount, result, progressTasks, summaryState, capped }) {
   const none = stats.devices === 0;
   return (
-    <section aria-label="What needs action" style={{ ...card, borderLeft: `4px solid ${none ? color.borderSuccess : stats.classIDevices ? color.borderDanger : color.borderBrand}`, display: 'flex', gap: sp(300), alignItems: 'center', flexWrap: 'nowrap', minHeight: '112px' }}>
-      {none ? (
-        <>
-          <CheckCircleIcon label="" color={color.success} />
-          <div>
-            <Heading size="large">No devices need action</Heading>
-            <div style={muted}>None of your devices match an open recall with an exact or likely match.</div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ fontSize: '56px', fontWeight: 700, lineHeight: 1, color: color.text, flex: '0 0 auto' }} aria-hidden="true">
-            {stats.devices}
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <Heading size="large">{stats.devices === 1 ? 'device needs action' : 'devices need action'}</Heading>
-            <div style={{ marginTop: sp(50) }}>
-              {stats.classIDevices > 0 ? (
-                <span style={{ fontWeight: 600 }}>
-                  {stats.classIDevices} {stats.classIDevices === 1 ? 'device has' : 'devices have'} a Class I recall, the most serious.
-                </span>
-              ) : (
-                <span style={muted}>No device has a Class I recall.</span>
-              )}{' '}
-              <span>
-                {stats.openRecalls} open recall{stats.openRecalls === 1 ? '' : 's'} affect{stats.openRecalls === 1 ? 's' : ''} them.
-              </span>
+    <section aria-label="What needs action" style={{ ...card, borderLeft: `4px solid ${none ? color.borderSuccess : stats.classIDevices ? color.borderDanger : color.borderBrand}` }}>
+      <div style={{ display: 'flex', gap: sp(300), alignItems: 'center', flexWrap: 'nowrap', minHeight: '72px' }}>
+        {none ? (
+          <>
+            <CheckCircleIcon label="" color={color.success} />
+            <div>
+              <Heading size="large">No devices need action</Heading>
+              <div style={muted}>None of your devices match an open recall with an exact or likely match.</div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: '56px', fontWeight: 700, lineHeight: 1, color: color.text, flex: '0 0 auto' }} aria-hidden="true">
+              {stats.devices}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <Heading size="large">{stats.devices === 1 ? 'device needs action' : 'devices need action'}</Heading>
+              <div style={{ marginTop: sp(50) }}>
+                {stats.classIDevices > 0 ? (
+                  <span style={{ fontWeight: 600 }}>
+                    {stats.classIDevices} {stats.classIDevices === 1 ? 'device has' : 'devices have'} a Class I recall, the most serious.
+                  </span>
+                ) : (
+                  <span style={muted}>No device has a Class I recall.</span>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      <SummaryLine devicesCount={devicesCount} stats={stats} result={result} progressTasks={progressTasks} summaryState={summaryState} capped={capped} />
     </section>
   );
 }
 
 // "Do this first": the most urgent devices that have no task yet. One primary action for the whole block
-// (create them all, with a confirmation), and a quiet default button on each row.
+// (create them all, with a confirmation). Each row has ONE action, "Create task"; the device name opens its details.
 export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, projects, projectKey, onProject, hasAll, onCreateAll, pendingCount, deviceCount, loading }) {
   const options = projects.map((p) => ({ label: `${p.name} (${p.key})`, value: p.key }));
   return (
@@ -86,7 +120,7 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
           {matches.map((m, i) => (
             <li key={m.deviceId} style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'center', padding: `${sp(150)} 0`, borderTop: i ? `1px solid ${color.border}` : 'none' }}>
               <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-                <strong>{cap(m.deviceName)}</strong>
+                <NameLink label={`Details for ${cap(m.deviceName)}, recall ${m.recallNumber}`} onClick={() => onOpen(m.deviceId)}>{cap(m.deviceName)}</NameLink>
                 <div style={muted}>
                   {m.ward || 'No ward'} · {m.deviceManufacturer} {m.deviceModel} · <span style={noBreak}>{m.recallNumber}</span>
                 </div>
@@ -95,10 +129,7 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
                 <div style={{ minWidth: '64px' }}><ClassLozenge recallClass={m.recallClass} /></div>
                 <div style={{ minWidth: '96px' }}><MatchLozenge confidence={m.confidence} /></div>
               </div>
-              <div style={{ display: 'flex', gap: sp(100) }}>
-                <Button isDisabled={!canCreate || busy} onClick={() => onCreate(m)}>Create task</Button>
-                <DetailsButton onClick={() => onOpen(m.deviceId)} />
-              </div>
+              <Button isDisabled={!canCreate || busy} onClick={() => onCreate(m)}>Create task</Button>
             </li>
           ))}
         </ol>
@@ -108,46 +139,5 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
       )}
       {!canCreate && matches.length > 0 && <div style={{ ...muted, marginTop: sp(100) }}>Choose a project above to create tasks.</div>}
     </section>
-  );
-}
-
-function StatCard({ label, value, children, accent }) {
-  return (
-    <div style={{ ...card, minHeight: '132px' }} role="group" aria-label={label}>
-      <div style={muted}>{label}</div>
-      <div style={{ fontSize: '32px', fontWeight: 600, lineHeight: 1.2 }}>{value}</div>
-      {children}
-    </div>
-  );
-}
-
-export function SummaryCards({ devicesCount, stats, result, summary, summaryState, progressTasks }) {
-  const byClass = openRecallsByClass(result);
-  const narrow = useNarrow();
-  const none = !progressTasks || progressTasks.total === 0;
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(auto-fit, minmax(210px, 1fr))', gap: sp(200) }}>
-      <StatCard label="Devices" value={devicesCount} accent={color.borderBrand}>
-        <div style={muted}>monitored for recalls</div>
-      </StatCard>
-      <StatCard label="Open recalls" value={stats.openRecalls} accent={stats.openRecalls ? color.borderDanger : color.borderSuccess}>
-        <div style={muted}>By class</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), marginTop: sp(50) }}>
-          {CLASSES.map((cls) => (
-            <span key={cls} style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100), ...noBreak }}>
-              <ClassLozenge recallClass={cls} />
-              <strong aria-label={`${byClass[cls]} recalls in class ${cls}`}>{byClass[cls]}</strong>
-            </span>
-          ))}
-          {byClass[UNKNOWN_CLASS] > 0 && <span style={muted}>+{byClass[UNKNOWN_CLASS]} unknown class</span>}
-        </div>
-      </StatCard>
-      <StatCard label="Tasks open" value={summaryState === 'loading' ? <Skeleton height="32px" width="48px" isShimmering /> : progressTasks ? progressTasks.open : '–'}>
-        <div style={muted}>
-          {summaryState === 'loading' ? ' ' : summaryState === 'error' ? 'Could not read the task counts.' : none ? 'None created yet.' : `${progressTasks.done} done, of ${progressTasks.total}${summary && summary.capped ? '+' : ''} RecallRadar tasks`}
-        </div>
-        {!none && summaryState === 'ok' && <div style={{ marginTop: sp(100) }}><ProgressBar ariaLabel={`${progressTasks.percentDone}% of tasks done`} value={progressTasks.percentDone / 100} appearance="success" /></div>}
-      </StatCard>
-    </div>
   );
 }

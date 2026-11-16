@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { invoke } from '@forge/bridge';
-import DynamicTable from '@atlaskit/dynamic-table';
+import { DynamicTableStateless } from '@atlaskit/dynamic-table';
 import Select from '@atlaskit/select';
 import SectionMessage from '@atlaskit/section-message';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import { sp, muted, color, useNarrow } from '../ui/kit';
+import Pager from '../ui/Pager';
+import { pageCount, clampPage, pageOf } from '../tablePaging.mjs';
 import Lozenge from '@atlaskit/lozenge';
 import { affectedMatches } from '../dashboardData.mjs';
+
+const WARD_PAGE_SIZE = 20;
 
 // Ward to team mapping: the team list is read from the Teamwork Graph (read-only) and the choice is saved
 // in RecallRadar. Each change is saved at once and announced.
@@ -16,6 +20,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState(null);
   const narrow = useNarrow();
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,7 +114,10 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
           })}
         </ul>
       ) : (
-        <DynamicTable caption={<VisuallyHidden>Ward to team mapping</VisuallyHidden>} label="Ward teams" head={{ cells: [{ key: 'w', content: 'Ward', width: 22 }, { key: 'n', content: 'Devices needing action', width: 28 }, { key: 't', content: 'Team', width: 40 }] }} rows={rows} rowsPerPage={20} isFixedSize />
+        <>
+          <DynamicTableStateless caption={<VisuallyHidden>Ward to team mapping</VisuallyHidden>} label="Ward teams" head={{ cells: [{ key: 'w', content: 'Ward', width: 22 }, { key: 'n', content: 'Devices needing action', width: 28 }, { key: 't', content: 'Team', width: 40 }] }} rows={pageOf(rows, page, WARD_PAGE_SIZE)} isFixedSize />
+          {rows.length > WARD_PAGE_SIZE && <Pager label="Pages of wards" page={clampPage(page, rows.length, WARD_PAGE_SIZE)} pages={pageCount(rows.length, WARD_PAGE_SIZE)} onChange={setPage} />}
+        </>
       )}
     </div>
   );

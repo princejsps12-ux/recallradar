@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { token } from '@atlaskit/tokens';
 import Lozenge from '@atlaskit/lozenge';
-import Button from '@atlaskit/button/new';
 import Spinner from '@atlaskit/spinner';
 import Tooltip from '@atlaskit/tooltip';
-import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
 import { formatDay, ago, niceFirm, softCase } from '../textCase.mjs';
 
 // Pure text helpers live in textCase.mjs (unit tested); everything in the UI imports them from here.
@@ -41,7 +39,7 @@ export const card = {
   boxSizing: 'border-box',
 };
 
-export const muted = { color: color.subtle, fontSize: '13px', lineHeight: '20px' };
+export const muted = { color: color.subtle, fontSize: '14px', lineHeight: '20px' };
 // Recall numbers such as Z-0208-2027 must never break at their hyphens.
 export const noBreak = { whiteSpace: 'nowrap' };
 
@@ -87,12 +85,26 @@ export function useNarrow(maxWidth = 720) {
   return narrow;
 }
 
-// One look for every "Details" button, on desktop and on a phone.
-export function DetailsButton({ onClick, label = 'Details' }) {
+// A device name that opens its details: bold, link blue, underlined while hovered or focused (the browser's own
+// focus ring stays). One of these replaces a separate "Details" button in every row. `label` names the target for
+// screen readers, because the same device appears on several rows ("Details for Impella Controller, recall Z-0208-2027");
+// it always contains the visible name. The 4 px of padding (cancelled by an equal negative margin, so the layout does
+// not move) make the target 32 px tall, the size of an Atlaskit button.
+export function NameLink({ children, onClick, label, style }) {
+  const [active, setActive] = useState(false);
   return (
-    <Button appearance="subtle" iconAfter={ChevronRightIcon} onClick={onClick}>
-      {label}
-    </Button>
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      onFocus={() => setActive(true)}
+      onBlur={() => setActive(false)}
+      style={{ display: 'inline-block', maxWidth: '100%', background: 'none', border: 0, padding: `${sp(50)} 0`, margin: `calc(-1 * ${sp(50)}) 0`, font: 'inherit', lineHeight: '24px', fontWeight: 600, textAlign: 'left', color: color.link, textDecoration: active ? 'underline' : 'none', cursor: 'pointer', ...style }}
+    >
+      {children}
+    </button>
   );
 }
 

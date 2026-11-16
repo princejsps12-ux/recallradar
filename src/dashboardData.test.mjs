@@ -7,6 +7,7 @@ import {
   wardsOf,
   filterMatches,
   taskProgress,
+  taskSummaryParts,
   screenFor,
   NO_WARD,
   urgencyRank,
@@ -102,4 +103,14 @@ test('matches for one device, most urgent first', () => {
   const r = { matches: [m('d1', 'Z-2', { recallClass: 'II' }), m('d1', 'Z-1'), m('d2', 'Z-3')], recallDetails: {} };
   assert.deepEqual(matchesForDevice(r, 'd1').map((x) => x.recallNumber), ['Z-1', 'Z-2']);
   assert.deepEqual(matchesForDevice(r, 'nope'), []);
+});
+
+test('the tasks part of the summary line says what the counts are, or why there are none', () => {
+  assert.equal(taskSummaryParts(null, 'loading'), null, 'a placeholder is shown while loading');
+  assert.deepEqual(taskSummaryParts(null, 'error'), { lead: '', rest: 'Task counts unavailable' });
+  assert.deepEqual(taskSummaryParts(null, 'ok'), { lead: '', rest: 'Task counts unavailable' }, 'ok but no numbers is still unavailable');
+  assert.deepEqual(taskSummaryParts(taskProgress({ open: 0, done: 0 }), 'ok'), { lead: '', rest: 'No RecallRadar tasks yet' });
+  assert.deepEqual(taskSummaryParts(taskProgress({ open: 4, done: 2 }), 'ok'), { lead: '4', rest: 'tasks open, 2 done' });
+  assert.deepEqual(taskSummaryParts(taskProgress({ open: 1, done: 0 }), 'ok'), { lead: '1', rest: 'task open, 0 done' }, 'one task is singular');
+  assert.deepEqual(taskSummaryParts(taskProgress({ open: 100, done: 20 }), 'ok', true), { lead: '100+', rest: 'tasks open, 20+ done' }, 'a capped count is "at least"');
 });

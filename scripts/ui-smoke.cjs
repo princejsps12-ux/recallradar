@@ -82,6 +82,20 @@ const click = async (el, re) => {
   if (!b) throw new Error('no button ' + re);
   await act(async () => { b.click(); await wait(150); });
 };
+// A button by its accessible name: an aria-label, or (icon buttons) its visually hidden text.
+const clickLabel = async (el, label) => {
+  const b = [...el.querySelectorAll('button')].find((x) => x.getAttribute('aria-label') === label || x.textContent.trim() === label);
+  if (!b) throw new Error('no button labelled ' + label);
+  await act(async () => { b.click(); await wait(150); });
+};
+// Atlaskit Select (react-select): open it with a mouse press on its control, then click the option
+const pickOption = async (el, inputId, optionText) => {
+  const input = el.querySelector('#' + inputId);
+  await act(async () => { input.closest('div[class*="control"], div').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })); input.focus(); input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); await wait(100); });
+  const option = [...document.querySelectorAll('[role="option"]')].find((o) => o.textContent === optionText);
+  if (option) await act(async () => { option.click(); await wait(150); });
+  return Boolean(option);
+};
 const typeInto = async (node, value, proto) => {
   const set = Object.getOwnPropertyDescriptor(proto, 'value').set;
   await act(async () => { set.call(node, value); node.dispatchEvent(new window.Event(proto === window.HTMLSelectElement.prototype ? 'change' : 'input', { bubbles: true })); await wait(40); });
@@ -94,19 +108,91 @@ const typeInto = async (node, value, proto) => {
     await click(el, /^Load demo hospital/);
     check('loading the demo hospital starts a check and shows the dashboard', calls.includes('loadDemoHospital') && calls.includes('startCheck') && /Affected devices/.test(text(el)));
   });
-  // 2. ready: cards, table, filter
-  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result } }, async (el) => {
-    check('ready screen shows the hero, do-this-first and summary cards', /devices? need(s)? action/.test(text(el)) && /Do this first/.test(text(el)) && /Open recalls/.test(text(el)) && /Tasks open/.test(text(el)));
-    check('table has a row per affected device', el.querySelectorAll('tbody tr').length >= 3);
+  // 2. ready: one hero with a summary line (no stat cards), the table, the filter, the collapsed recent list
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result } }, async (el, calls) => {
+    check('ready screen shows the hero and do-this-first', /devices? need(s)? action/.test(text(el)) && /Do this first/.test(text(el)));
+    const summary = el.querySelector('ul[aria-label="Summary"]');
+    check('the hero holds one summary line: devices, open recalls by class, task counts', Boolean(summary) && /3 devices monitored/.test(text(summary)) && /3 open recalls/.test(text(summary)) && /Class I/.test(text(summary)) && /Class III/.test(text(summary)) && /3 tasks open, 1 done/.test(text(summary)));
+    check('there are no separate stat cards any more', !el.querySelector('[role="group"][aria-label="Open recalls"]') && !el.querySelector('[role="group"][aria-label="Tasks open"]'));
+    check('table has a row per affected device and, with 3 rows, no pager', el.querySelectorAll('tbody tr').length === 3 && !el.querySelector('nav[aria-label="Pages of affected devices"]'));
     check('team name from the graph is shown', /Team Atlas/.test(text(el)));
-    // Atlaskit Select (react-select): open it with a mouse press on its control, then click the option
-    const input = el.querySelector('#rr-ward-filter');
-    await act(async () => { input.closest('div[class*="control"], div').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })); input.focus(); input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); await wait(100); });
-    const option = [...document.querySelectorAll('[role="option"]')].find((o) => o.textContent === 'ICU');
-    check('the ward filter lists the wards', Boolean(option));
-    if (option) await act(async () => { option.click(); await wait(150); });
+    check('every row has one way in: no "Details" buttons, the device name opens the details', ![...el.querySelectorAll('button')].some((b) => /^Details$/.test(b.textContent.trim())) && el.querySelectorAll('button[aria-label="Details for Pump d2, recall Z-2"]').length >= 1);
+    check('the ward filter lists the wards', await pickOption(el, 'rr-ward-filter', 'ICU'));
     check('ward filter narrows the table', /Showing 2 of 3/.test(text(el)));
     check('the table has an accessible caption and a status region', !!el.querySelector('caption') && !!el.querySelector('[role="status"]'));
+    // the least important section starts closed and asks the FDA only when opened
+    const recent = [...el.querySelectorAll('button')].find((b) => /^Recent FDA device recalls$/.test(b.textContent.trim()));
+    check('"Recent FDA device recalls" is a collapsed disclosure and has not asked the FDA yet', Boolean(recent) && recent.getAttribute('aria-expanded') === 'false' && !calls.includes('fetchRecalls') && !/Z-77/.test(text(el)));
+    await act(async () => { recent.click(); await wait(250); });
+    check('opening it loads the list once and shows it', recent.getAttribute('aria-expanded') === 'true' && calls.filter((c) => c === 'fetchRecalls').length === 1 && /Z-77/.test(text(el)));
+    // the drawer: the name opens it, the whole recall header is the toggle
+    const nameLink = el.querySelector('button[aria-label="Details for Pump d2, recall Z-2"]');
+    await act(async () => { nameLink.click(); await wait(250); });
+    const drawer = el.querySelector('aside[role="dialog"]');
+    check('the device name opens the drawer', Boolean(drawer) && drawer.getAttribute('aria-label') === 'Details for Pump d2');
+    if (drawer) {
+      const toggle = [...drawer.querySelectorAll('button[aria-expanded]')].find((b) => /Z-2/.test(b.textContent));
+      check('the whole recall header is one toggle holding the number and both lozenges', Boolean(toggle) && /Class II/.test(toggle.textContent) && /Likely match/.test(toggle.textContent) && toggle.getAttribute('aria-expanded') === 'false');
+      await act(async () => { toggle.click(); await wait(100); });
+      check('opening it shows why the device matches', toggle.getAttribute('aria-expanded') === 'true' && /Why we think it matches/.test(text(drawer)));
+      check('without a suggested person the drawer offers a plain "Create task" and no menu', [...drawer.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Create task') && ![...drawer.querySelectorAll('button')].some((b) => /More ways to create/.test(b.textContent)));
+    }
+  });
+  // 2b. a long list: ten per page with the standalone pager, sorting covers ALL rows, filters go back to page 1
+  const many = { ...result, matches: Array.from({ length: 23 }, (_, i) => mk('d' + (i + 1), 'Z-' + (i + 1), i < 2 ? 'I' : 'II', i % 2 ? 'ER' : 'ICU')) };
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: new Array(23).fill(1) }, getSavedMatches: { ok: true, result: many } }, async (el) => {
+    const pager = () => el.querySelector('nav[aria-label="Pages of affected devices"]');
+    const rows = () => el.querySelectorAll('tbody tr');
+    check('23 matches show ten rows and a pager', rows().length === 10 && Boolean(pager()) && /Showing 1–10 of 23 device and recall matches/.test(text(el)));
+    const current = () => [...pager().querySelectorAll('button[aria-current="page"]')].map((b) => b.textContent.trim());
+    check('the pager marks exactly one current page, and it is page 1', current().length === 1 && current()[0] === '1');
+    await clickLabel(el, 'Page 2');
+    check('page 2 shows rows 11 to 20, says so and becomes the current page', rows().length === 10 && /Showing 11–20 of 23/.test(text(el)) && current()[0] === '2');
+    await clickLabel(el, 'Next page');
+    check('the last page holds the remaining three', rows().length === 3 && /Showing 21–23 of 23/.test(text(el)));
+    const header = [...el.querySelectorAll('th')].find((t) => /^Device/.test(t.textContent.trim()));
+    const sortBy = async () => act(async () => { (header.querySelector('button') || header).click(); await wait(150); });
+    await sortBy();
+    await sortBy();
+    check('sorting covers all rows (the last name comes first, descending) and goes back to page 1', /^Pump d23/.test(text(rows()[0])) && /Showing 1–10 of 23/.test(text(el)));
+    check('the filter lists the wards', await pickOption(el, 'rr-ward-filter', 'ER'));
+    check('a filter starts again at page 1 and says how many there are in all', /Showing 1–10 of 11 device and recall matches \(23 in all\)/.test(text(el)) && rows().length === 10);
+  });
+  // 2c. a suggested person: "Create task" assigns nobody, the menu offers the one suggested person
+  const suggestions = { 'Z-2|d2': { accountId: 'acc-1', name: 'Casey Morgan', teamName: 'Team Atlas' } };
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result }, suggestAssignees: { ok: true, suggestions, skipped: [] }, createTasks: (payload) => { global.__createPayload = payload; return { ok: true, created: [{ pair: 'Z-2|d2', key: 'MOBL-6' }], existing: [], inProgress: [], failed: [], notFound: [], assignedTo: {}, assignRefused: [] }; } }, async (el, calls) => {
+    await clickLabel(el, 'Details for Pump d2, recall Z-2');
+    const drawer = el.querySelector('aside[role="dialog"]');
+    check('the drawer opened for the device', Boolean(drawer));
+    const more = drawer && [...drawer.querySelectorAll('button')].find((b) => /More ways to create the task for Z-2/.test(b.textContent));
+    check('with a suggested person the card has a split button: "Create task" plus a menu', Boolean(more) && [...drawer.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Create task'));
+    if (more) {
+      await act(async () => { more.click(); await wait(200); });
+      const item = [...document.querySelectorAll('[role="menuitem"], [role="menuitemradio"], button, a')].find((n) => /Create and assign to Casey Morgan/.test(n.textContent));
+      check('the menu offers "Create and assign to" the suggested person, with the team as the reason', Boolean(item) && /Fewest open RecallRadar tasks in Team Atlas/.test(document.body.textContent));
+      check('nothing was created just by opening the menu', !calls.includes('createTasks'));
+      if (item) {
+        await act(async () => { item.click(); await wait(250); });
+        check('choosing it creates the task and sends exactly that person for exactly that device and recall', calls.includes('createTasks') && global.__createPayload && global.__createPayload.assignees && global.__createPayload.assignees['Z-2|d2'] === 'acc-1');
+      }
+    }
+  });
+  // 2d. the remove dialog uses Atlaskit radios and a danger button that names what it removes
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result } }, async (el) => {
+    await clickLabel(el, 'More actions');
+    const item = [...document.querySelectorAll('[role="menuitem"], button, a')].find((n) => /^Remove devices…$/.test(n.textContent.trim()));
+    check('the "..." menu offers "Remove devices…"', Boolean(item));
+    if (item) {
+      await act(async () => { item.click(); await wait(250); });
+      const group = document.querySelector('[role="radiogroup"]');
+      const radios = group ? [...group.querySelectorAll('input[type="radio"]')] : [];
+      check('the remove dialog has a radio group with two choices, "only imported" selected', radios.length === 2 && radios[0].checked && !radios[1].checked && /Only the devices I imported/.test(group.textContent));
+      check('the danger button names the choice', [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Remove imported devices'));
+      if (radios[1]) {
+        await act(async () => { radios[1].click(); await wait(150); });
+        check('choosing "all devices" changes the danger button to "Remove all devices"', [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Remove all devices'));
+      }
+    }
   });
   // 3. error screen
   await run('jira:globalPage', { ...base, listDevices: { ok: false }, getSavedMatches: { ok: true, result: null } }, async (el) => {

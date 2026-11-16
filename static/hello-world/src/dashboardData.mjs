@@ -54,6 +54,17 @@ export function taskProgress(summary) {
   return { open: summary.open, done: summary.done, total, percentDone: total === 0 ? 0 : Math.round((summary.done / total) * 100) };
 }
 
+// The tasks part of the dashboard's summary line, as { lead, rest }: the number that is shown bold, and the words after
+// it. null while the counts are still loading (the page shows a placeholder). `capped` means Jira may hold more tasks
+// than were counted, so both numbers are "at least".
+export function taskSummaryParts(progress, state, capped = false) {
+  if (state === 'loading') return null;
+  if (state === 'error' || !progress) return { lead: '', rest: 'Task counts unavailable' };
+  if (progress.total === 0) return { lead: '', rest: 'No RecallRadar tasks yet' };
+  const plus = capped ? '+' : '';
+  return { lead: `${progress.open}${plus}`, rest: `${progress.open === 1 && !capped ? 'task' : 'tasks'} open, ${progress.done}${plus} done` };
+}
+
 // Which screen to show: 'loading', 'error', 'first-run' (no devices), 'no-check' (devices, never checked),
 // 'ready'. `devicesCount` is null until known.
 export function screenFor({ devicesCount, result, error, loading }) {

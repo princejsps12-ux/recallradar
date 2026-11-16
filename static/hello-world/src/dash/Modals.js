@@ -5,6 +5,7 @@ import Button from '@atlaskit/button/new';
 import Textarea from '@atlaskit/textarea';
 import Select from '@atlaskit/select';
 import Checkbox from '@atlaskit/checkbox';
+import { RadioGroup } from '@atlaskit/radio';
 import SectionMessage from '@atlaskit/section-message';
 import Spinner from '@atlaskit/spinner';
 import { sp, color, muted, LinkLike } from '../ui/kit';
@@ -76,15 +77,19 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
               {done && <SectionMessage appearance="success">{done}</SectionMessage>}
             </div>
             {removing && (
-              <fieldset style={{ border: 0, margin: 0, padding: 0 }}>
-                <legend style={{ marginBottom: sp(100) }}>Removing devices cannot be undone. The saved recall result is rebuilt on the next check. Which devices do you want to remove?</legend>
-                {[['imported', 'Only the devices I imported'], ['all', 'All devices, including the demo hospital']].map(([value, label]) => (
-                  <label key={value} style={{ display: 'flex', gap: sp(100), alignItems: 'center', padding: `${sp(75)} 0` }}>
-                    <input type="radio" name="rr-remove" value={value} checked={(removeAsk || 'imported') === value} onChange={() => setRemoveAsk(value)} />
-                    {label}
-                  </label>
-                ))}
-              </fieldset>
+              <>
+                <p id="rr-remove-question" style={{ margin: `0 0 ${sp(100)}` }}>Removing devices cannot be undone. The saved recall result is rebuilt on the next check. Which devices do you want to remove?</p>
+                <RadioGroup
+                  name="rr-remove"
+                  aria-labelledby="rr-remove-question"
+                  value={removeAsk || 'imported'}
+                  onChange={(e) => setRemoveAsk(e.target.value)}
+                  options={[
+                    { name: 'rr-remove', value: 'imported', label: 'Only the devices I imported' },
+                    { name: 'rr-remove', value: 'all', label: 'All devices, including the demo hospital' },
+                  ]}
+                />
+              </>
             )}
           </ModalBody>
           <ModalFooter>

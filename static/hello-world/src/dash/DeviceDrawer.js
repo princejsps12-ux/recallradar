@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { token } from '@atlaskit/tokens';
 import { SlideIn, ExitingPersistence } from '@atlaskit/motion';
 import Heading from '@atlaskit/heading';
-import Button from '@atlaskit/button/new';
-import Lozenge from '@atlaskit/lozenge';
+import Button, { IconButton, SplitButton } from '@atlaskit/button/new';
+import DropdownMenu, { DropdownItemGroup, DropdownItem } from '@atlaskit/dropdown-menu';
 import Avatar from '@atlaskit/avatar';
 import SectionMessage from '@atlaskit/section-message';
 import CrossIcon from '@atlaskit/icon/core/cross';
@@ -12,7 +12,7 @@ import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import { router } from '@forge/bridge';
-import { sp, cap, useNarrow, color, muted, ClassLozenge, MatchLozenge, LinkLike, formatDay } from '../ui/kit';
+import { sp, cap, color, muted, ClassLozenge, MatchLozenge, LinkLike, formatDay } from '../ui/kit';
 import { matchesForDevice } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 import { openIssue } from './DevicesTable';
@@ -44,6 +44,86 @@ function Field({ label, children }) {
   );
 }
 
+// One recall for this device. The WHOLE header row is the toggle (recall number, class and match included), so the
+// click target is the full width of the card; the task link or the Create button sits beside it, not inside it
+// (a button cannot hold another button). Expanded, it shows the facts and the reasons.
+function RecallCard({ m, result, tasks, suggestion, canCreate, busy, isOpen, onToggle, onCreate }) {
+  const [hover, setHover] = useState(false);
+  const key = tasks[pairOf(m)];
+  const details = (result.recallDetails || {})[m.recallNumber] || {};
+  const bodyId = `rr-card-${m.recallNumber}`;
+  const disabled = !canCreate || busy;
+  return (
+    <section aria-label={`Recall ${m.recallNumber}`} style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: `${sp(100)} ${sp(200)}`, marginTop: sp(100), background: hover ? token('elevation.surface.raised.hovered') : color.raised }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: sp(100) }}>
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          aria-controls={bodyId}
+          onClick={onToggle}
+          onMouseEnter={() => setHover(true)}
+          onMouseLeave={() => setHover(false)}
+          style={{ flex: '1 1 0', minWidth: 0, minHeight: '32px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: sp(100), textAlign: 'left', background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}
+        >
+          {isOpen ? <ChevronDownIcon label="" size="small" /> : <ChevronRightIcon label="" size="small" />}
+          <strong>{m.recallNumber}</strong>
+          <VisuallyHidden>{isOpen ? 'Hide details' : 'Show details'}</VisuallyHidden>
+          <ClassLozenge recallClass={m.recallClass} />
+          <MatchLozenge confidence={m.confidence} />
+        </button>
+        <span style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>
+          {key ? (
+            <>
+              <span>Task:</span>
+              <LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>
+            </>
+          ) : suggestion ? (
+            // "Create task" is the main action and assigns nobody. The menu offers the one suggested person: people are
+            // only ever assigned when the user picks that item.
+            <SplitButton>
+              <Button isDisabled={disabled} onClick={() => onCreate(m, false)}>Create task</Button>
+              <DropdownMenu
+                shouldRenderToParent
+                placement="bottom-end"
+                trigger={({ triggerRef, ...props }) => (
+                  <IconButton {...props} ref={triggerRef} isDisabled={disabled} label={`More ways to create the task for ${m.recallNumber}`} icon={ChevronDownIcon} />
+                )}
+              >
+                <DropdownItemGroup>
+                  <DropdownItem
+                    elemBefore={<Avatar size="xsmall" name={suggestion.name} />}
+                    description={`Fewest open RecallRadar tasks in ${suggestion.teamName}`}
+                    onClick={() => onCreate(m, true)}
+                  >
+                    {`Create and assign to ${suggestion.name}`}
+                  </DropdownItem>
+                </DropdownItemGroup>
+              </DropdownMenu>
+            </SplitButton>
+          ) : (
+            <Button isDisabled={disabled} onClick={() => onCreate(m, false)}>Create task</Button>
+          )}
+        </span>
+      </div>
+      {isOpen && (
+        <div id={bodyId} style={{ marginTop: sp(100) }}>
+          <div style={muted}>{m.firm}{details.status ? ` · ${details.status}` : ''}{details.initiated ? ` · started ${formatDay(details.initiated)}` : ''}{m.date ? ` · reported ${formatDay(m.date)}` : ''}</div>
+          <div style={{ marginTop: sp(50) }}><LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike></div>
+          <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">Why we think it matches</Heading></div>
+          <p style={{ margin: 0 }}>{m.reason}</p>
+          {details.reason && (
+            <>
+              <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">What the FDA says is wrong</Heading></div>
+              <ExpandableText text={details.reason} />
+            </>
+          )}
+        </div>
+      )}
+      {!key && !canCreate && <div style={{ ...muted, marginTop: sp(50) }}>Choose a project on the Overview tab first.</div>}
+    </section>
+  );
+}
+
 // The side drawer for one device: its details, each affected recall with the reason we matched it and what the
 // FDA says is wrong, and the Jira task (or the buttons to create one). It slides in from the right (Atlaskit's own
 // Drawer is always left-anchored). Keyboard: focus moves in when it opens, Tab stays inside, Escape closes it,
@@ -54,7 +134,6 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
   const panel = useRef(null);
   const closeWrap = useRef(null);
   const opener = useRef(null);
-  const narrow = useNarrow();
   const [openCards, setOpenCards] = useState({});
   useEffect(() => setOpenCards({}), [deviceId]);
   const missing = matches.filter((m) => !tasks[pairOf(m)]);
@@ -128,63 +207,20 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                       <Button appearance="primary" isDisabled={!canCreate || busy} onClick={() => onCreateMany(missing)}>{`Create ${missing.length} tasks`}</Button>
                     )}
                   </div>
-                  {matches.map((m) => {
-                    const key = tasks[pairOf(m)];
-                    const suggestion = suggestions[pairOf(m)];
-                    const details = (result.recallDetails || {})[m.recallNumber] || {};
-                    const isOpen = Boolean(openCards[m.recallNumber]);
-                    const bodyId = `rr-card-${m.recallNumber}`;
-                    return (
-                      <section key={m.recallNumber} aria-label={`Recall ${m.recallNumber}`} style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: `${sp(150)} ${sp(200)}`, marginTop: sp(100), background: color.raised }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), alignItems: 'center' }}>
-                          <button type="button" aria-expanded={isOpen} aria-controls={bodyId} onClick={() => setOpenCards({ ...openCards, [m.recallNumber]: !isOpen })} style={{ background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: sp(50) }}>
-                            {isOpen ? <ChevronDownIcon label="" size="small" /> : <ChevronRightIcon label="" size="small" />}
-                            <strong>{m.recallNumber}</strong>
-                            <VisuallyHidden>{isOpen ? 'Hide details' : 'Show details'}</VisuallyHidden>
-                          </button>
-                          <ClassLozenge recallClass={m.recallClass} />
-                          {!narrow && <MatchLozenge confidence={m.confidence} />}
-                          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>
-                            {key ? (
-                              <>
-                                <span>Task:</span>
-                                <LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>
-                              </>
-                            ) : (
-                              <Button isDisabled={!canCreate || busy} onClick={() => onCreate(m, false)}>Create task</Button>
-                            )}
-                          </span>
-                        </div>
-                        {narrow && <div style={{ marginTop: sp(75), marginLeft: sp(250) }}><MatchLozenge confidence={m.confidence} /></div>}
-                        {isOpen && (
-                          <div id={bodyId} style={{ marginTop: sp(100) }}>
-                            <div style={muted}>{m.firm}{details.status ? ` · ${details.status}` : ''}{details.initiated ? ` · started ${formatDay(details.initiated)}` : ''}{m.date ? ` · reported ${formatDay(m.date)}` : ''}</div>
-                            <div style={{ marginTop: sp(50) }}><LinkLike iconAfter={LinkExternalIcon} onClick={() => router.open(recallUrl(m.recallNumber))}>Full FDA record</LinkLike></div>
-                            <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">Why we think it matches</Heading></div>
-                            <p style={{ margin: 0 }}>{m.reason}</p>
-                            {details.reason && (
-                              <>
-                                <div style={{ margin: `${sp(150)} 0 ${sp(50)}` }}><Heading size="xsmall" as="h3">What the FDA says is wrong</Heading></div>
-                                <ExpandableText text={details.reason} />
-                              </>
-                            )}
-                            {!key && suggestion && (
-                              <div style={{ marginTop: sp(150) }}>
-                                <Button isDisabled={!canCreate || busy} onClick={() => onCreate(m, true)}>
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(75) }}>
-                                    <Avatar size="xsmall" name={suggestion.name} />
-                                    Create and assign to {suggestion.name}
-                                  </span>
-                                </Button>
-                                <div style={{ ...muted, marginTop: sp(50) }}>Suggested because they have the fewest open RecallRadar tasks in {suggestion.teamName}. Nobody is assigned unless you choose it.</div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {!key && !canCreate && <div style={{ ...muted, marginTop: sp(50) }}>Choose a project on the Overview tab first.</div>}
-                      </section>
-                    );
-                  })}
+                  {matches.map((m) => (
+                    <RecallCard
+                      key={m.recallNumber}
+                      m={m}
+                      result={result}
+                      tasks={tasks}
+                      suggestion={suggestions[pairOf(m)]}
+                      canCreate={canCreate}
+                      busy={busy}
+                      isOpen={Boolean(openCards[m.recallNumber])}
+                      onToggle={() => setOpenCards({ ...openCards, [m.recallNumber]: !openCards[m.recallNumber] })}
+                      onCreate={onCreate}
+                    />
+                  ))}
                   {matches.length === 0 && <SectionMessage appearance="information" title="Nothing to show">This device no longer matches an open recall.</SectionMessage>}
                 </div>
               </aside>
