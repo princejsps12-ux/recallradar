@@ -28,8 +28,8 @@ Your client may show the names with a prefix. The four tools:
    may mention. Copy them exactly (for example `Z-2723-2026`, `demo-001`). Never invent or guess a recall
    number, device id, serial number or Jira key. If a tool finds nothing, say so.
 3. **Say how fresh the data is.** Answers include `basedOn.checkedAt`. If `basedOn.stale` is true or there
-   is a `warning`, tell the user. If no saved check exists, say the user must open the RecallRadar panel
-   on a Jira issue and click "Check devices for recalls".
+   is a `warning`, tell the user. If no saved check exists, say the user must open the RecallRadar
+   dashboard in Jira (a check runs by itself after "Load demo hospital", or press Refresh).
 4. **Respect confidence.** `exact` = manufacturer, model and serial/lot are all listed in the recall.
    `likely` = the model matches but the serial/lot is not listed or not recorded: say it needs a manual
    check and never call it confirmed. `possible` matches are weak and are never listed as open recalls.

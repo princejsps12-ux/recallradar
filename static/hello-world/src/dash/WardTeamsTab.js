@@ -53,6 +53,8 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
     setBusy('');
   };
 
+  // Nothing to choose from: the dropdowns stay shut (an open list with only "No team" looks broken).
+  const noTeams = teams !== null && teams.length === 0;
   const options = [{ label: 'No team', value: '' }, ...(teams || []).map((t) => ({ label: t.name, value: t.ari }))];
 
   // How many devices need action in each ward, and whether any has a Class I recall: wards with the most
@@ -68,7 +70,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
   const classI = (w) => (needs[w] && needs[w].classI ? 1 : 0);
   const ordered = [...wardInfo.wards].sort((a, b) => classI(b) - classI(a) || count(b) - count(a) || a.localeCompare(b));
   const teamSelect = (ward, mapping, value) => (
-    <Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" placeholder="No team" isDisabled={busy === ward} isLoading={busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" />
+    <Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" placeholder="No team" isDisabled={busy === ward || noTeams} isLoading={busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" />
   );
   const needsText = (ward, n) => (n ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>{`${n} ${n === 1 ? 'device' : 'devices'}`}{needs[ward].classI ? <Lozenge appearance="removed">Class I</Lozenge> : null}</span>) : <span style={muted}>None</span>);
   const rows = ordered.map((ward) => {
@@ -93,7 +95,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
       <div role="status" aria-live="polite">
         {loadError && <SectionMessage appearance="error" title="Could not load teams">{loadError}</SectionMessage>}
         {message && <SectionMessage appearance={message.kind}>{message.text}</SectionMessage>}
-        {teams && teams.length === 0 && <SectionMessage appearance="information" title="No teams yet">You are not in any team in your Atlassian directory, so there is nothing to choose from.</SectionMessage>}
+        {teams && teams.length === 0 && <SectionMessage appearance="information" title="No teams yet">You are not in any team in your Atlassian directory, so there is nothing to choose from yet. Create a team (Teams in Jira's left sidebar), add yourself, then reopen this tab.</SectionMessage>}
       </div>
       {wardInfo.wards.length === 0 ? (
         <SectionMessage appearance="information" title="No wards yet">Load the demo hospital or import your devices; their wards appear here.</SectionMessage>

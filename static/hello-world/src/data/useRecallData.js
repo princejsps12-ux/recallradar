@@ -25,6 +25,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
   const wantSuggestions = withSuggestions === undefined ? !light : withSuggestions;
   const wantWards = !light || wantSuggestions;
   const [devicesCount, setDevicesCount] = useState(null);
+  const [importedCount, setImportedCount] = useState(0); // devices the person pasted in (the rest are the demo hospital)
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(null); // null = no check running
@@ -131,6 +132,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
       const [devices, saved, status] = await Promise.all([invoke('listDevices'), invoke('getSavedMatches'), invoke('getCheckStatus')]);
       if (!devices || !devices.ok) throw new Error('devices');
       setDevicesCount(devices.devices.length);
+      setImportedCount(devices.devices.filter((d) => d.source === 'manual').length);
       const savedResult = saved && saved.ok ? saved.result : null;
       setResult(savedResult);
       const job = status && status.ok ? status.job : null;
@@ -250,7 +252,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
     });
     setCreating({ active: false, done: 0, total: 0 });
     const text = summarize(totals);
-    if (text) setNote({ kind: totals.stopped || totals.failed.length ? 'warning' : 'success', title: totals.stopped || totals.failed.length ? 'Some tasks were not created' : totals.created ? 'Tasks created' : 'Nothing new to create', text });
+    if (text) setNote({ kind: totals.stopped || totals.failed.length ? 'warning' : 'success', title: totals.stopped || totals.failed.length ? 'Some tasks were not created' : totals.created ? (totals.created === 1 ? 'Task created' : 'Tasks created') : 'Nothing new to create', text });
     if (totals.created && !light) invoke('getTaskSummary').then((r) => { setSummary(r && r.ok ? r.summary : null); setSummaryState(r && r.ok ? 'ok' : 'error'); }).catch(() => {});
     return totals;
   };
@@ -272,17 +274,36 @@ export default function useRecallData({ withProjects = false, light = false, wit
     return false;
   };
 
-  const afterDevicesChanged = (count) => {
-    setDevicesCount(count);
+  // After an import or a removal: read the real device list again (an import answers with how many rows it added, not
+  // with how many devices there are now), say what happened, and check again.
+  const afterDevicesChanged = async (change = {}) => {
+    const before = devicesCount;
     setSummary(null);
     setSummaryState('loading');
-    if (count > 0) begin(true);
+    let total = change.cleared ? 0 : before || 0;
+    try {
+      const listed = await invoke('listDevices');
+      if (listed && listed.ok) {
+        total = listed.devices.length;
+        setImportedCount(listed.devices.filter((d) => d.source === 'manual').length);
+      }
+    } catch (e) {
+      // keep the best guess above; the next load corrects it
+    }
+    setDevicesCount(total);
+    const plural = (n) => `${n} ${n === 1 ? 'device' : 'devices'}`;
+    if (change.imported) {
+      setNote({ kind: 'success', title: `${plural(change.imported)} imported`, text: 'Checking them against the last year of FDA recalls now.' });
+    } else if (change.removed && before != null && before > total) {
+      setNote({ kind: 'success', title: `${plural(before - total)} removed`, text: total > 0 ? 'Checking the rest again.' : 'Nothing is left to check.' });
+    }
+    if (total > 0) begin(true);
     else setResult(null);
     loadWardInfo();
   };
 
   return {
-    devicesCount, result, error, progress, tasks, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, loadRecent, projects, projectKey, creating, note,
+    devicesCount, importedCount, result, error, progress, tasks, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, loadRecent, projects, projectKey, creating, note,
     setProjectKey, setNote, load, begin, createTasks, loadDemo, loadWardInfo, afterDevicesChanged,
   };
 }

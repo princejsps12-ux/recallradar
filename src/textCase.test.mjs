@@ -55,3 +55,11 @@ test('dates are always "4 Nov 2026", whatever the locale', () => {
   assert.equal(formatDay('soon'), 'soon');
   assert.equal(formatDay(undefined), '');
 });
+
+test('niceFirm fixes a company ending written in the wrong case, and nothing else in a mixed-case name', () => {
+  assert.equal(niceFirm('Philips North America Llc'), 'Philips North America LLC');
+  assert.equal(niceFirm('Acme Medical Gmbh'), 'Acme Medical GmbH');
+  assert.equal(niceFirm('Acme, Llp.'), 'Acme, LLP.');
+  assert.equal(niceFirm('Llc Holdings Inc'), 'Llc Holdings Inc', 'only an ending is touched');
+  assert.equal(niceFirm('Abiomed, Inc.'), 'Abiomed, Inc.');
+});

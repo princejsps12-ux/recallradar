@@ -45,13 +45,14 @@ test('the page says what to do, with the class meaning and the due days', () => 
 
 test('class II recalls are due in 7 days', () => {
   const body = buildRecallPageBody({ matches: [match('d1', { recallClass: 'II' })], info });
-  assert.match(body, /Class II recall are due 7 days/);
+  assert.match(body, /Act within about 7 days: RecallRadar tasks for this recall are due 7 days after they are created \(Class II\)/);
+  assert.equal((body.match(/due 7 days/g) || []).length, 1, 'the due-date rule is said once');
 });
 
 test('an unknown class is described honestly', () => {
   const body = buildRecallPageBody({ matches: [match('d1', { recallClass: '' })], info });
   assert.match(body, /Class not stated: treat as serious until confirmed/);
-  assert.match(body, /Class unknown recall are due 2 days/);
+  assert.match(body, /due 2 days after they are created \(class unknown, treated as Class I\)/);
 });
 
 test('the affected-devices table has one row per device with id, ward, serial and match', () => {
@@ -115,13 +116,14 @@ test('a likely match adds the "check it by hand" step', () => {
 
 test('the footer says when the saved check ran and that re-running updates the page', () => {
   const body = buildRecallPageBody({ matches: [match('d1')], info, checkedAt: '2026-11-15T09:00:23.000Z' });
-  assert.match(body, /saved check of 2026-11-15T09:00:23\.000Z/);
+  assert.match(body, /saved check of 15 Nov 2026, 09:00 UTC/);
+  assert.doesNotMatch(body, /T09:00:23/, 'no raw timestamp');
   assert.match(body, /Re-running it updates this page/);
 });
 
 test('the facts table covers class, firm, product, dates and status', () => {
   const body = buildRecallPageBody({ matches: [match('d1')], info });
-  for (const fragment of ['<th>Recall class</th><td>Class I</td>', '<th>Recalling firm</th><td>Abiomed, Inc.</td>', '<th>Product</th><td>Impella Controller</td>', '<th>Reported to FDA</th><td>2026-11-04</td>', '<th>Recall started</th><td>2026-09-17</td>', '<th>Status</th><td>Ongoing</td>']) {
+  for (const fragment of ['<th>Recall class</th><td>Class I</td>', '<th>Recalling firm</th><td>Abiomed, Inc.</td>', '<th>Product</th><td>Impella Controller</td>', '<th>Reported to FDA</th><td>4 Nov 2026</td>', '<th>Recall started</th><td>17 Sep 2026</td>', '<th>Status</th><td>Ongoing</td>']) {
     assert.ok(body.includes(fragment), fragment);
   }
 });

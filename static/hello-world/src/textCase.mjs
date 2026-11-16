@@ -31,7 +31,10 @@ const SMALL_WORDS = new Set(['AND', 'OF', 'THE', 'FOR', 'DE', 'DU', 'LA', 'LE', 
 // "PHILIPS MEDICAL SYSTEMS NEDERLAND B.V." becomes "Philips Medical Systems Nederland B.V.".
 // Kept as written: words with a digit ("3M"), dotted abbreviations ("B.V."), and short capitals ("USA", "GE", "AG").
 export function niceFirm(name) {
-  if (typeof name !== 'string' || !isAllCaps(name) || !/[A-Z]{4}/.test(name)) return name;
+  if (typeof name !== 'string') return name;
+  // Mixed-case names are left alone, except a company ending the FDA wrote in the wrong case ("Llc" for "LLC").
+  if (!isAllCaps(name)) return name.replace(/\b(Llc|Llp|Plc|Gmbh)(?=[.,)]?\s*$)/, (m) => FIRM_SUFFIXES[m.toUpperCase()] || m);
+  if (!/[A-Z]{4}/.test(name)) return name;
   let first = true;
   return name
     .split(/(\s+)/)

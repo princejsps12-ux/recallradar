@@ -68,7 +68,7 @@ export default function CreateAllWindow({ projectKey }) {
   if (totals) {
     return frame(
       <>
-        <Heading size="medium">{totals.created ? 'Tasks created' : 'Nothing was created'}</Heading>
+        <Heading size="medium">{totals.created ? (totals.created === 1 ? 'Task created' : 'Tasks created') : 'Nothing was created'}</Heading>
         <div style={{ marginTop: sp(150) }}>
           {d.note && (
             <SectionMessage appearance={d.note.kind === 'success' ? 'success' : 'warning'}>{d.note.text}</SectionMessage>

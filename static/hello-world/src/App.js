@@ -56,7 +56,7 @@ function PanelSkeleton() {
 
 function DeviceRow({ m }) {
   return (
-    <li style={{ display: 'flex', alignItems: 'center', gap: sp(150), height: `${ROW_HEIGHT}px`, boxSizing: 'border-box', borderTop: `1px solid ${color.border}` }}>
+    <li style={{ display: 'flex', alignItems: 'center', gap: sp(150), height: `${ROW_HEIGHT}px`, boxSizing: 'border-box', paddingRight: '2px', borderTop: `1px solid ${color.border}` }}>
       <div style={{ flex: '1 1 0', minWidth: 0 }}>
         <div style={ellipsis}><strong>{cap(m.deviceName)}</strong></div>
         <div style={{ ...muted, ...ellipsis }}>{m.ward || 'No ward'} · <span style={noBreak}>{m.recallNumber}</span></div>

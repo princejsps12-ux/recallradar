@@ -127,7 +127,7 @@ export function buildTaskDescription(match, dueDate) {
         text(`${match.recallNumber}, ${classText}, ${match.firm}, reported ${match.date || 'date unknown'}`),
       ),
       paragraph(bold('Product: '), text(match.product || 'not stated')),
-      paragraph(bold('FDA recall record: '), link(recallRecordUrl(match.recallNumber))),
+      paragraph(bold('FDA recall record (raw openFDA data, for checking): '), link(recallRecordUrl(match.recallNumber))),
       paragraph(bold('Search the FDA recall database: '), link(FDA_RECALL_DATABASE_URL)),
       paragraph(
         bold('Due: '),

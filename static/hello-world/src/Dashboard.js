@@ -62,7 +62,7 @@ export default function Dashboard() {
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: `${sp(300)} 0`, color: color.text }}>
       {children}
       <ImportModal isOpen={importOpen} onClose={() => setImportOpen(false)} onImported={d.afterDevicesChanged} />
-      <ImportModal mode="remove" isOpen={removeOpen} onClose={() => setRemoveOpen(false)} onImported={d.afterDevicesChanged} />
+      <ImportModal mode="remove" isOpen={removeOpen} onClose={() => setRemoveOpen(false)} onImported={d.afterDevicesChanged} importedCount={d.importedCount} total={d.devicesCount || 0} />
     </main>
   );
 

@@ -198,7 +198,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                   </div>
                   <div role="group" aria-label="Device facts" style={{ margin: `0 0 ${sp(300)}`, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: sp(200) }}>
                     <Field label="Ward">{first.ward}</Field>
-                    <Field label="Team">{first.ward && teams[first.ward]}</Field>
+                    <Field label="Team">{first.ward && teams[first.ward] ? teams[first.ward] : 'No team yet'}</Field>
                     <Field label="Serial or lot">{first.lotOrSerial}</Field>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: sp(100) }}>

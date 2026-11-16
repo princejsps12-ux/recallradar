@@ -178,7 +178,8 @@ const typeInto = async (node, value, proto) => {
     }
   });
   // 2d. the remove dialog uses Atlaskit radios and a danger button that names what it removes
-  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result } }, async (el) => {
+  const someImported = [{ source: 'manual' }, { source: 'manual' }, { source: 'demo' }];
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: someImported }, getSavedMatches: { ok: true, result } }, async (el) => {
     await clickLabel(el, 'More actions');
     const item = [...document.querySelectorAll('[role="menuitem"], button, a')].find((n) => /^Remove devices…$/.test(n.textContent.trim()));
     check('the "..." menu offers "Remove devices…"', Boolean(item));
@@ -186,13 +187,22 @@ const typeInto = async (node, value, proto) => {
       await act(async () => { item.click(); await wait(250); });
       const group = document.querySelector('[role="radiogroup"]');
       const radios = group ? [...group.querySelectorAll('input[type="radio"]')] : [];
-      check('the remove dialog has a radio group with two choices, "only imported" selected', radios.length === 2 && radios[0].checked && !radios[1].checked && /Only the devices I imported/.test(group.textContent));
-      check('the danger button names the choice', [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Remove imported devices'));
+      check('the remove dialog has a radio group with two choices, "only imported" selected', radios.length === 2 && radios[0].checked && !radios[1].checked && /Only the devices I imported \(2\)/.test(group.textContent) && /All devices, including the demo hospital \(3\)/.test(group.textContent));
+      check('the danger button names the choice', [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Remove 2 imported devices'));
       if (radios[1]) {
         await act(async () => { radios[1].click(); await wait(150); });
-        check('choosing "all devices" changes the danger button to "Remove all devices"', [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Remove all devices'));
+        check('choosing "all devices" changes the danger button to "Remove all 3 devices"', [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Remove all 3 devices'));
       }
     }
+  });
+  // Nothing imported: the "only imported" choice is shut and "all devices" is the preselected one.
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [{ source: 'demo' }, { source: 'demo' }] }, getSavedMatches: { ok: true, result } }, async (el) => {
+    await clickLabel(el, 'More actions');
+    const item = [...document.querySelectorAll('[role="menuitem"], button, a')].find((n) => /^Remove devices…$/.test(n.textContent.trim()));
+    if (item) await act(async () => { item.click(); await wait(250); });
+    // the previous run's dialog may still be in the document: this run's radios are the last two
+    const radios = [...document.querySelectorAll('[role="radiogroup"] input[type="radio"]')].slice(-2);
+    check('with nothing imported the "only imported" choice is disabled and "all devices" is chosen', radios.length === 2 && radios[0].disabled && radios[1].checked);
   });
   // 3. error screen
   await run('jira:globalPage', { ...base, listDevices: { ok: false }, getSavedMatches: { ok: true, result: null } }, async (el) => {

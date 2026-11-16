@@ -8,16 +8,16 @@ It runs as a panel on every Jira issue, as a Rovo agent, and as MCP tools other 
 
 **Install link:** [Install RecallRadar on your site](https://developer.atlassian.com/console/install/2e0464e9-8b4a-4388-b224-b4f05eae484f?signature=AYABeO4RTK5WoBjofwC5LLmbhsYAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucBww%2B9LK1oIgu9liOwPhgsXAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDHKMnOskwi5OXx%2FzLgIBEIA7zuERvhMx7ShEsGkCJm5Z8hk9ed%2Bt7tGaDRXY7BfQDQgmbBI9ZRnlrKpIjin2Om5ZKyqwiB1JHcdqFnsAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgGys7iVbyvKbXxP2R%2BERAnvAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM%2FVNU%2BxfhXtpy4%2BeYAgEQgDsvKNiIJmQha%2FJR9MFVh%2BPee9MRb%2BS8yIpLzcQKBiEpJmV5m14bJnObCM285wbWwmXa80cIEai5oxRxNQAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEATS%2Bkr01q3xokP63tO9y6hEAAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAydBB73g1k8hMBXv2oCARCAO39zZoIuJS%2BmBrVEmrJ6IgA8F1fJ1zjpKdaHLgS0A2U1ATDnB8LEBbE99JXX4bf6vnTBM2yrpM%2BXFlGLAgAAAAAMAAAQAAAAAAAAAAAAAAAAACbRvGQFLeROV2zy2GClH%2F%2F%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADJywqnoXY3ILklDld%2FHhPDyQrscgOSY0SSFTsEKQ8eo%2B3drtTsSIsOcDlwi9SCsXCp%2FHu8jd30aniNvAEKK7u5gOqM%3D&product=jira&product=confluence)
 
-Open it, pick your site and install it in **Jira**. That is all RecallRadar needs: the app is one installation for the whole site, so the same devices and checks show up in the Jira dashboard, in a Rovo chat started in Jira or Confluence, and in Rovo Home. **Confluence is an optional connection** that only the recall pages use. To add it, a site admin opens Atlassian Administration, Apps, Sites, your site, Connected apps, **RecallRadar**, View app details, **Connections**, and clicks **Connect** next to Confluence. Without it everything else works, and the Confluence dialog says the same.
+Open it, pick your site and install it in **Jira**. That is all RecallRadar needs: the app is one installation for the whole site, so the same devices and checks show up in the Jira dashboard, in a Rovo chat started in Jira or Confluence, and in Rovo Home. **Confluence is an optional connection** that only the recall pages use. The install dialog offers it under "additional Atlassian apps": tick **Confluence** there if you want the recall pages right away. Otherwise, or later, a site admin connects it: open admin.atlassian.com, choose your organization, expand **Apps** in the left menu and open **Sites**, click your site, then **Connected apps**, search for `recallradar` (that is the name the admin pages list it under), **View app details**, **Connections**, click **Connect** next to Confluence, and **Connect** again in the side panel that asks you to review the permissions. Without it everything else works, and the Confluence dialog says the same.
 
 **Before you start**
 - A Jira site where you can create issues, and a Jira issue to open (any issue works).
-- Optional, each unlocks one feature: **Rovo** (the chat agent), **Confluence** (recall pages, once connected as above), and membership of at least one **team** in your Atlassian directory (the ward-to-team feature lists the teams you belong to; with none, that dropdown is empty and everything else still works).
+- Optional, each unlocks one feature: **Rovo** (the chat agent; a free developer site has none, so if Jira shows no **Ask Rovo** button, skip step 4 and look at `marketplace/screenshots/21-rovo-chat-answer.png` and `22-rovo-chat-task-preview.png`), **Confluence** (recall pages, once connected as above), and membership of at least one **team** in your Atlassian directory (the ward-to-team feature lists the teams you belong to; with none, that dropdown is empty and everything else still works).
 
-**Five minutes, in order**
+**About ten minutes, in order**
 1. Jira, **Apps**, **RecallRadar**: the dashboard. On a fresh site it shows a first-run screen. Click **Load demo hospital** (30 sample devices with real manufacturer and model names), or **Import your own devices** and paste rows from a spreadsheet. It then checks them against the last year of FDA recalls in the background (about 15 seconds).
 2. Expect the headline "N devices need action" with the Class I count and one summary line (devices monitored, open recalls by class, task counts), a **Do this first** list and a table of affected devices. With the demo hospital you should see roughly 20 to 30 open exact or likely recalls across Class I, II and III; the exact numbers drift as the FDA publishes new recalls.
-3. Click a device name for its recalls, the reason each matched and what the FDA says is wrong, then **Create task** (or **Create and assign to ...** in the small menu beside it if you mapped a ward to a team). Open any Jira issue: the **RecallRadar** panel is a compact summary with **Open dashboard** and **Create all N tasks...**.
+3. Click a device name for its recalls, the reason each matched and what the FDA says is wrong, then **Create task** (or **Create and assign to ...** in the small menu beside it if you mapped a ward to a team). Open any Jira issue, click **Apps** (beside the **+** under its title) and choose **RecallRadar**: the panel is a compact summary with **Open dashboard** and **Create all N tasks...**.
 4. Ask **Rovo** (Ask Rovo in Jira, or Rovo Home; pick **RecallRadar Assistant**): "Which Cath Lab devices have open Class I recalls?"
 
 **Try it safely.** Tasks and Confluence pages are real. All RecallRadar tasks carry the label `recallradar`: find them with the Jira search `labels = recallradar` and delete them when you are done. Creating a task for the same recall and device twice is blocked on purpose, so delete the tasks before re-running. Assigning someone sends them a Jira notification, and nobody is assigned unless you click the assign button.
@@ -45,7 +45,7 @@ Open it, pick your site and install it in **Jira**. That is all RecallRadar need
 2. Click **Load demo hospital**. It adds 30 devices. Running it again replaces only the demo devices and leaves any other devices in storage alone.
 3. The check runs by itself ("Checked N of M FDA searches"); **Refresh** runs it again. The result reads "N devices need action", strongest match first.
 4. Open the **Ward teams** tab, and for each ward pick the team that handles it (the list comes from the Teamwork Graph).
-5. Click **Create task** on a row, **Create all N tasks…** (it asks you to confirm), or click a device's name to open its details and use **Create N tasks**. Tasks are created as you, so Jira applies your permissions, in the project chosen next to the button (on the issue panel: the project of that issue). If the ward has a team (and the Teamwork Graph answers), the **Create task** button in the drawer gets a small menu beside it with **Create and assign to <name>**; plain **Create task** never assigns anyone. In the "create all" confirmation, **Also assign the suggested team member** is a checkbox that starts **off**.
+5. Click **Create task** on a row, **Create all N tasks…** (it asks you to confirm), or click a device's name to open its details and use **Create task** (a device with several recalls also gets **Create N tasks**). Tasks are created as you, so Jira applies your permissions, in the project chosen next to the button (on the issue panel: the project of that issue). If the ward has a team (and the Teamwork Graph answers), the **Create task** button in the drawer gets a small menu beside it with **Create and assign to <name>**; plain **Create task** never assigns anyone. In the "create all" confirmation, **Also assign the suggested team member** is a checkbox that starts **off**.
 6. Open the **...** menu, click **Create Confluence pages**, choose a space and a recall, and click **Create page**.
 
 ## How matching works
@@ -181,7 +181,7 @@ Checked on the demo site: after creating all 35 tasks, a second tab that still t
 - **Looking up existing tasks** only searches Jira, so it may cover up to 200 pairs per request (`MAX_STATE_PAIRS_PER_REQUEST`); this is how the panel shows "Task: MOBL-12" for matches that already have one.
 - **Jira bulk limit.** Jira creates at most 50 issues per bulk call (`BULK_CREATE_LIMIT`).
 - **Permissions.** Tasks are created *as the person who clicked* (`asUser`), so someone who may not create issues gets Jira's error, and the app needs the `write:jira-work` scope.
-- **Project.** Tasks go to the project of the current issue; choosing a different project is not built.
+- **Project.** On the dashboard you choose the project next to the button; on the issue panel it is the project of that issue; in a Rovo chat you name it, or it is the project of the Jira page you are on.
 - **Task state is not tracked.** The panel shows the task's key as a link, not whether it is done.
 
 ## Teamwork Graph (read-only)
@@ -202,7 +202,7 @@ query recallradar_myteams($userId: ID!, $first: Int) {
 }
 ```
 
-Variables: `userId` = `ari:cloud:identity::user/<the signed-in person's account id>`, `first` = 25. Runs when you open **Ward teams** in the panel (to fill the team dropdown) and when a ward-to-team choice is saved (the server checks that the team really is in this list, and takes the team's **name from the graph**, not from the browser).
+Variables: `userId` = `ari:cloud:identity::user/<the signed-in person's account id>`, `first` = 25. Runs when you open the dashboard's **Ward teams** tab (to fill the team dropdown) and when a ward-to-team choice is saved (the server checks that the team really is in this list, and takes the team's **name from the graph**, not from the browser).
 
 **Call 2: the members of one team** (operation `recallradar_teammembers`)
 
@@ -378,7 +378,7 @@ claude mcp add --transport http recallradar https://mcp.atlassian.com/forge/<app
 
 **4. Teach the agent how to use the tools (optional but recommended).** [`integrations/claude/recallradar/SKILL.md`](integrations/claude/recallradar/SKILL.md) is a skill file for third-party agents: which tool for which question, always cite real recall numbers and device ids, say how fresh the data is, and ask the user before creating a task. In Claude Code copy the `recallradar` folder to `~/.claude/skills/`; in Claude Desktop zip the folder and add it under **Settings, Capabilities, Skills**.
 
-**5. Make sure there is a check to read.** The tools read the saved check. Open the RecallRadar panel on a Jira issue and click **Check devices for recalls** once (the daily refresh then keeps it current). Without a saved check the tools say so.
+**5. Make sure there is a check to read.** The tools read the saved check. Open the RecallRadar dashboard (Jira, Apps, RecallRadar): a check runs by itself after **Load demo hospital**, and **Refresh** runs it again (the daily refresh then keeps it current). Without a saved check the tools say so.
 
 ### What was and was not verified
 

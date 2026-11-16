@@ -174,9 +174,19 @@
         if (lines.length < 2 || !header.includes('manufacturer') || !header.includes('model')) {
           return { ok: false, errors: ['Line 1: the first row must name the columns, and Manufacturer and Model are required.'] };
         }
-        return { ok: true, count: lines.length - 1 };
+        const added = lines.slice(1).map((line, i) => {
+          const cells = line.split(/\t|,/);
+          return { id: `own-${String(st.devices.filter((d) => d.source === 'manual').length + i + 1).padStart(3, '0')}`, name: cells[0] || 'Imported device', manufacturer: cells[1] || 'Unknown', model: cells[2] || 'Unknown', serial: cells[3] || '', ward: cells[4] || '', source: 'manual' };
+        });
+        st.devices = st.devices.concat(added);
+        st.result = null;
+        st.job = null;
+        return { ok: true, count: added.length };
       },
       removeImportedDevices() {
+        st.devices = st.devices.filter((d) => d.source !== 'manual');
+        st.result = null;
+        st.job = null;
         return { ok: true, count: st.devices.length };
       },
       clearDevices() {

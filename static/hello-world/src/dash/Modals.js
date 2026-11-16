@@ -15,13 +15,15 @@ const EXAMPLE = 'Name\tManufacturer\tModel\tSerial\tWard\nSigma Spectrum pump\tB
 
 // Paste rows from a spreadsheet; the first row names the columns. All or nothing: a bad row is listed and
 // nothing is imported.
-export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
+export function ImportModal({ isOpen, onClose, onImported, mode = 'import', importedCount = 0, total = 0 }) {
   const removing = mode === 'remove';
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState([]);
   const [removeAsk, setRemoveAsk] = useState(''); // '' | 'imported' | 'all'
   const [done, setDone] = useState('');
+  // With nothing imported the only thing left to remove is everything, so that is the preselected choice.
+  const defaultChoice = importedCount > 0 ? 'imported' : 'all';
   const mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
 
@@ -33,7 +35,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
       const r = await invoke('importDevices', { text });
       if (r && r.ok) {
         setText('');
-        onImported(r.count);
+        onImported({ imported: r.count });
         onClose();
       } else if (mounted.current) setProblems((r && r.errors) || ['Could not import the devices.']);
     } catch (e) {
@@ -45,12 +47,12 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
   const remove = async () => {
     setBusy(true);
     try {
-      const r = await invoke(removeAsk === 'all' ? 'clearDevices' : 'removeImportedDevices');
+      const r = await invoke((removeAsk || defaultChoice) === 'all' ? 'clearDevices' : 'removeImportedDevices');
       if (r && r.ok && mounted.current && removing) onClose();
       if (r && r.ok) {
-        setDone(removeAsk === 'all' ? 'Removed all devices.' : 'Removed the devices you imported.');
+        setDone((removeAsk || defaultChoice) === 'all' ? 'Removed all devices.' : 'Removed the devices you imported.');
         setRemoveAsk('');
-        onImported(r.count);
+        onImported({ removed: true, cleared: (removeAsk || defaultChoice) === 'all' });
       } else setProblems([(r && r.error) || 'Could not remove them.']);
     } catch (e) {
       setProblems(['Could not reach RecallRadar.']);
@@ -82,11 +84,11 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
                 <RadioGroup
                   name="rr-remove"
                   aria-labelledby="rr-remove-question"
-                  value={removeAsk || 'imported'}
+                  value={removeAsk || defaultChoice}
                   onChange={(e) => setRemoveAsk(e.target.value)}
                   options={[
-                    { name: 'rr-remove', value: 'imported', label: 'Only the devices I imported' },
-                    { name: 'rr-remove', value: 'all', label: 'All devices, including the demo hospital' },
+                    { name: 'rr-remove', value: 'imported', label: `Only the devices I imported (${importedCount})`, isDisabled: importedCount === 0 },
+                    { name: 'rr-remove', value: 'all', label: `All devices, including the demo hospital (${total})` },
                   ]}
                 />
               </>
@@ -94,7 +96,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
           </ModalBody>
           <ModalFooter>
             <Button appearance="subtle" onClick={onClose}>Cancel</Button>
-            {removing && <Button appearance="danger" isLoading={busy} onClick={remove}>{(removeAsk || 'imported') === 'all' ? 'Remove all devices' : 'Remove imported devices'}</Button>}
+            {removing && <Button appearance="danger" isLoading={busy} onClick={remove}>{(removeAsk || defaultChoice) === 'all' ? `Remove all ${total} devices` : `Remove ${importedCount} imported ${importedCount === 1 ? 'device' : 'devices'}`}</Button>}
             {!removing && <Button appearance="primary" isLoading={busy && !removeAsk} isDisabled={!text.trim()} onClick={submit}>Import devices</Button>}
           </ModalFooter>
         </Modal>
@@ -107,7 +109,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
 // assignment (off by default). Tasks go in the project chosen on the dashboard.
 export function CreateAllBody({ count, deviceCount, suggestedCount, projectName, assign, onAssign, running }) {
   const facts = [
-    ['Devices', deviceCount],
+    ['Devices without a task', deviceCount],
     ['Tasks', `${count} (one for each device and recall)`],
     ['Project', projectName],
   ];
@@ -182,8 +184,20 @@ export function ConfluenceModal({ isOpen, onClose, result }) {
       .catch(() => setError('Could not reach RecallRadar.'));
   }, [isOpen, spaces]);
 
-  const open = [...new Set(affectedMatches(result).map((m) => m.recallNumber))];
-  const recallOptions = [{ label: `All open recalls (${open.length})`, value: '' }, ...open.map((n) => ({ label: n, value: n }))];
+  // One option per open recall, with its class and the first affected device, so a recall number is not all there is to go by.
+  const byRecall = new Map();
+  for (const m of affectedMatches(result)) {
+    if (!byRecall.has(m.recallNumber)) byRecall.set(m.recallNumber, { cls: m.recallClass, devices: [] });
+    const entry = byRecall.get(m.recallNumber);
+    if (!entry.devices.includes(m.deviceName)) entry.devices.push(m.deviceName);
+  }
+  const open = [...byRecall.keys()];
+  const MAX_PAGES_AT_ONCE = 10; // the same limit the server applies per request (MAX_PAGES_PER_CALL)
+  const allLabel = open.length > MAX_PAGES_AT_ONCE ? `All open recalls (the first ${MAX_PAGES_AT_ONCE} of ${open.length}; choose the others one at a time)` : `All open recalls (${open.length})`;
+  const recallOptions = [{ label: allLabel, value: '' }, ...open.map((n) => {
+    const { cls, devices } = byRecall.get(n);
+    return { label: `${n} · ${cls ? `Class ${cls}` : 'class not stated'} · ${devices[0]}${devices.length > 1 ? ` +${devices.length - 1}` : ''}`, value: n };
+  })];
   const spaceOptions = (spaces || []).map((s) => ({ label: `${s.name} (${s.key})`, value: s.key }));
 
   const create = async () => {
@@ -225,7 +239,7 @@ export function ConfluenceModal({ isOpen, onClose, result }) {
             <div role="status" aria-live="polite" style={{ marginTop: sp(200) }}>
               {outcome && outcome.kind === 'error' && <SectionMessage appearance="error">{outcome.text}</SectionMessage>}
               {outcome && outcome.kind === 'success' && (
-                <SectionMessage appearance="success" title={`Done in the ${outcome.space} space`}>
+                <SectionMessage appearance="success" title={`Done in ${outcome.space}`}>
                   <ul style={{ margin: 0, paddingLeft: '20px' }}>
                     {outcome.pages.map((p) => (
                       <li key={p.recallNumber}>{p.recallNumber}: page {p.action}. <LinkLike onClick={() => router.open(p.url)}>{p.title}</LinkLike></li>

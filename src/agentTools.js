@@ -94,7 +94,7 @@ export function readInputs(payload) {
 // --- Shared answers ------------------------------------------------------------------------------------
 
 const NO_SAVED_CHECK =
-  'There is no saved recall check yet. Ask the user to open the RecallRadar panel on a Jira issue and click "Check devices for recalls" (or wait for the daily refresh), then ask again.';
+  'There is no saved recall check yet. Ask the user to open the RecallRadar dashboard in Jira (a check runs by itself after "Load demo hospital", or press Refresh), or wait for the daily refresh, then ask again.';
 
 // No devices means none were loaded on this site yet. The app has ONE installation per site (Jira is the required app,
 // Confluence an optional connection: see `app.compatibility` in manifest.yml), so the Jira dashboard, a chat in the
