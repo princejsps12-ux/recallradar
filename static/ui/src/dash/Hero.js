@@ -92,7 +92,7 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
           <div style={{ margin: 0 }}>
             <Heading size="medium" as="h2" id="rr-urgent">Do this first</Heading>
           </div>
-          <div style={muted}>{!loading && pendingCount === 0 ? 'Nothing is waiting for a task.' : `Most urgent first. ${pendingCount} ${pendingCount === 1 ? 'task' : 'tasks'} for ${deviceCount} ${deviceCount === 1 ? 'device' : 'devices'}, one per device and recall.`}</div>
+          {(loading || pendingCount > 0) && <div style={muted}>{`Most urgent first. ${pendingCount} ${pendingCount === 1 ? 'task' : 'tasks'} for ${deviceCount} ${deviceCount === 1 ? 'device' : 'devices'}, one per device and recall.`}</div>}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'flex-end' }}>
           {(loading || pendingCount > 0) && <div style={{ minWidth: '240px' }}>
