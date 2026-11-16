@@ -19,8 +19,9 @@ const pairOf = (m) => ({ recallNumber: m.recallNumber, deviceId: m.deviceId });
 const key = (m) => `${m.recallNumber}|${m.deviceId}`;
 
 test('the preview answers every resolver the real app defines', async () => {
-  const defined = [...readFileSync(join(here, 'index.js'), 'utf8').matchAll(/(?:resolver\.define|defineForAdministrators)\('([A-Za-z]+)'/g)].map((m) => m[1]);
-  assert.ok(defined.length >= 15, 'the pattern found the resolvers in src/index.js');
+  const { createHandlers } = await import('./handlers.js');
+  const defined = Object.keys(createHandlers({}));
+  assert.ok(defined.length >= 15, 'the handlers were found in src/handlers.js');
   for (const name of defined) assert.ok(RESOLVERS.includes(name), `preview backend is missing the resolver "${name}"`);
   const backend = make('ready');
   for (const name of RESOLVERS) {

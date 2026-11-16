@@ -203,9 +203,5 @@ export function createJiraClient({ request, route }) {
     return { administrator: has('ADMINISTER'), projectAdministrator: has('ADMINISTER_PROJECTS') };
   }
 
-  async function isAdministrator() {
-    return (await adminRoles()).administrator;
-  }
-
-  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, isAdministrator, adminRoles };
+  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, adminRoles };
 }

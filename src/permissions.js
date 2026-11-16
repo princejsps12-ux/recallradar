@@ -10,7 +10,7 @@
 // administrators. Reading, checking for recalls and creating tasks stay open to everyone who can use the app (Jira's
 // own permissions decide who may create issues). The check runs on the server: the dashboard only reflects it.
 //
-// `jira` is the Jira client as the signed-in person (see jiraClient.js): it needs isAdministrator().
+// `jira` is the Jira client as the signed-in person (see jiraClient.js): it needs adminRoles().
 // No Forge imports here, so it is unit tested with plain Node.
 
 export const NOT_ADMIN_MESSAGE =
@@ -22,7 +22,7 @@ export const PERMISSION_CHECK_FAILED = 'Could not check your Jira permissions. P
 // safer to stop than to guess), with its own message so a person is not told they lack a permission they may have.
 export async function refuseUnlessAdministrator(jira) {
   try {
-    if (await jira.isAdministrator()) return null;
+    if ((await jira.adminRoles()).administrator) return null;
   } catch (error) {
     return { ok: false, error: PERMISSION_CHECK_FAILED };
   }

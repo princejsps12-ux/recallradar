@@ -1,0 +1,338 @@
+// The resolvers the panel and the dashboard call, as plain functions with their dependencies handed in.
+//
+// index.js is the only place that knows Forge: it builds the real dependencies (storage, Jira as the signed-in person,
+// the queue, ...) and registers every function returned here with @forge/resolver. Everything else, which is what the
+// pages actually depend on (who may do what, which answer each call gives, what a failure looks like), is here and is
+// unit tested with fakes (handlers.test.mjs). No Forge imports in this file.
+//
+// Every handler takes Forge's request ({ payload, context }) and RETURNS its answer: failures come back as
+// { ok: false, error } so the page can show them, they are never thrown.
+import { buildRecallsUrl, parseRecalls, DEFAULT_LIMIT } from './openfda.js';
+import { loadDemoHospital } from './demoHospital.js';
+import { getSavedMatches, requestCheck, getCheckStatus, getLatestResult } from './matchService.js';
+import { createTasks, getTaskStates, validatePairs, selectMatches, MAX_STATE_PAIRS_PER_REQUEST } from './taskService.js';
+import { assigneesForMatches, checkExplicitAssignees, setWardTeam } from './teamService.js';
+import { createRecallPages } from './recallPageService.js';
+import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient.js';
+import { importDevices } from './deviceCsv.js';
+import { refuseUnlessAdministrator, refuseUnlessTeamManager } from './permissions.js';
+
+// Jira project keys: letters, digits and underscores, starting with a letter (for example MOBL).
+const PROJECT_KEY = /^[A-Z][A-Z0-9_]{1,19}$/;
+
+// Tasks are created in the project of the issue the panel is open on. The dashboard (a global page) has no
+// issue, so it sends the project the person chose; Jira still applies that person's permissions to it.
+export function projectKeyFrom(context, chosen) {
+  const extension = (context && context.extension) || {};
+  if (typeof chosen === 'string' && PROJECT_KEY.test(chosen.trim().toUpperCase()) && !(extension.issue && extension.issue.key)) {
+    return chosen.trim().toUpperCase();
+  }
+  if (extension.project && extension.project.key) return extension.project.key;
+  const issueKey = extension.issue && extension.issue.key;
+  return issueKey ? issueKey.slice(0, issueKey.lastIndexOf('-')) : null;
+}
+
+/**
+ * @param {object} deps
+ *   deviceStore, matchCache, checkJobs, taskGuard      Forge storage behind the small interfaces in their own files
+ *   jira            the Jira client as the signed-in person (jiraClient.js)
+ *   confluence      the Confluence client as the signed-in person (confluenceClient.js)
+ *   teamGraph, wardTeams, openTaskCounts               Teamwork Graph reads and the saved ward-to-team mapping
+ *   loadSnapshot, taskKeyLookup                        the saved check and the Jira task keys for a snapshot (runtime.js)
+ *   enqueue(message)   puts a message on the recall-check queue
+ *   fetch(url, options) the HTTP call to openFDA
+ *   now()              the current Date
+ *   log                console-like (error)
+ */
+export function createHandlers(deps) {
+  const log = deps.log || console;
+  const now = deps.now || (() => new Date());
+
+  // The device list is shared by the whole site, so changing it is for Jira administrators: the check runs here, on the
+  // server (see permissions.js). The dashboard asks getCapabilities only to show it up front.
+  const forAdministrators = (handler) => async (request) => (await refuseUnlessAdministrator(deps.jira)) || handler(request);
+
+  // The matches the browser asked about, taken from OUR saved result so nothing is trusted from the page.
+  async function requestedMatches(pairsFromBrowser, max) {
+    const pairs = validatePairs(pairsFromBrowser, max);
+    const devices = await deps.deviceStore.listDevices();
+    const latest = await getLatestResult({ devices, cache: deps.matchCache, jobs: deps.checkJobs });
+    return selectMatches(latest ? latest.matches : [], pairs);
+  }
+
+  const handlers = {
+    // Fetch the latest device recalls from openFDA in a small, UI-friendly shape.
+    async fetchRecalls() {
+      try {
+        const response = await deps.fetch(buildRecallsUrl(DEFAULT_LIMIT), { headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error(`openFDA request failed with status ${response.status}`);
+        return { ok: true, recalls: parseRecalls(await response.json()) };
+      } catch (error) {
+        log.error('Failed to fetch recalls from openFDA', error);
+        return { ok: false, error: 'Could not load recalls from openFDA. Please try again later.' };
+      }
+    },
+
+    // The hospital's devices, from Forge storage.
+    async listDevices() {
+      try {
+        return { ok: true, devices: await deps.deviceStore.listDevices() };
+      } catch (error) {
+        log.error('Failed to list devices', error);
+        return { ok: false, error: 'Could not load the device list.' };
+      }
+    },
+
+    // What this person may change: the device list (Jira administrators) and the ward teams (Jira or project administrators).
+    async getCapabilities() {
+      try {
+        const roles = await deps.jira.adminRoles();
+        return { ok: true, canManageDevices: roles.administrator, canManageTeams: roles.administrator || roles.projectAdministrator };
+      } catch (error) {
+        log.error('Failed to read the permissions', error);
+        return { ok: false };
+      }
+    },
+
+    // "Load demo hospital": adds the 30 sample devices (replacing only earlier demo devices).
+    loadDemoHospital: forAdministrators(async () => {
+      try {
+        return { ok: true, count: await loadDemoHospital(deps.deviceStore) };
+      } catch (error) {
+        log.error('Failed to load demo hospital', error);
+        return { ok: false, error: 'Could not load the demo hospital.' };
+      }
+    }),
+
+    // "Import your own devices": pasted spreadsheet text. All or nothing; the answer lists every problem line.
+    importDevices: forAdministrators(async ({ payload }) => {
+      try {
+        const text = payload && typeof payload.text === 'string' ? payload.text : '';
+        return await importDevices(deps.deviceStore, text);
+      } catch (error) {
+        log.error('Failed to import devices', error);
+        return { ok: false, errors: ['Could not save the devices. Please try again.'] };
+      }
+    }),
+
+    // What the panel shows when it opens: the saved result (fresh or expired), if any.
+    async getSavedMatches() {
+      try {
+        const devices = await deps.deviceStore.listDevices();
+        return { ok: true, result: await getSavedMatches({ devices, cache: deps.matchCache }) };
+      } catch (error) {
+        log.error('Failed to read the saved result', error);
+        return { ok: false, error: 'Could not load the saved result.' };
+      }
+    },
+
+    // "Check devices" / "Refresh". Returns at once: either a saved result, or the news that a background check is
+    // running (the panel then polls getCheckStatus). payload.refresh = check again even if a fresh saved result exists.
+    async startCheck({ payload }) {
+      try {
+        const devices = await deps.deviceStore.listDevices();
+        const outcome = await requestCheck({
+          devices,
+          cache: deps.matchCache,
+          jobs: deps.checkJobs,
+          enqueue: (message) => deps.enqueue(message),
+          refresh: Boolean(payload && payload.refresh),
+          nowMs: () => now().getTime(),
+        });
+        return { ok: true, ...outcome };
+      } catch (error) {
+        log.error('Failed to start the check', error);
+        return { ok: false, error: 'Could not start the check. Please try again.' };
+      }
+    },
+
+    // The panel's polling call: progress, and the result once the background check has finished.
+    async getCheckStatus() {
+      try {
+        return { ok: true, ...(await getCheckStatus({ jobs: deps.checkJobs })) };
+      } catch (error) {
+        log.error('Failed to read the check status', error);
+        return { ok: false, error: 'Could not read the check status.' };
+      }
+    },
+
+    // Which of these matches already have a task? Returns { tasks: { "recall|device": "MOBL-12" } }.
+    async getTaskStates({ payload }) {
+      try {
+        const { matches } = await requestedMatches(payload && payload.pairs, MAX_STATE_PAIRS_PER_REQUEST);
+        return { ok: true, tasks: await getTaskStates({ matches, jira: deps.jira, guard: deps.taskGuard }) };
+      } catch (error) {
+        log.error('Failed to read task states', error);
+        return { ok: false, error: 'Could not look up existing tasks.' };
+      }
+    },
+
+    // "Create task" / "Create tasks for all": one task per recall + device that does not have one yet.
+    // payload.assignees = optional { "recall|device": accountId } the person agreed to. Each one is re-checked against the
+    // ward's team in the Teamwork Graph, so a forged request cannot assign anybody else. Nobody is assigned unless asked.
+    async createTasks({ payload, context }) {
+      try {
+        const projectKey = projectKeyFrom(context, payload && payload.projectKey);
+        if (!projectKey) return { ok: false, error: 'Choose a project for the new tasks first.' };
+        const { matches, notFound } = await requestedMatches(payload && payload.pairs);
+        let assignees = new Map();
+        let assignRefused = [];
+        let assignError = null;
+        if (payload && payload.assignees && Object.keys(payload.assignees).length > 0) {
+          try {
+            ({ assignees, refused: assignRefused } = await checkExplicitAssignees({
+              explicit: payload.assignees,
+              matches,
+              store: deps.wardTeams,
+              graph: deps.teamGraph,
+            }));
+          } catch (error) {
+            // The graph is down: still create the tasks, unassigned, and say so.
+            log.error('Could not check assignees', error);
+            assignError = 'The Teamwork Graph could not be reached, so the tasks were created without an assignee.';
+          }
+        }
+        const outcome = await createTasks({ matches, jira: deps.jira, guard: deps.taskGuard, projectKey, today: now(), assignees });
+        const assignedTo = {};
+        for (const { pair } of outcome.created) if (assignees.has(pair)) assignedTo[pair] = assignees.get(pair).name;
+        return { ok: true, ...outcome, notFound, assignedTo, assignRefused, assignError };
+      } catch (error) {
+        log.error('Failed to create tasks', error);
+        return { ok: false, error: 'Could not create the tasks. Please try again.' };
+      }
+    },
+
+    // The saved ward-to-team mappings, plus the wards found in the device list. Storage only: no graph call.
+    async getWardTeams() {
+      try {
+        const devices = await deps.deviceStore.listDevices();
+        const wards = [...new Set(devices.map((d) => d.ward).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        return { ok: true, mappings: await deps.wardTeams.list(), wards };
+      } catch (error) {
+        log.error('Failed to read ward teams', error);
+        return { ok: false, error: 'Could not load the ward teams.' };
+      }
+    },
+
+    // Teamwork Graph call 1: the teams the signed-in person belongs to, for the mapping dropdown.
+    async listTeams({ context }) {
+      try {
+        return { ok: true, teams: await deps.teamGraph.listTeams(context.accountId) };
+      } catch (error) {
+        log.error('Failed to read teams from the Teamwork Graph', error);
+        return { ok: false, error: 'Could not read teams from the Teamwork Graph.' };
+      }
+    },
+
+    // Save (or, with an empty teamAri, remove) one ward's team. Jira administrators and project administrators only; the
+    // server also checks that the team is one of the caller's teams in the graph.
+    async setWardTeam({ payload, context }) {
+      try {
+        const refused = await refuseUnlessTeamManager(deps.jira);
+        if (refused) return refused;
+        const ward = payload && typeof payload.ward === 'string' ? payload.ward : '';
+        const teamAri = payload && typeof payload.teamAri === 'string' && payload.teamAri ? payload.teamAri : null;
+        return await setWardTeam({ ward, teamAri, accountId: context.accountId, graph: deps.teamGraph, store: deps.wardTeams });
+      } catch (error) {
+        log.error('Failed to save the ward team', error);
+        return { ok: false, error: error.message || 'Could not save the ward team.' };
+      }
+    },
+
+    // Suggested assignees for matches (Teamwork Graph call 2, once per team, plus one Jira search for load).
+    // Only a suggestion: the page asks before anything is assigned.
+    async suggestAssignees({ payload }) {
+      try {
+        const { matches } = await requestedMatches(payload && payload.pairs, MAX_STATE_PAIRS_PER_REQUEST);
+        const { assignees, skipped } = await assigneesForMatches({
+          matches,
+          store: deps.wardTeams,
+          graph: deps.teamGraph,
+          openCounts: await deps.openTaskCounts(),
+        });
+        return { ok: true, suggestions: Object.fromEntries(assignees), skipped };
+      } catch (error) {
+        log.error('Failed to suggest assignees', error);
+        return { ok: false, error: 'Could not read team members from the Teamwork Graph.' };
+      }
+    },
+
+    // The Jira projects the person can see, for the dashboard's project choice.
+    async listProjects() {
+      try {
+        return { ok: true, ...(await deps.jira.listProjects()) };
+      } catch (error) {
+        log.error('Failed to list projects', error);
+        return { ok: false, error: 'Could not read your Jira projects.' };
+      }
+    },
+
+    // Remove the devices that were imported by paste (the demo hospital is left alone).
+    removeImportedDevices: forAdministrators(async () => {
+      try {
+        await deps.deviceStore.removeBySource('manual');
+        return { ok: true, count: (await deps.deviceStore.listDevices()).length };
+      } catch (error) {
+        log.error('Failed to remove imported devices', error);
+        return { ok: false, error: 'Could not remove the imported devices.' };
+      }
+    }),
+
+    // "Remove all devices": start over (demo and imported). Also forgets the saved check, which belonged to them.
+    clearDevices: forAdministrators(async () => {
+      try {
+        await deps.deviceStore.clear();
+        await deps.matchCache.clear();
+        return { ok: true, count: 0 };
+      } catch (error) {
+        log.error('Failed to clear devices', error);
+        return { ok: false, error: 'Could not remove the devices.' };
+      }
+    }),
+
+    // Task counts for the dashboard: { open, done, capped }. Read as the signed-in person.
+    async getTaskSummary() {
+      try {
+        return { ok: true, summary: await deps.jira.taskStatusCounts() };
+      } catch (error) {
+        log.error('Failed to count tasks', error);
+        return { ok: false, error: 'Could not count the RecallRadar tasks.' };
+      }
+    },
+
+    // The Confluence spaces the signed-in person can see, for the space chooser. Never guessed: the person picks.
+    async listSpaces() {
+      try {
+        const spaces = await deps.confluence.listSpaces();
+        return { ok: true, spaces: spaces.map((s) => ({ key: s.key, name: s.name })) };
+      } catch (error) {
+        // A site that only installed the app in Jira is the normal case, not a failure worth an error log.
+        if (isNotConnected(error)) return { ok: false, notConnected: true, error: NOT_CONNECTED_MESSAGE };
+        log.error('Failed to list Confluence spaces', error);
+        return { ok: false, error: 'Could not read Confluence spaces. Please try again.' };
+      }
+    },
+
+    // "Create Confluence recall page": one page per open recall in the chosen space (or just one recall), or an update
+    // of the page that is already there. Written as the clicking person, so Confluence applies their rights.
+    async createRecallPage({ payload }) {
+      try {
+        const inputs = {
+          spaceKey: payload && typeof payload.spaceKey === 'string' ? payload.spaceKey : '',
+          recallNumber: payload && typeof payload.recallNumber === 'string' ? payload.recallNumber : '',
+        };
+        const snapshot = await deps.loadSnapshot();
+        return await createRecallPages({
+          snapshot,
+          inputs,
+          deps: { confluence: deps.confluence, ...(snapshot.result ? { getTaskKeys: deps.taskKeyLookup(snapshot) } : {}) },
+        });
+      } catch (error) {
+        log.error('Failed to create the recall page', error);
+        return { ok: false, error: 'Could not create the Confluence page. Please try again.' };
+      }
+    },
+  };
+
+  return handlers;
+}

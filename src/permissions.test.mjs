@@ -7,16 +7,16 @@ const route = (strings, ...values) => strings.reduce((out, s, i) => out + s + (i
 const answering = (status, body) => ({ async request(path) { this.asked = path; return { ok: status >= 200 && status < 300, status, json: async () => body }; } });
 
 test('an administrator is let through', async () => {
-  assert.equal(await refuseUnlessAdministrator({ isAdministrator: async () => true }), null);
+  assert.equal(await refuseUnlessAdministrator({ adminRoles: async () => ({ administrator: true, projectAdministrator: false }) }), null);
 });
 
-test('anyone else is refused with the plain message, and flagged so the page can say so', async () => {
-  const out = await refuseUnlessAdministrator({ isAdministrator: async () => false });
+test('anyone else (a project administrator too) is refused with the plain message, and flagged so the page can say so', async () => {
+  const out = await refuseUnlessAdministrator({ adminRoles: async () => ({ administrator: false, projectAdministrator: true }) });
   assert.deepEqual(out, { ok: false, notAllowed: true, error: NOT_ADMIN_MESSAGE });
 });
 
 test('a failed permission check refuses too, without claiming the person lacks the permission', async () => {
-  const out = await refuseUnlessAdministrator({ isAdministrator: async () => { throw new Error('Jira answered 500'); } });
+  const out = await refuseUnlessAdministrator({ adminRoles: async () => { throw new Error('Jira answered 500'); } });
   assert.equal(out.ok, false);
   assert.equal(out.error, PERMISSION_CHECK_FAILED);
   assert.notEqual(out.notAllowed, true);
@@ -26,7 +26,7 @@ test('the Jira client reads the ADMINISTER permission, and only a clear "true" c
   const ask = async (status, body) => {
     const fake = answering(status, body);
     const client = createJiraClient({ request: (p, o) => fake.request.call(fake, p, o), route });
-    return { result: await client.isAdministrator().then((v) => v, (e) => e), fake };
+    return { result: await client.adminRoles().then((v) => v.administrator, (e) => e), fake };
   };
   const yes = await ask(200, { permissions: { ADMINISTER: { havePermission: true } } });
   assert.equal(yes.result, true);
@@ -53,7 +53,7 @@ test('the Jira client answers both admin questions from one permissions call', a
   const fake = answering(200, { permissions: { ADMINISTER: { havePermission: false }, ADMINISTER_PROJECTS: { havePermission: true } } });
   const client = createJiraClient({ request: (p, o) => fake.request.call(fake, p, o), route });
   assert.deepEqual(await client.adminRoles(), { administrator: false, projectAdministrator: true });
-  assert.equal(await client.isAdministrator(), false);
+  assert.equal((await client.adminRoles()).administrator, false);
   const none = answering(200, { permissions: {} });
   const noClient = createJiraClient({ request: (p, o) => none.request.call(none, p, o), route });
   assert.deepEqual(await noClient.adminRoles(), { administrator: false, projectAdministrator: false });

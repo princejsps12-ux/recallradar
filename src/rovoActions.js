@@ -1,16 +1,5 @@
-// The Rovo agent's actions. Each is a thin Forge handler: it loads the saved check, calls the pure
-// tool in agentTools.js, and returns the tool's answer (an object; Rovo turns it into a reply).
-// Every handler is also a reusable `action` module, so other agents can call it too.
-import {
-  listOpenRecalls,
-  checkDevice,
-  recallDetails,
-  createRemediationTasks,
-  createRemediationTask,
-  readInputs,
-} from './agentTools';
-import { createRecallPages } from './recallPageService';
-import { whoHandlesWard } from './teamService';
+// The Forge entry points of the Rovo agent's actions (manifest.yml `function` handlers): the real dependencies are built
+// here, the behaviour is in rovoHandlers.js.
 import {
   loadSnapshot,
   jiraAsUser,
@@ -22,91 +11,29 @@ import {
   openTaskCounts,
   taskKeyLookup,
 } from './runtime';
+import { createRovoHandlers, projectKeyFrom } from './rovoHandlers';
 
-// Where the conversation happens, if Rovo says (for example inside a Jira issue): used as the
-// default Jira project for new tasks. Rovo's exact context shape is not guaranteed, so look in the
-// places it is documented to appear and fall back to "unknown" (the agent then asks the user).
-export function projectKeyFrom(payload, context) {
-  const jira = (payload && payload.context && payload.context.jira) || {};
-  if (jira.projectKey) return jira.projectKey;
-  const issueKey = jira.issueKey || (context && context.extension && context.extension.issue && context.extension.issue.key);
-  if (issueKey && issueKey.includes('-')) return issueKey.slice(0, issueKey.lastIndexOf('-'));
-  return (context && context.extension && context.extension.project && context.extension.project.key) || '';
-}
+export { projectKeyFrom };
 
-async function runTool(name, payload, tool) {
-  try {
-    // Log the NAMES of the inputs only, never the values.
-    console.info(`Rovo action ${name}: input keys`, Object.keys(payload || {}));
-    return await tool(await loadSnapshot(), readInputs(payload));
-  } catch (error) {
-    console.error(`Rovo action ${name} failed`, error);
-    return { ok: false, error: 'RecallRadar could not complete that. Please try again.' };
-  }
-}
+const actions = createRovoHandlers({
+  loadSnapshot,
+  jira: jiraAsUser,
+  confluence: confluenceAsUser,
+  taskGuard,
+  previewStore,
+  teamGraph,
+  wardTeams,
+  openTaskCounts,
+  taskKeyLookup,
+  now: () => new Date(),
+  log: console,
+});
 
-export const listOpenRecallsAction = (payload) =>
-  runTool('list_open_recalls', payload, (snapshot, inputs) =>
-    snapshot.result
-      ? listOpenRecalls({ snapshot, inputs, deps: { getTaskKeys: taskKeyLookup(snapshot) } })
-      : listOpenRecalls({ snapshot, inputs }),
-  );
-
-export const checkDeviceAction = (payload) =>
-  runTool('check_device', payload, (snapshot, inputs) => checkDevice({ snapshot, inputs }));
-
-export const recallDetailsAction = (payload) =>
-  runTool('recall_details', payload, (snapshot, inputs) =>
-    snapshot.result
-      ? recallDetails({ snapshot, inputs, deps: { getTaskKeys: taskKeyLookup(snapshot) } })
-      : recallDetails({ snapshot, inputs }),
-  );
-
-export const createRemediationTasksAction = (payload, context) =>
-  runTool('create_remediation_tasks', payload, (snapshot, inputs) =>
-    createRemediationTasks({
-      snapshot,
-      inputs,
-      deps: {
-        jira: jiraAsUser,
-        guard: taskGuard,
-        previewStore,
-        now: () => new Date(),
-        defaultProjectKey: projectKeyFrom(payload, context),
-        team: { store: wardTeams, graph: teamGraph, openCounts: openTaskCounts },
-      },
-    }),
-  );
-
-// ONE task, for external agents (see the rovo:mcp module). Creates a single task as the calling user.
-export const createRemediationTaskAction = (payload, context) =>
-  runTool('create_remediation_task', payload, (snapshot, inputs) =>
-    createRemediationTask({
-      snapshot,
-      inputs,
-      deps: { jira: jiraAsUser, guard: taskGuard, now: () => new Date(), defaultProjectKey: projectKeyFrom(payload, context) },
-    }),
-  );
-
-// One Confluence page per open recall (create, or update the page that is already there).
-export const createRecallPageAction = (payload) =>
-  runTool('create_recall_page', payload, (snapshot, inputs) =>
-    createRecallPages({
-      snapshot,
-      inputs,
-      deps: { confluence: confluenceAsUser, ...(snapshot.result ? { getTaskKeys: taskKeyLookup(snapshot) } : {}) },
-    }),
-  );
-
-// Which Teamwork Graph team handles a ward, who is in it, and who to suggest (read-only). Needs no saved
-// check, so it does not go through runTool. The mapping itself is saved in the RecallRadar panel.
-export const whoHandlesWardAction = async (payload) => {
-  try {
-    const inputs = readInputs(payload);
-    console.info('Rovo action who_handles_ward: input keys', Object.keys(payload || {}));
-    return await whoHandlesWard({ ward: inputs.ward, store: wardTeams, graph: teamGraph, openCounts: await openTaskCounts() });
-  } catch (error) {
-    console.error('Rovo action who_handles_ward failed', error);
-    return { ok: false, error: 'RecallRadar could not read the Teamwork Graph. Please try again.' };
-  }
-};
+// Explicit functions (not a destructuring export): the Forge linter looks for them by name.
+export const listOpenRecallsAction = (payload, context) => actions.listOpenRecallsAction(payload, context);
+export const checkDeviceAction = (payload, context) => actions.checkDeviceAction(payload, context);
+export const recallDetailsAction = (payload, context) => actions.recallDetailsAction(payload, context);
+export const createRemediationTasksAction = (payload, context) => actions.createRemediationTasksAction(payload, context);
+export const createRemediationTaskAction = (payload, context) => actions.createRemediationTaskAction(payload, context);
+export const createRecallPageAction = (payload, context) => actions.createRecallPageAction(payload, context);
+export const whoHandlesWardAction = (payload, context) => actions.whoHandlesWardAction(payload, context);
