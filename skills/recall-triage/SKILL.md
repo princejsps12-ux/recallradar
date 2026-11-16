@@ -33,6 +33,11 @@ so answers are fast and always come from the same data the RecallRadar panel sho
    a person. Never call a LIKELY match confirmed. POSSIBLE matches are weak; mention them only if asked.
 4. **No clinical or repair advice.** RecallRadar does not know a manufacturer's specific fix. Give the
    steps the tool returns and point to the manufacturer's recall notice.
+5. **"RecallRadar sees no devices" is not "load the demo hospital".** The devices and saved checks live in
+   the Jira installation of the app. If a tool says it cannot see them from this chat (for example in Rovo
+   Home or Confluence), the devices are not missing: tell the user to repeat the request from Ask Rovo
+   inside a Jira page. Only when nothing was ever loaded do you point them to the RecallRadar dashboard
+   and **Load demo hospital**.
 
 ## Creating tasks: preview, then confirm
 

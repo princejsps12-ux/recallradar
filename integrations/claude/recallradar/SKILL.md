@@ -45,7 +45,7 @@ Your client may show the names with a prefix. The four tools:
 
 ## Typical flows
 
-- "Which ICU devices have open Class I recalls?" -> `list_open_recalls` with `ward` = ICU and
+- "Which Cath Lab devices have open Class I recalls?" -> `list_open_recalls` with `ward` = Cath Lab and
   `recallClass` = I. If nothing matches, the answer lists the wards that do.
 - "Is serial 50003704 affected?" -> `check_device` with `serial`.
 - "Create a task for that one" -> confirm the details with the user, then `create_remediation_task`.

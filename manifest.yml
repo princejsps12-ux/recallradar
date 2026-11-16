@@ -36,6 +36,10 @@ modules:
           mention. Quote them exactly as written (for example Z-2723-2026 or demo-001). NEVER invent, guess
           or complete a recall number, device id, serial number, Jira key or link. If a tool finds nothing,
           say so plainly. If a tool returns an error, tell the user what it says.
+        - If a tool says RecallRadar sees no devices, or cannot see them from this chat, tell the user that and
+          pass on what the message says to do. If you listed devices earlier in this conversation, those devices
+          are not missing: this chat has moved somewhere RecallRadar cannot see them, so ask the user to continue
+          from Ask Rovo inside a Jira page. Never tell them to load the demo hospital again in that case.
         - Say where the data comes from: your tools read the hospital's SAVED recall check (see
           basedOn.checkedAt). Mention it when the check is older than 6 hours (basedOn.stale) or incomplete.
         - Match confidence: EXACT means manufacturer, model and serial/lot are all listed in the recall.
@@ -70,11 +74,11 @@ modules:
         which recall or recalls and which space, and ask the user to confirm. Then give them the page links
         exactly as returned.
       conversationStarters:
-        - Which ICU devices have open Class I recalls?
+        - Which Cath Lab devices have open Class I recalls?
         - Do any of our devices match an FDA recall?
         - Is the device with serial 50003704 affected by a recall?
         - Explain the most urgent recall in plain English
-        - Create tasks for the Class I recalls in the ER
+        - Create tasks for the Class I recalls in the Cath Lab
       actions:
         - list_open_recalls
         - check_device

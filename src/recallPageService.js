@@ -12,7 +12,7 @@
 // No Forge imports here.
 import { compact } from './text.js';
 import { isTaskWorthy, pairKey } from './taskRules.js';
-import { CLOSED_STATUSES } from './agentTools.js';
+import { CLOSED_STATUSES, noData } from './agentTools.js';
 import { recallPageTitle, buildRecallPageBody } from './recallPage.js';
 
 // Each page costs two Confluence calls (look for it, then write it), roughly a second. Ten per call keeps
@@ -30,13 +30,7 @@ function isClosed(details) {
 // inputs: spaceKey (the Confluence space to write in), recallNumber (optional: just that recall).
 export async function createRecallPages({ snapshot, inputs = {}, deps }) {
   const { result } = snapshot;
-  if (!result) {
-    return {
-      ok: false,
-      error:
-        'There is no saved recall check yet. Ask the user to open the RecallRadar panel on a Jira issue and click "Check devices for recalls", then ask again.',
-    };
-  }
+  if (!result) return noData(snapshot);
 
   const spaceKey = text(inputs.spaceKey).toUpperCase();
   if (!spaceKey) {

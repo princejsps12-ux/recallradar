@@ -15,6 +15,9 @@ import {
   createRemediationTasks,
   createRemediationTask,
   createPreviewStore,
+  installProduct,
+  notVisibleHere,
+  noData,
 } from './agentTools.js';
 import { createTaskGuard } from './taskService.js';
 import { pairKey, taskLabel } from './taskRules.js';
@@ -119,9 +122,56 @@ test('list: without a saved check it says how to get one', async () => {
   assert.match(out.error, /saved recall check/);
 });
 
-test('list: with no devices at all it says so', async () => {
+test('list: with no devices at all it says so, and does not blame the user for devices that may simply be out of reach', async () => {
   const out = await listOpenRecalls({ snapshot: { devices: [], result: null } });
   assert.match(out.error, /no devices/);
+  assert.match(out.error, /Rovo Home/, 'it names the other place the chat may be running');
+  assert.match(out.error, /Ask Rovo inside a Jira page/);
+  assert.match(out.error, /Load demo hospital/, 'and still says how to load devices when there really are none');
+  assert.match(out.error, /do NOT ask them to load the demo hospital again/);
+});
+
+test('the Jira installation with no devices, and an unknown one, get the same both-ways answer', () => {
+  const jira = noData({ devices: [], result: null, product: 'jira' });
+  const unknown = noData({ devices: [], result: null, product: 'unknown' });
+  const absent = noData({ devices: [], result: null });
+  assert.deepEqual(jira, unknown);
+  assert.deepEqual(jira, absent);
+  assert.match(jira.error, /Load demo hospital/);
+});
+
+test('a call that surely runs outside Jira says the devices are out of reach, not missing', () => {
+  const confluence = noData({ devices: [], result: null, product: 'confluence' });
+  assert.equal(confluence.ok, false);
+  assert.match(confluence.error, /running in Confluence/);
+  assert.match(confluence.error, /Ask Rovo inside a Jira page/);
+  assert.doesNotMatch(confluence.error, /click "Load demo hospital"/, 'it never tells anyone to reload devices that are fine');
+  assert.match(notVisibleHere('compass').error, /a place outside Jira/);
+  assert.match(notVisibleHere('compass').error, /Do NOT ask the user to load the demo hospital/);
+});
+
+test('devices without a saved check still ask for a check, wherever the call runs', () => {
+  const withDevices = { devices, result: null };
+  assert.match(noData({ ...withDevices, product: 'jira' }).error, /saved recall check/);
+  assert.match(noData({ ...withDevices, product: 'confluence' }).error, /saved recall check/);
+});
+
+test('which product runs a call is read from the installation id, and only the product', () => {
+  assert.equal(installProduct({ installContext: 'ari:cloud:jira::site/11111111-2222-3333-4444-555555555555' }), 'jira');
+  assert.equal(installProduct({ installContext: 'ari:cloud:jira-software::site/abc' }), 'jira');
+  assert.equal(installProduct({ installContext: 'ari:cloud:confluence::site/11111111-2222-3333-4444-555555555555' }), 'confluence');
+  assert.equal(installProduct({ installContext: 'ari:cloud:compass::site/abc' }), 'compass');
+  for (const nothing of [undefined, null, {}, { installContext: '' }, { installContext: 42 }, { installContext: 'not an ari' }, { installContext: 'ari:cloud:::site/x' }]) {
+    assert.equal(installProduct(nothing), 'unknown', JSON.stringify(nothing));
+  }
+  assert.doesNotMatch(String(installProduct({ installContext: 'ari:cloud:jira::site/secret-site-id' })), /secret/);
+});
+
+test('every tool that needs the saved check gives the same no-devices answer outside Jira', async () => {
+  const snapshot = { devices: [], result: null, product: 'confluence' };
+  assert.match((await listOpenRecalls({ snapshot })).error, /running in Confluence/);
+  assert.match((await checkDevice({ snapshot, inputs: { serial: 'SN-d1' } })).error, /running in Confluence/);
+  assert.match((await recallDetails({ snapshot, inputs: { recallNumber: 'Z-1-2026' } })).error, /running in Confluence/);
 });
 
 test('list: returns exact and likely matches only, never possible ones, and drops closed recalls', async () => {

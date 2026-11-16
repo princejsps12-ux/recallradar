@@ -8,6 +8,8 @@ import {
   createRemediationTasks,
   createRemediationTask,
   readInputs,
+  installProduct,
+  notVisibleHere,
 } from './agentTools';
 import { createRecallPages } from './recallPageService';
 import { whoHandlesWard } from './teamService';
@@ -36,9 +38,12 @@ export function projectKeyFrom(payload, context) {
 
 async function runTool(name, payload, context, tool) {
   try {
-    // Log the NAMES of the inputs only (never the values), to see what Rovo sent.
-    console.info(`Rovo action ${name}: input keys`, Object.keys(payload || {}));
-    const snapshot = await loadSnapshot();
+    // Log the NAMES of the inputs only (never the values) and the product whose installation runs this call (never the
+    // site id): "runs in confluence" is how a chat in Rovo Home looks in the logs, "runs in jira" a chat inside Jira.
+    const product = installProduct(context);
+    console.info(`Rovo action ${name}: input keys`, Object.keys(payload || {}), 'runs in', product);
+    // The product rides on the snapshot so that "no devices" can say whether this is simply not the Jira installation.
+    const snapshot = { ...(await loadSnapshot()), product };
     return await tool(snapshot, readInputs(payload));
   } catch (error) {
     console.error(`Rovo action ${name} failed`, error);
@@ -101,10 +106,13 @@ export const createRecallPageAction = (payload, context) =>
 
 // Which Teamwork Graph team handles a ward, who is in it, and who to suggest (read-only). Needs no saved
 // check, so it does not go through runTool. The mapping itself is saved in the RecallRadar panel.
-export const whoHandlesWardAction = async (payload) => {
+export const whoHandlesWardAction = async (payload, context) => {
   try {
     const inputs = readInputs(payload);
-    console.info('Rovo action who_handles_ward: input keys', Object.keys(payload || {}));
+    const product = installProduct(context);
+    console.info('Rovo action who_handles_ward: input keys', Object.keys(payload || {}), 'runs in', product);
+    // The ward-to-team mapping is saved in the Jira installation: anywhere else it would wrongly say "no team is mapped".
+    if (product !== 'jira' && product !== 'unknown') return notVisibleHere(product);
     return await whoHandlesWard({ ward: inputs.ward, store: wardTeams, graph: teamGraph, openCounts: await openTaskCounts() });
   } catch (error) {
     console.error('Rovo action who_handles_ward failed', error);

@@ -16,9 +16,9 @@ Open it, pick your site, and install it in **Jira** and **Confluence** (Confluen
 
 **Five minutes, in order**
 1. Jira, **Apps**, **RecallRadar**: the dashboard. On a fresh site it shows a first-run screen. Click **Load demo hospital** (30 sample devices with real manufacturer and model names), or **Import your own devices** and paste rows from a spreadsheet. It then checks them against the last year of FDA recalls in the background (about 15 seconds).
-2. Expect cards for devices, open recalls by class, and task progress, plus a table of affected devices. With the demo hospital you should see roughly 20 to 30 open exact or likely recalls across Class I, II and III; the exact numbers drift as the FDA publishes new recalls.
-3. Open any Jira issue: the **RecallRadar** panel shows each match with its reason. Click **Create task** (or **Create & assign** if you mapped a ward to a team).
-4. Ask **Rovo** (Ask Rovo, pick **RecallRadar Assistant**): "Which ICU devices have open Class I recalls?"
+2. Expect the headline "N devices need action" with the Class I count and one summary line (devices monitored, open recalls by class, task counts), a **Do this first** list and a table of affected devices. With the demo hospital you should see roughly 20 to 30 open exact or likely recalls across Class I, II and III; the exact numbers drift as the FDA publishes new recalls.
+3. Click a device name for its recalls, the reason each matched and what the FDA says is wrong, then **Create task** (or **Create and assign to ...** in the small menu beside it if you mapped a ward to a team). Open any Jira issue: the **RecallRadar** panel is a compact summary with **Open dashboard** and **Create all N tasks...**.
+4. In a Jira page, ask **Rovo** (Ask Rovo, pick **RecallRadar Assistant**): "Which Cath Lab devices have open Class I recalls?"
 
 **Try it safely.** Tasks and Confluence pages are real. All RecallRadar tasks carry the label `recallradar`: find them with the Jira search `labels = recallradar` and delete them when you are done. Creating a task for the same recall and device twice is blocked on purpose, so delete the tasks before re-running. Assigning someone sends them a Jira notification, and nobody is assigned unless you click the assign button.
 
@@ -267,7 +267,7 @@ The rule (written once, in `SUGGESTION_RULE` in [`src/teamService.js`](src/teamS
 
 Each action is an `action` module (a reusable Rovo action other agents can call) and all six are grouped in one `rovo:skill`, `recall-triage` ([`skills/recall-triage/SKILL.md`](skills/recall-triage/SKILL.md)). The logic is in [`src/agentTools.js`](src/agentTools.js) (pure, unit tested); [`src/rovoActions.js`](src/rovoActions.js) is the thin Forge handler layer.
 
-**Starter questions** on the agent: "Which ICU devices have open Class I recalls?", "Do any of our devices match an FDA recall?", "Is the device with serial 50003704 affected by a recall?", "Explain the most urgent recall in plain English", "Create tasks for the Class I recalls in the ER".
+**Starter questions** on the agent: "Which Cath Lab devices have open Class I recalls?", "Do any of our devices match an FDA recall?", "Is the device with serial 50003704 affected by a recall?", "Explain the most urgent recall in plain English", "Create tasks for the Class I recalls in the Cath Lab". (The demo hospital's Class I recalls are in the Cath Lab and Respiratory; its ICU devices have none, so the first starter would answer "none" there.)
 
 ### Never invented
 
@@ -310,7 +310,7 @@ Checked in Rovo chat on the demo site: the agent asked for a space (listing the 
 ### Limits
 
 - **Answers are only as fresh as the saved check** (6 hours; the answer says how old it is, and the panel refreshes it). A check saved by an older version has no per-recall reason text, so refresh it once in the panel.
-- **Ask from inside Jira.** Open **Ask Rovo** from a Jira page (the sidebar or the floating window). In **Rovo Home**, the full-screen chat outside Jira, the agent's actions answered "the hospital has no devices" for the same hospital (twice, on 2026-11-16), and worked again in the Jira sidebar straight afterwards. The cause was not investigated; a different app installation context is the likely one (Forge storage belongs to an installation).
+- **Ask from inside Jira.** Open **Ask Rovo** from a Jira page (the sidebar or the floating window). The devices and saved checks live in the app's **Jira** installation (Forge storage belongs to one installation: an app, a site and a product). In **Rovo Home**, the full-screen chat outside Jira, the agent's actions run in the app's **Confluence** installation instead (the Forge log says `runs in confluence`; Confluence is installed because page creation needs it), which has no devices. The agent now says exactly that and asks you to repeat the request from Jira; before 2026-11-16 it told you to load the demo hospital again. Making the data visible to both installations would mean keeping it somewhere shared, which is not built.
 - **Only devices in the hospital list** can be checked, against recalls the check found for them.
 - **Action inputs are plain text, numbers or true/false** (Rovo does not allow lists), so "which matches" is chosen with filters: recall number, device id, ward, class.
 

@@ -68,7 +68,15 @@ const run = (fake, inputs, snap = snapshot(), extraDeps = {}) =>
   createRecallPages({ snapshot: snap, inputs, deps: { confluence: fake.confluence, ...extraDeps } });
 
 test('without a saved check it says how to get one', async () => {
-  assert.match((await run(fakeConfluence(), { spaceKey: 'MD' }, snapshot(null))).error, /saved recall check/);
+  const withDevices = { devices: [{ id: 'd1' }], result: null };
+  assert.match((await run(fakeConfluence(), { spaceKey: 'MD' }, withDevices)).error, /saved recall check/);
+});
+
+test('with no devices in sight it says they may be out of reach, and outside Jira that they surely are', async () => {
+  assert.match((await run(fakeConfluence(), { spaceKey: 'MD' }, snapshot(null))).error, /no devices/);
+  const outside = (await run(fakeConfluence(), { spaceKey: 'MD' }, { ...snapshot(null), product: 'confluence' })).error;
+  assert.match(outside, /running in Confluence/);
+  assert.doesNotMatch(outside, /click "Load demo hospital"/);
 });
 
 test('without a space it lists the spaces and asks, instead of guessing', async () => {
