@@ -310,6 +310,7 @@ Checked in Rovo chat on the demo site: the agent asked for a space (listing the 
 ### Limits
 
 - **Answers are only as fresh as the saved check** (6 hours; the answer says how old it is, and the panel refreshes it). A check saved by an older version has no per-recall reason text, so refresh it once in the panel.
+- **Ask from inside Jira.** Open **Ask Rovo** from a Jira page (the sidebar or the floating window). In **Rovo Home**, the full-screen chat outside Jira, the agent's actions answered "the hospital has no devices" for the same hospital (twice, on 2026-11-16), and worked again in the Jira sidebar straight afterwards. The cause was not investigated; a different app installation context is the likely one (Forge storage belongs to an installation).
 - **Only devices in the hospital list** can be checked, against recalls the check found for them.
 - **Action inputs are plain text, numbers or true/false** (Rovo does not allow lists), so "which matches" is chosen with filters: recall number, device id, ward, class.
 

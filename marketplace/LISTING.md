@@ -37,7 +37,7 @@ Hospitals track thousands of devices, and FDA publishes new device recalls every
 - **Confluence recall pages**: one page per recall (what is wrong, what to do, affected devices, live task cards).
 
 **With Rovo and other agents**
-- The **RecallRadar Assistant** answers "Which ICU devices have open Class I recalls?" from the saved check, with the FDA recall numbers and device ids cited, never invented, and creates tasks only after you confirm a preview.
+- The **RecallRadar Assistant** answers "Which Cath Lab devices have open Class I recalls?" from the saved check, with the FDA recall numbers and device ids cited, never invented, and creates tasks only after you confirm a preview.
 - The same tools are available over **MCP** to other agents (an admin must enable them).
 
 **Built to be trusted**
@@ -58,12 +58,12 @@ Try it in a minute: open the dashboard and click **Load demo hospital** (30 devi
 
 Then `16-create-all-confirm-light.jpg` (it asks before creating), `04-ward-teams-light.jpg`, `06-confluence-dialog-light.jpg`, `05-import-dialog-light.jpg`, `07-first-run-light.jpg`, the dark ones (`10`, `11`, `12`), the phone ones (`13`, `14`) and the states (`17-check-refreshing`, `18-all-tasks-created`, `19-no-devices-need-action`). `08-loading-state-light.jpg` is for the README, not the gallery.
 
-**To take by hand on the demo site** (the preview cannot show other Atlassian products):
+**Taken on the demo site** (other Atlassian products, so not generated; 2026-11-16, cropped to the content so no names or avatars show). They are `20` to `23` in the same folder; add them to the gallery after the generated ones:
 
-1. A Jira task created by RecallRadar, showing the ward, the reason, the FDA link and the due date.
-2. Rovo chat: "Which ICU devices have open Class I recalls?" with the cited answer.
-3. Rovo chat: the task preview asking "Shall I create these N tasks?".
-4. A Confluence recall page with the device table and the live task cards.
+- `20-jira-task-created.png`: the task RecallRadar created (MOBL-129): ward, device, why it matched, the recall, the FDA links and a due date from the recall class.
+- `21-rovo-chat-answer.png`: Rovo chat, "Which Cath Lab devices have open Class I recalls?", answered from the saved check with the recall numbers and device ids, and the Jira task one of them already has. (The demo hospital's ICU devices have no Class I recall, so the Cath Lab is the example that shows an answer.)
+- `22-rovo-chat-task-preview.png`: Rovo chat, the preview that ends "Shall I create these 5 tasks?" (nothing is created until the person confirms).
+- `23-confluence-recall-page.png`: the Confluence recall page with the affected-devices table and the live Jira task card.
 
 ## Support and links (fill in before submitting)
 
