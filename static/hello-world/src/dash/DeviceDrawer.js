@@ -175,7 +175,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
           <div onClick={onClose} aria-hidden="true" style={{ position: 'absolute', inset: 0, background: token('color.blanket') }}><div style={{ position: 'absolute', inset: 0, background: token('color.blanket') }} /></div>
           <SlideIn enterFrom="right" fade="none" duration="medium">
             {(motion) => (
-              <aside
+              <div
                 {...motion}
                 ref={(node) => {
                   panel.current = node;
@@ -223,7 +223,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                   ))}
                   {matches.length === 0 && <SectionMessage appearance="information" title="Nothing to show">This device no longer matches an open recall.</SectionMessage>}
                 </div>
-              </aside>
+              </div>
             )}
           </SlideIn>
         </div>

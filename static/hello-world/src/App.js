@@ -3,7 +3,7 @@ import { router, view, Modal } from '@forge/bridge';
 import Button from '@atlaskit/button/new';
 import Skeleton from '@atlaskit/skeleton';
 import VisuallyHidden from '@atlaskit/visually-hidden';
-import SectionMessage, { SectionMessageAction } from '@atlaskit/section-message';
+import SectionMessage from '@atlaskit/section-message';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import RefreshIcon from '@atlaskit/icon/core/refresh';
 import CheckCircleIcon from '@atlaskit/icon/core/check-circle';
@@ -74,13 +74,24 @@ export default function App() {
 
   if (d.devicesCount === null && !d.error) return <PanelSkeleton />;
   if (d.devicesCount === null) {
-    return <SectionMessage appearance="error" title="Something went wrong" actions={<SectionMessageAction onClick={d.load}>Try again</SectionMessageAction>}>{d.error}</SectionMessage>;
+    return (
+      <>
+        <SectionMessage appearance="error" title="Something went wrong">{d.error}</SectionMessage>
+        <div style={{ marginTop: sp(150) }}><Button onClick={d.load}>Try again</Button></div>
+      </>
+    );
   }
   if (d.devicesCount === 0) {
     return (
-      <SectionMessage appearance="information" title="No devices yet" actions={[<SectionMessageAction key="d" onClick={d.loadDemo}>Load demo hospital</SectionMessageAction>, <SectionMessageAction key="o" onClick={openDashboard}>Open the dashboard to import yours</SectionMessageAction>]}>
-        Add the sample hospital (30 devices with real manufacturer and model names) to see RecallRadar at work.
-      </SectionMessage>
+      <>
+        <SectionMessage appearance="information" title="No devices yet">
+          Add the sample hospital (30 devices with real manufacturer and model names) to see RecallRadar at work.
+        </SectionMessage>
+        <div style={{ display: 'flex', gap: sp(100), flexWrap: 'wrap', marginTop: sp(150) }}>
+          <Button appearance="primary" onClick={d.loadDemo}>Load demo hospital</Button>
+          <Button onClick={openDashboard}>Open the dashboard to import yours</Button>
+        </div>
+      </>
     );
   }
 

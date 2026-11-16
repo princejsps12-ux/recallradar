@@ -6,7 +6,7 @@ import MoreIcon from '@atlaskit/icon/core/show-more-horizontal';
 import Tabs, { Tab, TabList, TabPanel } from '@atlaskit/tabs';
 import Button from '@atlaskit/button/new';
 import Skeleton from '@atlaskit/skeleton';
-import SectionMessage, { SectionMessageAction } from '@atlaskit/section-message';
+import SectionMessage from '@atlaskit/section-message';
 import Heading from '@atlaskit/heading';
 import { token } from '@atlaskit/tokens';
 import { FlagGroup, AutoDismissFlag } from '@atlaskit/flag';
@@ -68,9 +68,10 @@ export default function Dashboard() {
 
   if (screen === 'error') {
     return page(
-      <SectionMessage appearance="error" title="Something went wrong" actions={<SectionMessageAction onClick={d.load}>Try again</SectionMessageAction>}>
-        {d.error}
-      </SectionMessage>,
+      <>
+        <SectionMessage appearance="error" title="Something went wrong">{d.error}</SectionMessage>
+        <div style={{ marginTop: sp(150) }}><Button onClick={d.load}>Try again</Button></div>
+      </>,
     );
   }
   if (screen === 'loading') return page(<LoadingScreen />);
@@ -149,13 +150,17 @@ export default function Dashboard() {
           <Tab>{d.wardLoaded ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(75) }}>Ward teams <Badge>{`${d.wardInfo.mappings.length}/${d.wardInfo.wards.length}`}</Badge></span>) : 'Ward teams'}</Tab>
         </TabList>
         <TabPanel>
-          <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300) }}>
+          <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300), width: '100%' }}>
             <Hero stats={stats} devicesCount={d.devicesCount} result={d.result} progressTasks={progressTasks} summaryState={d.summaryState} capped={Boolean(d.summary && d.summary.capped)} />
-            <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} loading={!d.tasksReady} />
-            <section style={card} aria-labelledby="rr-affected-h">
-              <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-affected-h">Affected devices</Heading></div>
-              <DevicesTable matches={all} tasks={d.tasks} teams={teams} onOpen={setDrawerDevice} tasksReady={d.tasksReady} />
-            </section>
+            {/* Nothing matches an open recall: the hero says so. A "do this first" list and a table of zero rows with
+                filters would only repeat it (the table's empty state even asked to "clear filters" when none was set). */}
+            {all.length > 0 && <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} loading={!d.tasksReady} />}
+            {all.length > 0 && (
+              <section style={card} aria-labelledby="rr-affected-h">
+                <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-affected-h">Affected devices</Heading></div>
+                <DevicesTable matches={all} tasks={d.tasks} teams={teams} onOpen={setDrawerDevice} tasksReady={d.tasksReady} />
+              </section>
+            )}
             <RecentRecalls recent={d.recent} onOpen={d.loadRecent} />
           </div>
         </TabPanel>

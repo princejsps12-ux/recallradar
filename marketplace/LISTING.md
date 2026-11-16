@@ -46,16 +46,24 @@ Hospitals track thousands of devices, and FDA publishes new device recalls every
 
 Try it in a minute: open the dashboard and click **Load demo hospital** (30 devices with real manufacturer and model names, so some really match recalls).
 
-## Screenshots to take (1440 x 900, light theme, demo hospital loaded)
+## Screenshots
 
-1. Dashboard: summary cards and the affected-devices table (Jira, Apps, RecallRadar).
-2. Dashboard filtered to Class I in one ward.
-3. Issue panel: a match with the reason, the **Team: ... (from Teamwork Graph)** line, and the two buttons **Create task** / **Create & assign**.
-4. A created Jira task showing ward, reason, FDA link, due date.
-5. Rovo chat: "Which ICU devices have open Class I recalls?" with the cited answer.
-6. Rovo chat: task preview asking "Shall I create these N tasks?".
-7. A Confluence recall page with device table and live task cards.
-8. First-run screen with the big **Load demo hospital** button.
+**The app's own screenshots are generated** (`npm run shots`, see [`scripts/preview/README.md`](../scripts/preview/README.md)) from the real production bundle, with invented data, so they always match the current UI. They are in [`marketplace/screenshots/`](screenshots/) at 1440 x 900 CSS pixels (the issue panel at 680 x 262, phone at 390 x 844), captured at 2x. Upload them in this order, the first five are the ones a gallery shows first:
+
+1. `01-dashboard-overview-light.jpg`: "21 devices need action", the summary line and **Do this first**.
+2. `03-device-drawer-light.jpg`: one device's recalls, each with the reason it matched and what the FDA says is wrong.
+3. `15-assign-menu-light.jpg`: **Create task**, with the Teamwork Graph's suggested assignee in the menu (nobody is assigned unless you choose).
+4. `02-affected-devices-light.jpg`: the table you can filter, sort and page through.
+5. `09-issue-panel-light.jpg`: the compact panel on every Jira issue.
+
+Then `16-create-all-confirm-light.jpg` (it asks before creating), `04-ward-teams-light.jpg`, `06-confluence-dialog-light.jpg`, `05-import-dialog-light.jpg`, `07-first-run-light.jpg`, the dark ones (`10`, `11`, `12`), the phone ones (`13`, `14`) and the states (`17-check-refreshing`, `18-all-tasks-created`, `19-no-devices-need-action`). `08-loading-state-light.jpg` is for the README, not the gallery.
+
+**To take by hand on the demo site** (the preview cannot show other Atlassian products):
+
+1. A Jira task created by RecallRadar, showing the ward, the reason, the FDA link and the due date.
+2. Rovo chat: "Which ICU devices have open Class I recalls?" with the cited answer.
+3. Rovo chat: the task preview asking "Shall I create these N tasks?".
+4. A Confluence recall page with the device table and the live task cards.
 
 ## Support and links (fill in before submitting)
 

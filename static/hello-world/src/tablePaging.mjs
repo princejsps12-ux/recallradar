@@ -51,3 +51,17 @@ export function rangeOf(page, total, perPage = PAGE_SIZE) {
   const current = clampPage(page, total, perPage);
   return { from: (current - 1) * perPage + 1, to: Math.min(total, current * perPage) };
 }
+
+export const GAP = '…';
+
+// The page numbers a pager shows: at most seven slots, always the first and the last page, the current page with a
+// neighbour either side, and "…" where pages are skipped. [1, 2, 3, 4, 5, '…', 20] near the start, [1, '…', 9, 10, 11,
+// '…', 20] in the middle, [1, '…', 16, 17, 18, 19, 20] near the end. With seven pages or fewer, all of them.
+export function pageWindow(current, total) {
+  const last = Math.max(1, Math.floor(total) || 1);
+  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+  const page = Math.min(Math.max(1, Math.floor(current) || 1), last);
+  if (page <= 4) return [1, 2, 3, 4, 5, GAP, last];
+  if (page >= last - 3) return [1, GAP, last - 4, last - 3, last - 2, last - 1, last];
+  return [1, GAP, page - 1, page, page + 1, GAP, last];
+}

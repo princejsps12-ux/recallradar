@@ -6,7 +6,10 @@
   "private": true,
   "scripts": {
     "test": "node --test",
-    "test:ui": "node scripts/ui-smoke.cjs"
+    "test:ui": "node scripts/ui-smoke.cjs",
+    "preview": "node scripts/preview/server.cjs",
+    "test:preview": "node scripts/preview/check.cjs",
+    "shots": "node scripts/preview/shots.cjs"
   },
   "devDependencies": {
     "eslint": "^8.56.0",

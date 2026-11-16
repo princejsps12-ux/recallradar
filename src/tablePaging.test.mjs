@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PAGE_SIZE, sortRows, pageCount, clampPage, pageOf, rangeOf } from '../static/hello-world/src/tablePaging.mjs';
+import { PAGE_SIZE, GAP, sortRows, pageCount, clampPage, pageOf, rangeOf, pageWindow } from '../static/hello-world/src/tablePaging.mjs';
 
 const rows = (values) => values.map((v, i) => ({ v, id: i }));
 const ids = (list) => list.map((r) => r.id);
@@ -61,4 +61,26 @@ test('the range text counts rows from 1 and stops at the total', () => {
   assert.deepEqual(rangeOf(1, 4), { from: 1, to: 4 });
   assert.deepEqual(rangeOf(1, 0), { from: 0, to: 0 });
   assert.deepEqual(rangeOf(5, 23), { from: 21, to: 23 }, 'clamped like the page itself');
+});
+
+test('the pager shows at most seven slots with the first, the last and the current page', () => {
+  assert.deepEqual(pageWindow(1, 1), [1]);
+  assert.deepEqual(pageWindow(2, 4), [1, 2, 3, 4], 'few pages: all of them');
+  assert.deepEqual(pageWindow(4, 7), [1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(pageWindow(1, 20), [1, 2, 3, 4, 5, GAP, 20]);
+  assert.deepEqual(pageWindow(4, 20), [1, 2, 3, 4, 5, GAP, 20]);
+  assert.deepEqual(pageWindow(10, 20), [1, GAP, 9, 10, 11, GAP, 20]);
+  assert.deepEqual(pageWindow(17, 20), [1, GAP, 16, 17, 18, 19, 20]);
+  assert.deepEqual(pageWindow(20, 20), [1, GAP, 16, 17, 18, 19, 20]);
+  for (let total = 1; total <= 40; total += 1) {
+    for (let current = 1; current <= total; current += 1) {
+      const slots = pageWindow(current, total);
+      assert.ok(slots.length <= 7, `${current} of ${total}: at most seven slots`);
+      assert.ok(slots.includes(current) && slots.includes(1) && slots.includes(total), `${current} of ${total}: first, last and current are shown`);
+      const numbers = slots.filter((x) => x !== GAP);
+      assert.deepEqual(numbers, [...new Set(numbers)].sort((a, b) => a - b), `${current} of ${total}: in order, no repeats`);
+    }
+  }
+  assert.deepEqual(pageWindow(99, 20), pageWindow(20, 20), 'a page past the end is the last page');
+  assert.deepEqual(pageWindow(0, 20), pageWindow(1, 20));
 });

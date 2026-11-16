@@ -426,8 +426,9 @@ src/taskService.js        Creating tasks without duplicates (Jira search + short
 src/jiraClient.js         The Jira calls: find by label, issue type, bulk create
 src/demoHospital.js       The 30 demo devices and "Load demo hospital"
 src/*.test.mjs            Unit tests (Node's built-in runner)
-scripts/                  Developer checks that use the network
-static/hello-world/       Custom UI (React) for the issue panel
+scripts/                  Developer checks that use the network; ui-smoke.cjs (jsdom UI test)
+scripts/preview/          The real app in a browser without Jira: every state, checks, screenshots
+static/hello-world/       Custom UI (React): the issue panel, the dashboard and the "Create all" pop-up
 ```
 
 ## Develop
@@ -454,6 +455,9 @@ forge install --upgrade -e development     # only when scopes or permissions cha
 
 `npm test` runs every `src/*.test.mjs` file with Node's built-in test runner: no extra packages. The matching tests cover each rule, each fact check, the boundaries of every threshold, ordering, and cases that must **not** match.
 
+`npm run test:ui` renders the real panel and dashboard in jsdom with a stubbed Forge bridge and clicks the main flows (it cannot judge looks).
+
+`npm run preview` and `npm run test:preview` run the **production bundle in a real browser**, without Jira, under a content security policy like the Forge iframe's, over every screen and state (first run, errors, a running check, nothing affected, and so on) in light and dark, on desktop and phone widths, plus a tour of the drawer, menus and dialogs. They fail on a policy violation, a console error, an accessibility violation (axe-core, WCAG 2.2 AA) or a panel that outgrows its frame. `npm run shots` regenerates the Marketplace screenshots from the same page. See [`scripts/preview/README.md`](scripts/preview/README.md).
 ### Permissions
 
 | Scope / permission | Why |

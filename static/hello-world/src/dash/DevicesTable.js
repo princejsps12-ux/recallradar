@@ -104,7 +104,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady
       {narrow ? (
         <div>
           {shown.length === 0 ? (
-            <EmptyState header="No devices match these filters" description="Try another ward or class, or clear the filters." />
+            <EmptyState headingLevel={3} header="No devices match these filters" description="Try another ward or class, or clear the filters." />
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: sp(150) }} aria-label="Affected devices">
               {ordered.slice(0, limit).map((m) => {
@@ -143,7 +143,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady
               setPage(1);
             }}
             isFixedSize
-            emptyView={<EmptyState header="No devices match these filters" description="Try another ward or class, or clear the filters." primaryAction={<Button onClick={clearFilters}>Clear filters</Button>} />}
+            emptyView={<EmptyState headingLevel={3} header="No devices match these filters" description="Try another ward or class, or clear the filters." primaryAction={<Button onClick={clearFilters}>Clear filters</Button>} />}
             label="Affected devices"
           />
           {pages > 1 && <Pager label="Pages of affected devices" page={current} pages={pages} onChange={setPage} />}

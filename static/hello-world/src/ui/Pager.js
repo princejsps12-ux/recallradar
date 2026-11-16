@@ -1,50 +1,46 @@
-import React, { forwardRef } from 'react';
-import Pagination from '@atlaskit/pagination';
+import React from 'react';
 import Button, { IconButton } from '@atlaskit/button/new';
+import VisuallyHidden from '@atlaskit/visually-hidden';
 import ChevronLeftIcon from '@atlaskit/icon/core/chevron-left';
 import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
-import { sp } from './kit';
+import { sp, muted } from './kit';
+import { pageWindow, GAP } from '../tablePaging.mjs';
 
-// Why the buttons are ours: Atlaskit's Pagination (and the pager built into DynamicTable) draws its buttons with the
-// LEGACY Button, which writes its styles into <style> tags at run time. The Forge iframe's content security policy
-// blocks those, so the pager came out as plain browser buttons: small, with no clear current page. Pagination lets us
-// hand it the three button components; these use the NEW Button, whose styles are in a normal stylesheet and do load.
+// Page numbers under a table, built only from Atlaskit's NEW Button (32 px tall, filled blue current page).
 //
-// The legacy Button gives each of them aria-current, aria-label, disabled and onClick (it keeps `isSelected` for its own
-// styling), so the current page is read from aria-current. Every button is 32 px tall, the size of an Atlaskit button.
-const PageButton = forwardRef(function PageButton({ children, onClick, disabled, 'aria-current': current, 'aria-label': label, 'data-testid': testId }, ref) {
-  return (
-    <Button ref={ref} appearance={current ? 'primary' : 'subtle'} isDisabled={disabled} onClick={onClick} aria-current={current} aria-label={label} testId={testId}>
-      {children}
-    </Button>
-  );
-});
-
-const PreviousButton = forwardRef(function PreviousButton({ onClick, disabled, 'aria-label': label, 'data-testid': testId }, ref) {
-  return <IconButton ref={ref} appearance="subtle" icon={ChevronLeftIcon} label={label} isDisabled={disabled} onClick={onClick} testId={testId} />;
-});
-
-const NextButton = forwardRef(function NextButton({ onClick, disabled, 'aria-label': label, 'data-testid': testId }, ref) {
-  return <IconButton ref={ref} appearance="subtle" icon={ChevronRightIcon} label={label} isDisabled={disabled} onClick={onClick} testId={testId} />;
-});
-
-// Defined once: a new object on every render would remount the buttons and lose keyboard focus.
-const components = { Page: PageButton, Previous: PreviousButton, Next: NextButton };
-
-// Page numbers (1-based) centred under a table. `label` names the navigation for screen readers.
+// Why not @atlaskit/pagination (or the pager inside DynamicTable)? Both draw their buttons with the LEGACY Button, which
+// writes its styles into <style> tags at run time. The Forge iframe's content security policy blocks those, so the pager
+// came out as plain browser buttons. Handing Pagination our own button components fixed the look but not the cause: the
+// legacy Button still tried to write its blocked styles on every render (the preview's check reports that as a CSP
+// violation). A pager is a nav, a list and buttons, so this one has none of that.
+//
+// `page` is 1-based; `label` names the navigation for screen readers. The pure part (which numbers to show) is
+// pageWindow in tablePaging.mjs, unit tested.
 export default function Pager({ page, pages, onChange, label }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', marginTop: sp(200) }}>
-      <Pagination
-        label={label}
-        pages={Array.from({ length: pages }, (_, i) => i + 1)}
-        selectedIndex={page - 1}
-        onChange={(event, next) => onChange(next)}
-        previousLabel="Previous page"
-        nextLabel="Next page"
-        pageLabel="Page"
-        components={components}
-      />
-    </div>
+    <nav aria-label={label} style={{ display: 'flex', justifyContent: 'center', marginTop: sp(200) }}>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', alignItems: 'center', gap: sp(50) }}>
+        <li>
+          <IconButton appearance="subtle" icon={ChevronLeftIcon} label="Previous page" isDisabled={page <= 1} onClick={() => onChange(page - 1)} />
+        </li>
+        {pageWindow(page, pages).map((item, index) => (
+          <li key={item === GAP ? `gap-${index}` : item}>
+            {item === GAP ? (
+              <span style={{ ...muted, padding: `0 ${sp(100)}` }}>
+                <span aria-hidden="true">…</span>
+                <VisuallyHidden>Skipped pages</VisuallyHidden>
+              </span>
+            ) : (
+              <Button appearance={item === page ? 'primary' : 'subtle'} aria-current={item === page ? 'page' : undefined} aria-label={`Page ${item}`} onClick={() => onChange(item)}>
+                {item}
+              </Button>
+            )}
+          </li>
+        ))}
+        <li>
+          <IconButton appearance="subtle" icon={ChevronRightIcon} label="Next page" isDisabled={page >= pages} onClick={() => onChange(page + 1)} />
+        </li>
+      </ul>
+    </nav>
   );
 }

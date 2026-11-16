@@ -128,7 +128,7 @@ const typeInto = async (node, value, proto) => {
     // the drawer: the name opens it, the whole recall header is the toggle
     const nameLink = el.querySelector('button[aria-label="Details for Pump d2, recall Z-2"]');
     await act(async () => { nameLink.click(); await wait(250); });
-    const drawer = el.querySelector('aside[role="dialog"]');
+    const drawer = el.querySelector('[role="dialog"]');
     check('the device name opens the drawer', Boolean(drawer) && drawer.getAttribute('aria-label') === 'Details for Pump d2');
     if (drawer) {
       const toggle = [...drawer.querySelectorAll('button[aria-expanded]')].find((b) => /Z-2/.test(b.textContent));
@@ -162,7 +162,7 @@ const typeInto = async (node, value, proto) => {
   const suggestions = { 'Z-2|d2': { accountId: 'acc-1', name: 'Casey Morgan', teamName: 'Team Atlas' } };
   await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result }, suggestAssignees: { ok: true, suggestions, skipped: [] }, createTasks: (payload) => { global.__createPayload = payload; return { ok: true, created: [{ pair: 'Z-2|d2', key: 'MOBL-6' }], existing: [], inProgress: [], failed: [], notFound: [], assignedTo: {}, assignRefused: [] }; } }, async (el, calls) => {
     await clickLabel(el, 'Details for Pump d2, recall Z-2');
-    const drawer = el.querySelector('aside[role="dialog"]');
+    const drawer = el.querySelector('[role="dialog"]');
     check('the drawer opened for the device', Boolean(drawer));
     const more = drawer && [...drawer.querySelectorAll('button')].find((b) => /More ways to create the task for Z-2/.test(b.textContent));
     check('with a suggested person the card has a split button: "Create task" plus a menu', Boolean(more) && [...drawer.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Create task'));
@@ -227,6 +227,16 @@ const typeInto = async (node, value, proto) => {
     check('closing the pop-up tells the panel to reload', global.__closed && global.__closed.created === true);
   });
   global.__modal = undefined;
+  // 7. nothing matches an open recall: the hero says so and there is no empty table with "Clear filters" to confuse
+  const quiet = { ...result, matches: [mk('d9', 'Z-9', 'II', 'ER', 'possible')] };
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result: quiet } }, async (el) => {
+    check('with no affected devices the hero says so', /No devices need action/.test(text(el)));
+    check('with no affected devices there is no "do this first" list, no table and no filters', !/Do this first/.test(text(el)) && !/Affected devices/.test(text(el)) && !/Clear filters/.test(text(el)) && !el.querySelector('table'));
+  });
+  // 8. the issue panel with no devices: the main action is a real button
+  await run('jira:issuePanel', { ...base, listDevices: { ok: true, devices: [] }, getSavedMatches: { ok: true, result: null } }, async (el, calls) => {
+    check('an empty panel offers "Load demo hospital" as a button', /No devices yet/.test(text(el)) && [...el.querySelectorAll('button')].some((b) => /^Load demo hospital$/.test(b.textContent.trim())));
+  });
   console.log(failures.length ? `\n${failures.length} FAILED` : '\nall UI checks passed');
   process.exit(failures.length ? 1 : 0);
 })().catch((e) => { console.log('CRASH', e.stack); process.exit(1); });

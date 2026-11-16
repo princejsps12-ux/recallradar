@@ -23,7 +23,7 @@ export default function FirstRun({ onLoadDemo, onImport, error }) {
         {STEPS.map(([n, title, text]) => (
           <li key={n} style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: sp(200), background: color.sunken, margin: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
             <Lozenge isBold appearance="inprogress">{`Step ${n}`}</Lozenge>
-            <div style={{ margin: `${sp(100)} 0 ${sp(50)}` }}><Heading size="small">{title}</Heading></div>
+            <div style={{ margin: `${sp(100)} 0 ${sp(50)}` }}><Heading size="small" as="h2">{title}</Heading></div>
             <div style={muted}>{text}</div>
           </li>
         ))}

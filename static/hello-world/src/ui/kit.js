@@ -155,14 +155,15 @@ export function formatWhen(iso) {
 
 // A button that looks like a real text link: token blue, underlined, with the browser's own keyboard focus ring.
 // (Atlaskit's new Button has no link look, and the legacy one did not render as a link here.) `iconAfter` is an icon
-// component, shown small after the text.
+// component, shown small after the text. The 2 px of padding (cancelled by an equal negative margin, so nothing moves)
+// make the target 24 px tall, the minimum size WCAG 2.2 asks for.
 export function LinkLike({ children, onClick, iconAfter: Icon, ...rest }) {
   return (
     <button
       type="button"
       onClick={onClick}
       {...rest}
-      style={{ background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', color: color.link, textDecoration: 'underline', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: sp(50) }}
+      style={{ background: 'none', border: 0, padding: `${sp(25)} 0`, margin: `calc(-1 * ${sp(25)}) 0`, font: 'inherit', color: color.link, textDecoration: 'underline', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: sp(50) }}
     >
       {children}
       {Icon ? <Icon label="" size="small" /> : null}
