@@ -391,10 +391,15 @@ export async function recallDetails({ snapshot, inputs = {}, deps = {} }) {
 
 // --- 3. create_remediation_tasks -----------------------------------------------------------------------------------------
 
+// A one-use confirmation token must not be guessable: 16 hex characters from the platform's secure random source.
+function randomToken() {
+  return globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+}
+
 // A preview is saved so that "confirm" creates EXACTLY what was shown, nothing more. The agent cannot
 // create a task it has not previewed: confirming needs the one-time token a preview returns.
 // `kv` has get/set/delete. Tokens are one-use.
-export function createPreviewStore(kv, nowMs = () => Date.now(), makeToken = () => Math.random().toString(36).slice(2, 10)) {
+export function createPreviewStore(kv, nowMs = () => Date.now(), makeToken = randomToken) {
   const key = (token) => `rovo-preview:${token}`;
 
   async function save(entry) {

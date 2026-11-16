@@ -191,5 +191,14 @@ export function createJiraClient({ request, route }) {
     return { projects, recent };
   }
 
-  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects };
+  // Whether the signed-in person holds Jira's global "Administer Jira" permission. Jira answers
+  // { permissions: { ADMINISTER: { havePermission: true | false } } }; anything else counts as "no".
+  async function isAdministrator() {
+    const response = await request(route`/rest/api/3/mypermissions?permissions=ADMINISTER`, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Jira answered ${response.status} when asked for the permissions`);
+    const body = await response.json();
+    return Boolean(body && body.permissions && body.permissions.ADMINISTER && body.permissions.ADMINISTER.havePermission === true);
+  }
+
+  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, isAdministrator };
 }

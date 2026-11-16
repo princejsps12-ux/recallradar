@@ -15,6 +15,7 @@ import { assigneesForMatches, checkExplicitAssignees, setWardTeam } from './team
 import { createRecallPages } from './recallPageService';
 import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient';
 import { importDevices } from './deviceCsv';
+import { refuseUnlessAdministrator } from './permissions';
 import {
   deviceStore,
   matchCache,
@@ -64,8 +65,26 @@ resolver.define('listDevices', async () => {
   }
 });
 
+// The device list is shared by the whole site, so changing it (demo hospital, import, remove) is for Jira administrators:
+// the check runs here, on the server (see permissions.js). The dashboard asks getCapabilities only to show it up front.
+function defineForAdministrators(name, handler) {
+  resolver.define(name, async (request) => {
+    const refused = await refuseUnlessAdministrator(jiraAsUser);
+    return refused || handler(request);
+  });
+}
+
+resolver.define('getCapabilities', async () => {
+  try {
+    return { ok: true, canManageDevices: await jiraAsUser.isAdministrator() };
+  } catch (error) {
+    console.error('Failed to read the permissions', error);
+    return { ok: false };
+  }
+});
+
 // "Load demo hospital": adds the 30 sample devices (replacing only earlier demo devices).
-resolver.define('loadDemoHospital', async () => {
+defineForAdministrators('loadDemoHospital', async () => {
   try {
     return { ok: true, count: await loadDemoHospital(deviceStore) };
   } catch (error) {
@@ -75,7 +94,7 @@ resolver.define('loadDemoHospital', async () => {
 });
 
 // "Import your own devices": pasted spreadsheet text. All or nothing; the answer lists every problem line.
-resolver.define('importDevices', async ({ payload }) => {
+defineForAdministrators('importDevices', async ({ payload }) => {
   try {
     const text = payload && typeof payload.text === 'string' ? payload.text : '';
     return await importDevices(deviceStore, text);
@@ -274,7 +293,7 @@ resolver.define('listProjects', async () => {
 });
 
 // Remove the devices that were imported by paste (the demo hospital is left alone).
-resolver.define('removeImportedDevices', async () => {
+defineForAdministrators('removeImportedDevices', async () => {
   try {
     await deviceStore.removeBySource('manual');
     return { ok: true, count: (await deviceStore.listDevices()).length };
@@ -285,7 +304,7 @@ resolver.define('removeImportedDevices', async () => {
 });
 
 // "Remove all devices": start over (demo and imported). Also forgets the saved check, which belonged to them.
-resolver.define('clearDevices', async () => {
+defineForAdministrators('clearDevices', async () => {
   try {
     await deviceStore.clear();
     await matchCache.clear();

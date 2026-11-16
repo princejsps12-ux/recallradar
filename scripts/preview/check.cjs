@@ -7,13 +7,13 @@
 //   - issue-panel content taller than its fixed frame (262 px), or anything wider than the screen.
 // Lesser axe findings and targets under 24 x 24 px are listed as warnings.
 //
-//   (cd static/hello-world && npm run build)
+//   (cd static/ui && npm run build)
 //   node scripts/preview/check.cjs            the full matrix, a few minutes
 //   node scripts/preview/check.cjs --quick    light theme, fewer states
 const { session, open, click, waitFor, press, choose, axe, measure, sleep } = require('./lib.cjs');
 
 const quick = process.argv.includes('--quick');
-const DASHBOARD_STATES = ['ready', 'in-progress', 'all-done', 'first-run', 'no-check', 'running', 'refreshing', 'stale', 'failed-lookups', 'none-affected', 'no-graph', 'refresh-error', 'error', 'loading'];
+const DASHBOARD_STATES = ['ready', 'in-progress', 'all-done', 'first-run', 'no-check', 'running', 'refreshing', 'stale', 'failed-lookups', 'none-affected', 'no-graph', 'not-admin', 'first-run-not-admin', 'refresh-error', 'error', 'loading'];
 const PANEL_STATES = ['ready', 'in-progress', 'all-done', 'first-run', 'no-check', 'running', 'stale', 'failed-lookups', 'none-affected', 'refresh-error', 'error', 'loading'];
 
 function matrix() {

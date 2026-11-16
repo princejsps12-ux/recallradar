@@ -1,12 +1,12 @@
 // Shared helpers for the preview scripts (check.cjs, shots.cjs): start the preview server, drive headless Chrome with
-// puppeteer-core (installed in static/hello-world, it uses the Chrome you already have), open a view in a state, wait
+// puppeteer-core (installed in static/ui, it uses the Chrome you already have), open a view in a state, wait
 // until it has settled, click things by their visible text, run axe-core.
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { start } = require('./server.cjs');
 
-const app = path.resolve(__dirname, '../../static/hello-world');
+const app = path.resolve(__dirname, '../../static/ui');
 const puppeteer = require(path.join(app, 'node_modules/puppeteer-core'));
 
 const SIZES = { dashboard: [1440, 900], panel: [680, 262], 'create-all': [600, 460] };
@@ -21,7 +21,7 @@ function chromePath() {
 
 // One server and one browser for the whole run. `scale` is the device pixel ratio (2 = crisp screenshots).
 async function session({ scale = 1 } = {}) {
-  if (!fs.existsSync(path.join(app, 'build', 'asset-manifest.json'))) throw new Error('No build yet: run "npm run build" in static/hello-world first.');
+  if (!fs.existsSync(path.join(app, 'build', 'asset-manifest.json'))) throw new Error('No build yet: run "npm run build" in static/ui first.');
   const { server, port } = await start(0);
   const browser = await puppeteer.launch({ executablePath: chromePath(), headless: true, args: ['--hide-scrollbars'] });
   return { port, scale, browser, close: async () => { await browser.close(); server.close(); } };

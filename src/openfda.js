@@ -150,3 +150,16 @@ export function buildModelRecallsUrl(modelWordLists, fromYmd, toYmd, limit = MAX
   if (clauses.length === 0) return null;
   return searchUrl(`(${clauses.join('+OR+')})+AND+${reportDateRange(fromYmd, toYmd)}`, limit);
 }
+
+// openFDA answers 429 when too many requests come from one address (the allowance is shared by everybody behind it) and
+// now and then a 5xx. One short wait and one more try turns most of those into a normal answer; more tries would only
+// add to the load that caused it, and a search that still fails is counted as failed (the result is then not saved).
+export const RETRY_STATUSES = [429, 500, 502, 503, 504];
+export const RETRY_WAIT_MS = 1500;
+
+export async function fetchWithOneRetry(doFetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))) {
+  const first = await doFetch();
+  if (!RETRY_STATUSES.includes(first.status)) return first;
+  await wait(RETRY_WAIT_MS);
+  return doFetch();
+}

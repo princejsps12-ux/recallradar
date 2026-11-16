@@ -6,7 +6,7 @@
 //   node scripts/preview/shot.cjs panel first-run dark 360 262 --out=/tmp/panel.png
 //
 // view: dashboard | panel | create-all    state: see STATES in README.md    theme: light | dark
-// Needs the bundle built first (cd static/hello-world && npm run build) and Chrome. Prints where the image went.
+// Needs the bundle built first (cd static/ui && npm run build) and Chrome. Prints where the image went.
 const path = require('path');
 const { session, open } = require('./lib.cjs');
 

@@ -19,7 +19,7 @@ const pairOf = (m) => ({ recallNumber: m.recallNumber, deviceId: m.deviceId });
 const key = (m) => `${m.recallNumber}|${m.deviceId}`;
 
 test('the preview answers every resolver the real app defines', async () => {
-  const defined = [...readFileSync(join(here, 'index.js'), 'utf8').matchAll(/resolver\.define\('([A-Za-z]+)'/g)].map((m) => m[1]);
+  const defined = [...readFileSync(join(here, 'index.js'), 'utf8').matchAll(/(?:resolver\.define|defineForAdministrators)\('([A-Za-z]+)'/g)].map((m) => m[1]);
   assert.ok(defined.length >= 15, 'the pattern found the resolvers in src/index.js');
   for (const name of defined) assert.ok(RESOLVERS.includes(name), `preview backend is missing the resolver "${name}"`);
   const backend = make('ready');
@@ -53,12 +53,12 @@ test('every scenario starts the way its description says', async () => {
       continue;
     }
     assert.equal(devices.ok, true, name);
-    assert.equal(devices.devices.length, name === 'first-run' ? 0 : 30, name);
+    assert.equal(devices.devices.length, name.startsWith('first-run') ? 0 : 30, name);
     const saved = await backend.invoke('getSavedMatches');
     const status = await backend.invoke('getCheckStatus');
     assert.equal(saved.ok, true);
     assert.equal(status.ok, true);
-    const hasResult = !['first-run', 'no-check', 'running'].includes(name); // 'refreshing' keeps its old result
+    const hasResult = !['first-run', 'first-run-not-admin', 'no-check', 'running'].includes(name); // 'refreshing' keeps its old result
     assert.equal(Boolean(saved.result), hasResult, `${name}: saved result`);
     assert.equal(status.job ? status.job.status : null, ['running', 'refreshing'].includes(name) ? 'running' : null, `${name}: job`);
   }
@@ -197,4 +197,20 @@ test('the "not connected to Confluence" state says what the real app says', asyn
   const connected = await make('ready').invoke('listSpaces', {});
   assert.equal(connected.ok, true, 'every other state has Confluence connected');
   assert.ok(connected.spaces.length > 0);
+});
+
+test('the "not a Jira administrator" states refuse device changes in the words of the real app', async () => {
+  const { NOT_ADMIN_MESSAGE: real } = await import('./permissions.js');
+  assert.equal((await import('node:module').then(() => require('../scripts/preview/backend.js'))).NOT_ADMIN_MESSAGE, real);
+  for (const name of ['not-admin', 'first-run-not-admin']) {
+    const backend = make(name);
+    assert.deepEqual(await backend.invoke('getCapabilities', {}), { ok: true, canManageDevices: false }, name);
+    for (const [resolver, payload] of [['loadDemoHospital', {}], ['importDevices', { text: 'Manufacturer\tModel\nA\tB' }], ['removeImportedDevices', {}], ['clearDevices', {}]]) {
+      const answer = await backend.invoke(resolver, payload);
+      assert.equal(answer.ok, false, `${name} ${resolver}`);
+      assert.equal(answer.notAllowed, true, `${name} ${resolver}`);
+      assert.equal(answer.error, real, `${name} ${resolver}`);
+    }
+  }
+  assert.deepEqual(await make('ready').invoke('getCapabilities', {}), { ok: true, canManageDevices: true });
 });

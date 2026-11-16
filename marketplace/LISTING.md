@@ -32,7 +32,7 @@ Hospitals track thousands of devices, and FDA publishes new device recalls every
 
 **In Jira**
 - A **dashboard** with devices, open recalls by class, task progress, and a filterable table of affected devices by ward and class.
-- A **panel on every issue**: check devices, see each match with its reason, create a Jira task (one or all) with the ward, the reason, a link to the FDA recall and a due date from the recall's class (Class I sooner than II and III). Never a duplicate task for the same recall and device.
+- A **compact panel on every issue** (add it from the issue's Apps button): the headline, the three most urgent devices, **Open dashboard** and **Create all N tasks…**. On the dashboard, open a device to see each match with its reason and create a Jira task (one or all) with the ward, the reason, a link to the FDA recall and a due date from the recall's class (Class I sooner than II and III). Never a duplicate task for the same recall and device.
 - **Ward teams from the Teamwork Graph** (read-only): map each ward to a team, see "Team: <name> (from Teamwork Graph)", and get a suggested assignee. Nobody is assigned unless you say yes.
 - **Confluence recall pages**: one page per recall (what is wrong, what to do, affected devices, live task cards).
 
@@ -44,7 +44,7 @@ Hospitals track thousands of devices, and FDA publishes new device recalls every
 - It reads the saved check, never guesses a space, team or recall number, and tasks and pages are written as the person who clicked, so Jira and Confluence permissions apply.
 - No patient data. It sends only manufacturer and model names to openFDA.
 
-Try it in a minute: open the dashboard and click **Load demo hospital** (30 devices with real manufacturer and model names, so some really match recalls).
+Try it in about ten minutes (install, then): open the dashboard and click **Load demo hospital** (30 devices with real manufacturer and model names, so some really match recalls).
 
 ## Screenshots
 
@@ -88,3 +88,5 @@ Then `16-create-all-confirm-light.jpg` (it asks before creating), `04-ward-teams
 - Each search reads the newest 25 matching recalls; older ones in the last year may be missing (the panel says so).
 - openFDA allows about 1,000 anonymous requests a day per IP; a full check uses about 24, which is why results are saved for 6 hours.
 - External MCP clients were not tested end to end.
+
+**About the screenshots.** `01` to `19` are generated from the app with invented demo data (`npm run shots`), so their counts agree with each other (for example 21 devices need action, 27 tasks). `20` to `23` were taken live on a Forge demo site with its own data (for example one Cath Lab device with six Class I recalls), so their numbers differ from the generated ones. Both show the real app and its real behaviour.

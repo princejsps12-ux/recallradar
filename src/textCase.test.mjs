@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { niceFirm, softCase, ago, formatDay } from '../static/hello-world/src/textCase.mjs';
+import { niceFirm, softCase, ago, formatDay } from '../static/ui/src/textCase.mjs';
 
 test('firm names in capitals keep dotted abbreviations and short capitals', () => {
   assert.equal(niceFirm('PHILIPS MEDICAL SYSTEMS NEDERLAND B.V.'), 'Philips Medical Systems Nederland B.V.');

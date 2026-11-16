@@ -146,3 +146,19 @@ test('parseRecalls returns an empty list for missing or malformed bodies', () =>
   assert.deepEqual(parseRecalls({ results: 'nope' }), []);
   assert.deepEqual(parseRecalls({ error: { code: 'NOT_FOUND' } }), []);
 });
+
+test('a rate-limited or failing openFDA answer is tried once more after a short wait, and no more', async () => {
+  const { fetchWithOneRetry, RETRY_WAIT_MS } = await import('./openfda.js');
+  const run = async (statuses) => {
+    const calls = [];
+    const waits = [];
+    const answers = [...statuses];
+    const out = await fetchWithOneRetry(async () => { calls.push(1); return { status: answers.shift() }; }, async (ms) => { waits.push(ms); });
+    return { status: out.status, calls: calls.length, waits };
+  };
+  assert.deepEqual(await run([200]), { status: 200, calls: 1, waits: [] });
+  assert.deepEqual(await run([404]), { status: 404, calls: 1, waits: [] }, '"no hits" is an answer, not a failure');
+  assert.deepEqual(await run([429, 200]), { status: 200, calls: 2, waits: [RETRY_WAIT_MS] });
+  assert.deepEqual(await run([503, 200]), { status: 200, calls: 2, waits: [RETRY_WAIT_MS] });
+  assert.deepEqual(await run([429, 429, 200]), { status: 429, calls: 2, waits: [RETRY_WAIT_MS] }, 'only one retry');
+});

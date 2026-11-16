@@ -1,6 +1,6 @@
 # The preview: the real app, without Jira
 
-This folder runs the **production bundle** (`static/hello-world/build`, the same files `forge deploy` ships) in a plain
+This folder runs the **production bundle** (`static/ui/build`, the same files `forge deploy` ships) in a plain
 browser, with a small fake in place of the Forge host. Every screen and state of the dashboard, the issue panel and the
 "Create all" pop-up can be opened, captured and checked without Jira, without a deploy and without touching any real data.
 
@@ -15,14 +15,14 @@ reported) here instead of on the live page. Forge's own docs describe the policy
 ## Use it
 
 ```bash
-(cd static/hello-world && npm run build)    # the bundle (after any change to static/hello-world/src)
+(cd static/ui && npm run build)    # the bundle (after any change to static/ui/src)
 npm run preview                             # http://localhost:4173/   (node scripts/preview/server.cjs)
 npm run test:preview                        # the checks below, in headless Chrome (a minute and a half)
 npm run shots                               # regenerate the Marketplace screenshots
 ```
 
 Chrome must be installed (`CHROME=/path/to/chrome` if it is somewhere unusual). Everything else is in
-`static/hello-world/node_modules` (`puppeteer-core`, `axe-core`).
+`static/ui/node_modules` (`puppeteer-core`, `axe-core`).
 
 Open `http://localhost:4173/frame.html?view=dashboard&state=in-progress&theme=dark`. The page shows the app in an iframe of
 an exact size, so a phone width is a phone-width layout.
@@ -61,6 +61,8 @@ and imports answer the way the dialogs read them. People, teams and projects are
 | `none-affected` | Nothing matches an open recall |
 | `no-graph` | The Teamwork Graph refuses (no suggestions, no team list): what the demo site did on 2026-11-16 |
 | `no-confluence` | Like `ready`, but the app is installed in Jira only, not connected to Confluence: the Create Confluence pages dialog says how to connect it |
+| `not-admin` | Like `ready`, but the person is not a Jira administrator: Import devices and Remove devices are shut in the menu |
+| `first-run-not-admin` | The welcome screen for a person who is not a Jira administrator: it says who can add devices |
 | `refresh-error` | **Refresh** cannot start a check |
 | `error` | The device list cannot be read: the error screen |
 | `loading` | Nothing ever answers: the loading skeleton |
@@ -75,7 +77,7 @@ preview cannot quietly fall behind the app.
   dialog, both tabs, the pager, sorting, filters, selects) and fails on: a content security policy violation, a console
   error, an axe-core violation of impact serious or critical (WCAG 2.0 to 2.2 AA and best practice: contrast, names,
   roles, headings), issue-panel content taller than its 262 px frame, anything wider than the screen, or a phone run
-  whose frame is not really that wide. Targets under 24 x 24 px are warnings. Last run: 106 screens, all clean.
+  whose frame is not really that wide. Targets under 24 x 24 px are warnings. Last run: 110 screens, all clean.
   - One known, accepted violation: opening a dialog makes `@atlaskit/modal-dialog` (through `react-scrolllock`) write a
     `body { box-sizing ... }` style, which the policy blocks. The only effect is that the page behind a dialog can still
     scroll. Any other violation fails the run.

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PAGE_SIZE, GAP, sortRows, pageCount, clampPage, pageOf, rangeOf, pageWindow } from '../static/hello-world/src/tablePaging.mjs';
+import { PAGE_SIZE, GAP, sortRows, pageCount, clampPage, pageOf, rangeOf, pageWindow } from '../static/ui/src/tablePaging.mjs';
 
 const rows = (values) => values.map((v, i) => ({ v, id: i }));
 const ids = (list) => list.map((r) => r.id);

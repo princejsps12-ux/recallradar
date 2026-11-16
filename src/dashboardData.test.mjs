@@ -15,7 +15,7 @@ import {
   urgentMatches,
   heroStats,
   matchesForDevice,
-} from '../static/hello-world/src/dashboardData.mjs';
+} from '../static/ui/src/dashboardData.mjs';
 
 const m = (deviceId, recallNumber, extra = {}) => ({ deviceId, recallNumber, confidence: 'exact', recallClass: 'I', ward: 'ICU', ...extra });
 const result = {

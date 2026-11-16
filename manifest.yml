@@ -1,6 +1,6 @@
 modules:
   jira:issuePanel:
-    - key: recallradar-hello-world-panel
+    - key: recallradar-panel
       resource: main
       resolver:
         function: resolver
@@ -270,6 +270,7 @@ modules:
       tools:
         - check_device
         - list_open_recalls
+        - who_handles_ward
         - create_remediation_task
   # The recall check runs in the background: the button queues it, this consumer does it.
   # Only queue consumers and scheduled triggers may set timeoutSeconds (UI functions are fixed
@@ -308,7 +309,7 @@ modules:
       timeoutSeconds: 300
 resources:
   - key: main
-    path: static/hello-world/build
+    path: static/ui/build
 permissions:
   scopes:
     - read:jira-work

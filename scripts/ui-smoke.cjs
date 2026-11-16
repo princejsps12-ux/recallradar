@@ -1,11 +1,11 @@
 // A quick UI check that needs no browser or Atlassian site: it renders the real React views in jsdom with a
 // stubbed @forge/bridge, clicks through the main flows and prints what it sees. Fails (exit 1) on a crash or a wrong result.
-// Needs `npm install --legacy-peer-deps` in static/hello-world first (that installs jsdom and Babel).
+// Needs `npm install --legacy-peer-deps` in static/ui first (that installs jsdom and Babel).
 // Run: node scripts/ui-smoke.cjs
 const path = require('path');
 const fs = require('fs');
 const Module = require('module');
-const root = path.resolve(__dirname, '../static/hello-world');
+const root = path.resolve(__dirname, '../static/ui');
 const { JSDOM } = require(root + '/node_modules/jsdom');
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'https://example.test/', pretendToBeVisual: true });
 global.window = dom.window;
@@ -203,6 +203,11 @@ const typeInto = async (node, value, proto) => {
     // the previous run's dialog may still be in the document: this run's radios are the last two
     const radios = [...document.querySelectorAll('[role="radiogroup"] input[type="radio"]')].slice(-2);
     check('with nothing imported the "only imported" choice is disabled and "all devices" is chosen', radios.length === 2 && radios[0].disabled && radios[1].checked);
+  });
+  // Not a Jira administrator: the welcome screen says who can add devices and its two buttons are shut.
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [] }, getSavedMatches: { ok: true, result: null }, getCapabilities: { ok: true, canManageDevices: false } }, async (el) => {
+    const buttons = [...el.querySelectorAll('button')].filter((b) => /Load demo hospital|Import your own devices/.test(b.textContent));
+    check('a person who is not a Jira administrator is told who can add devices, and both buttons are shut', /A Jira administrator adds the devices/.test(text(el)) && buttons.length === 2 && buttons.every((b) => b.disabled));
   });
   // 3. error screen
   await run('jira:globalPage', { ...base, listDevices: { ok: false }, getSavedMatches: { ok: true, result: null } }, async (el) => {

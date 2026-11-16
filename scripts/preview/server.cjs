@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// The preview server: runs the REAL production bundle (static/hello-world/build) with a stubbed Forge host, so every
+// The preview server: runs the REAL production bundle (static/ui/build) with a stubbed Forge host, so every
 // screen and state can be seen, captured and checked without Jira and without touching any real data.
 //
-//   (cd static/hello-world && npm run build)     the bundle, the same one forge deploy ships
+//   (cd static/ui && npm run build)     the bundle, the same one forge deploy ships
 //   node scripts/preview/server.cjs               then open http://localhost:4173/
 //
 // /frame.html?view=dashboard&state=ready&theme=light&width=1440&height=900 is the page to open (it shows the app in an
@@ -13,7 +13,7 @@ const path = require('path');
 
 const PORT = Number(process.env.PORT || 4173);
 const here = __dirname;
-const app = path.resolve(here, '../../static/hello-world');
+const app = path.resolve(here, '../../static/ui');
 const build = path.join(app, 'build');
 
 // The policy the Forge iframe applies, as far as styling goes: NO 'unsafe-inline' for styles (so <style> tags written
@@ -121,7 +121,7 @@ function handle(req, res) {
   if (route === '/favicon.ico') return send(res, 204, 'image/x-icon', '');
   if (route === '/frame.html') return send(res, 200, TYPES['.html'], FRAME);
   if (route === '/app.html') {
-    if (!fs.existsSync(path.join(build, 'asset-manifest.json'))) return send(res, 500, 'text/plain', 'No build yet: run "npm run build" in static/hello-world first.');
+    if (!fs.existsSync(path.join(build, 'asset-manifest.json'))) return send(res, 500, 'text/plain', 'No build yet: run "npm run build" in static/ui first.');
     return send(res, 200, TYPES['.html'], appPage(url.searchParams), csp);
   }
   if (route === '/csp-probe.html') return send(res, 200, TYPES['.html'], PROBE, csp);

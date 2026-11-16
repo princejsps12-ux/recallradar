@@ -1,0 +1,29 @@
+# Runs the checks that need no Atlassian site, no network and no browser: the unit tests, the production build of the
+# Custom UI and the jsdom smoke test of the real panel and dashboard. (The headless-Chrome preview check,
+# `npm run test:preview`, needs Chrome and is run by hand: see docs/DEVELOPMENT.md.)
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            static/ui/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm ci --legacy-peer-deps
+        working-directory: static/ui
+      - run: npm run build
+        working-directory: static/ui
+        env:
+          CI: 'false'
+      - run: npm run test:ui

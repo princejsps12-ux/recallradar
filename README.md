@@ -19,12 +19,14 @@ Open it, pick your site and install it in **Jira**. That is all RecallRadar need
 2. Expect the headline "N devices need action" with the Class I count and one summary line (devices monitored, open recalls by class, task counts), a **Do this first** list and a table of affected devices. With the demo hospital you should see roughly 20 to 30 open exact or likely recalls across Class I, II and III; the exact numbers drift as the FDA publishes new recalls.
 3. Click a device name for its recalls, the reason each matched and what the FDA says is wrong, then **Create task** (or **Create and assign to ...** in the small menu beside it if you mapped a ward to a team). Open any Jira issue, click **Apps** (beside the **+** under its title) and choose **RecallRadar**: the panel is a compact summary with **Open dashboard** and **Create all N tasks...**.
 4. Ask **Rovo** (Ask Rovo in Jira, or Rovo Home; pick **RecallRadar Assistant**): "Which Cath Lab devices have open Class I recalls?"
+5. Optional: open the **Ward teams** tab and pick the team that handles each ward (the list comes from the Teamwork Graph). Then **Create and assign to …** is offered in the drawer. Nobody is assigned unless you choose it.
+6. Optional: open the **...** menu, **Create Confluence pages**, choose a space and a recall, **Create page** (needs the Confluence connection above; running it again updates the page).
 
 **Try it safely.** Tasks and Confluence pages are real. All RecallRadar tasks carry the label `recallradar`: find them with the Jira search `labels = recallradar` and delete them when you are done. Creating a task for the same recall and device twice is blocked on purpose, so delete the tasks before re-running. Assigning someone sends them a Jira notification, and nobody is assigned unless you click the assign button.
 
 **Words used here.** *Device recall*: the FDA tells hospitals a device model or lot has a problem. *Class I / II / III*: how dangerous (I most, III least). *Ward*: the hospital unit, such as ICU. *Rovo*: Atlassian's AI chat agent. *MCP*: a standard way for other AI tools to call an app's functions. *Teamwork Graph*: Atlassian's directory of teams and people.
 
-**Scope today.** Your devices come from the demo hospital or a pasted spreadsheet (the import replaces your earlier paste). A direct JSM Assets import is not built. Only manufacturer and model names ever leave Atlassian (to openFDA); there is no patient data.
+**Scope today.** Your devices come from the demo hospital or a pasted spreadsheet (the import replaces your earlier paste). The device list is shared by the whole site, so loading, importing and removing devices is for **Jira administrators** (whoever installs the app is one); everyone else can read results and create tasks. A direct JSM Assets import is not built. Only manufacturer and model names ever leave Atlassian (to openFDA); there is no patient data.
 
 ## What it does today
 
@@ -38,15 +40,6 @@ Open it, pick your site and install it in **Jira**. That is all RecallRadar need
 | **Ward teams** | Map each hospital ward (ICU, ER, ...) to a **Teamwork Graph team**. The team list is read from the graph; the mapping is saved in Forge storage. Match rows and the device drawer then show the team name and a suggested assignee. See "Teamwork Graph (read-only)". |
 | **Create Confluence pages** | Pick a space and a recall (or all open ones): one Confluence page per recall with what is wrong, what to do, affected devices and live task cards. Running it again updates the page. Needs the optional Confluence connection (see the quick start); without it the dialog says how to connect it. |
 | **RecallRadar Assistant** | A Rovo agent that answers questions about recalls from the saved check, explains them in plain English, and creates Jira tasks after you confirm. See "The Rovo agent". |
-
-## Try it
-
-1. Open Jira, **Apps**, **RecallRadar** (the dashboard). The compact **RecallRadar** panel on an issue shows the same result.
-2. Click **Load demo hospital**. It adds 30 devices. Running it again replaces only the demo devices and leaves any other devices in storage alone.
-3. The check runs by itself ("Checked N of M FDA searches"); **Refresh** runs it again. The result reads "N devices need action", strongest match first.
-4. Open the **Ward teams** tab, and for each ward pick the team that handles it (the list comes from the Teamwork Graph).
-5. Click **Create task** on a row, **Create all N tasks…** (it asks you to confirm), or click a device's name to open its details and use **Create task** (a device with several recalls also gets **Create N tasks**). Tasks are created as you, so Jira applies your permissions, in the project chosen next to the button (on the issue panel: the project of that issue). If the ward has a team (and the Teamwork Graph answers), the **Create task** button in the drawer gets a small menu beside it with **Create and assign to <name>**; plain **Create task** never assigns anyone. In the "create all" confirmation, **Also assign the suggested team member** is a checkbox that starts **off**.
-6. Open the **...** menu, click **Create Confluence pages**, choose a space and a recall, and click **Create page**.
 
 ## How matching works
 
@@ -69,73 +62,11 @@ Each (device, recall) pair gets **at most one result: the strongest rule that ap
 
 If no rule applies, nothing is reported.
 
-### How each fact is checked
-
-- **Normalising text.** Everything is lower-cased and split into words at any character that is not a letter or digit. `MMT-1885CLW/00763` and `mmt 1885clw 00763` are the same. Phrases must match **as whole words, in order**, so model `N15` matches `N12/N15/N17` but never `N150`.
-- **Manufacturer.** Legal words (`Inc`, `Corporation`, `Ltd`, `GmbH`, `AB`...) are ignored. Two makers match when **all** words of the shorter name appear in the longer one (`Philips` matches `Philips North America Llc`), and at least one shared word is specific. Generic words (`Medical`, `Healthcare`, `Systems`...) alone never match: `Medical Systems` does not match `GE Medical Systems Information Technologies`.
-- **Model.** Looked for in both the product description and the code info.
-- **Lot/serial.** Looked for in the code info only, since that is where FDA lists them.
-- **All units.** The recall's code info contains `all serial`, `all lot`, `all unexpired` or `all units`.
-- **Device type** (weakest rule only). Every word of the device's type (`infusion pump`) appears in the recall's product text.
-
-### The numbers, and why
-
-There are no unexplained constants. All are named exports in [`src/matching.js`](src/matching.js) or [`src/recallSearch.js`](src/recallSearch.js):
-
-| Constant | Value | Reason |
-| --- | --- | --- |
-| `MIN_MODEL_LENGTH` | 3 characters | A model like `A1` or `10` would "appear" in almost every recall by chance. |
-| `MIN_LOT_LENGTH` | 4 characters | Same reason for lot/serial numbers. |
-| `MIN_MODEL_LENGTH_OTHER_MAKER` | 5 characters | The `possible-model-other-maker` rule ignores the manufacturer, so the model alone must be distinctive. |
-| `LOOKBACK_DAYS` | 365 | Looks at the last year of recalls: recent enough to matter, without old closed-out recalls. |
-| `MODELS_PER_QUERY` | 5 | Keeps search URLs short and stops one very common model crowding out others. |
-| `MAX_RECALLS_PER_QUERY` | 100 | openFDA's per-request maximum without paging. |
-| `SEARCH_LIMIT_PER_QUERY` | 25 | Newest recalls requested per search. Smaller is faster; 25 kept every match in the demo (see "Speed" below). |
-| `CACHE_TTL_HOURS` | 6 | How long a saved check stays fresh. FDA publishes about weekly, so a few hours old is fine, and it spares openFDA's request limit. |
-| `SEARCH_DEADLINE_MS` | 240 s | Gives up on slow searches 60 s before the 300 s limit of the background function. |
-| `STALE_JOB_MS` | 6 min | A background job with no progress update for this long counts as failed. |
-| `MAX_CACHE_BYTES` | 200 KiB | Forge storage rejects values over 240 KiB; larger results are skipped (recomputed) instead of failing. |
-
-### Ordering
-
-Results are sorted by confidence (exact, likely, possible), then recall class (I is the most serious), then newest recall first, then device id, so the order is always the same.
-
-### Known limits
-
-- **Serial ranges are not understood.** A recall that says `serial number < 2224` lists no individual numbers, so a device inside the range shows as **likely** and needs a person to check.
-- **No spelling variants.** `monitor` and `monitors` are different words, and `MMT1885CLW` does not match `MMT-1885CLW`.
-- **Newest 25 recalls per search.** A manufacturer or model group with more than 25 recalls in the window may have older ones missed. The panel says so when any search hit this cap (openFDA reports the real total, so it is exact, not a guess). The model searches still catch recalls that mention a hospital model.
-- **openFDA rate limit.** Anonymous use is limited (about 1,000 requests a day per IP address, 240 a minute). One check makes about two dozen requests, which is why it runs on a button click, and why results are saved (see below).
-- **The FDA is not the only source.** Recalls from other regulators are not included.
+Each check, every number and the reasons: [`docs/MATCHING.md`](docs/MATCHING.md).
 
 ## The check runs in the background
 
-A check makes about two dozen openFDA requests and a cold one takes 10 to 14 seconds on the demo site. A Forge UI function is cut off after 25 seconds and that limit cannot be raised (custom timeouts exist only for queue consumers and scheduled triggers), so a slow day could make a click fail. Instead:
-
-1. **Clicking "Check devices" starts a background job and returns at once.** The resolver records a job and puts a message on a Forge queue (async events). A queue consumer ([`src/consumer.js`](src/consumer.js), allowed to run for up to 300 seconds) does the work.
-2. **The panel shows progress.** It asks for the job's status every 2 seconds and shows "Checked 14 of 24 FDA searches". If you reload the page mid-check, it picks the running job back up.
-3. **Results are saved for 6 hours** in Forge storage (an older one is shown flagged as old while a refresh runs, but **nothing is kept longer than 24 hours**), with a "last checked" time and a **Refresh** button. A saved result is used only while it is under 6 hours old and the device list is unchanged (a fingerprint of the devices). When the panel opens on an **expired** result, it shows that result flagged "older than 6 hours" and refreshes it in the background, so the panel is never empty.
-4. **A daily trigger refreshes the saved result** ([`src/scheduled.js`](src/scheduled.js)), so it is usually already there before anyone clicks.
-
-The rules that keep it correct (each has unit tests): a check with failed lookups is shown but **not** saved; only the running job with the right id may be updated, so late or duplicate queue deliveries are skipped; a job that stops reporting for 6 minutes counts as failed; a result too large for storage is reported as a failure, not lost; the search has its own 240-second deadline inside the 300-second limit. The pieces are [`src/checkJob.js`](src/checkJob.js) (job record), [`src/matchService.js`](src/matchService.js) (start / run / status) and [`src/matchCache.js`](src/matchCache.js) (saved result).
-
-Searches are also kept small: each asks for the newest 25 recalls (`SEARCH_LIMIT_PER_QUERY`), not 100.
-
-### Measurements (demo hospital: 30 devices, 24 searches)
-
-| | Before | After |
-| --- | --- | --- |
-| Search size | 100 recalls | 25 recalls |
-| Cold check, on a laptop | 5 to 15 s (about 10 s on average, 4 runs) | 5 to 12 s (about 7 s on average, 6 runs) |
-| Cold check, on the demo Jira site | about 30 s (read off the screen, so rough) | 13.4 s and 10.7 s (reported by the app, 2 runs) |
-| Downloaded | 21.4 MB | 19.5 MB |
-| Recalls fetched / matches found | 280 / 101 | 200 / 101 |
-| Best match per device | 12 exact, 9 likely, 4 possible | unchanged |
-| **Repeat check (saved result)** | same as a cold check | **0 ms, 0 MB** |
-
-The honest picture: smaller searches help a little and cold timings are noisy (openFDA's response time varies a lot), but they do not fix the real cost. **One recall record (Z-1645-2026, BD Alaris) is 8.7 MB**, almost all of it a sub-object we never use, and openFDA cannot leave fields out. It is downloaded twice (by a manufacturer search and by a model search), which is about 17 of the 19.5 MB. Saving the result is what makes the panel feel instant: the cost is paid once per 6 hours instead of on every click.
-
-Ideas not built: skip the duplicate download, or fetch per-device in the background.
+A Forge UI function is cut off at 25 seconds and a cold check takes 10 to 15 seconds (and could take longer), so the check is a background job: Refresh (or loading the demo hospital) queues it and returns at once, a queue consumer with a 300-second limit does the work, and the page shows "Checked N of 24 FDA searches". The result is saved for 6 hours, shown the moment you open the page, and refreshed once a day. The design, its rules and the measurements: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Creating tasks
 
@@ -152,105 +83,11 @@ Every **exact** or **likely** match can become a Jira task. **Possible** matches
 | Labels | `recallradar`, and one label per recall and device (see "No duplicates") |
 | Type / project | `Task` (else the project's first non-sub-task type), in the project of the issue the panel is open on |
 
-### Due-date rule
-
-FDA classes a recall by how dangerous the problem is ([21 CFR 7.3](https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-7/subpart-A/section-7.3)): **Class I** a reasonable chance of serious harm or death; **Class II** temporary or medically reversible harm, or a remote chance of serious harm; **Class III** not likely to cause harm. The due date is a number of **calendar days from the day the task is created** (the UTC date), so it never depends on weekends or holidays.
-
-| Recall class | Days | Why |
-| --- | --- | --- |
-| **Class I** | **2** | Serious harm is possible, so the device should be found and quarantined within a couple of days, not left for a weekly review. |
-| **Class II** and **III** | **7** | Harm is unlikely or reversible, so the team's normal weekly review is soon enough. |
-| Unknown or missing class | **2** | Serious harm cannot be ruled out. In a hospital a task that is due too early costs far less than a missed recall, so it is treated like Class I. |
-
-The numbers are the constants `DUE_DAYS_CLASS_I`, `DUE_DAYS_CLASS_II_III` and `UNKNOWN_CLASS_DUE_DAYS` in [`src/taskRules.js`](src/taskRules.js), and each task's description states the rule that set its date. They are a starting point for a hospital to tune, not a regulatory requirement.
-
-### No duplicates
-
-Each task carries a label that encodes its recall and device (`recallradar-Z-2723-2026-demo-001`). Two layers stop a second task for the same pair:
-
-1. **Jira is the source of truth.** Before creating anything, the app searches Jira for those labels, so an existing task is found even if the app's own storage was cleared, or the task was made from another browser or tab.
-2. **A 2-minute guard in Forge storage** (`GUARD_TTL_MS`). Jira's search index can lag a few seconds behind a new issue, so a fast double click could slip past layer 1. For two minutes the app remembers what it just created or is creating. After that Jira's own search knows, and a task that was deleted in Jira can be created again.
-
-Also: the same pair listed twice in one request makes one task; a "possible" match is refused by the server; and the browser sends only the recall number and device id, while everything else in a task is rebuilt **on the server** from the saved check result, so a forged request cannot set a task's text or due date.
-
-Checked on the demo site: after creating all 35 tasks, a second tab that still thought none existed asked for all 35 again, and the server created none ("34 already had a task"). Jira held 35 tasks with 35 distinct labels.
-
-### Limits
-
-- **Request size.** Creating a task takes about 0.6 s, and a UI function is cut off at 25 s: creating 34 in one request took about 20 s on the demo site. So one request may ask for at most 25 tasks (`MAX_PAIRS_PER_REQUEST`) and the panel sends batches of 10, with a running count.
-- **Looking up existing tasks** only searches Jira, so it may cover up to 200 pairs per request (`MAX_STATE_PAIRS_PER_REQUEST`); this is how the panel shows "Task: MOBL-12" for matches that already have one.
-- **Jira bulk limit.** Jira creates at most 50 issues per bulk call (`BULK_CREATE_LIMIT`).
-- **Permissions.** Tasks are created *as the person who clicked* (`asUser`), so someone who may not create issues gets Jira's error, and the app needs the `write:jira-work` scope.
-- **Project.** On the dashboard you choose the project next to the button; on the issue panel it is the project of that issue; in a Rovo chat you name it, or it is the project of the Jira page you are on.
-- **Task state is not tracked.** The panel shows the task's key as a link, not whether it is done.
+The due-date rule, how duplicates are prevented and the limits: [`docs/TASKS.md`](docs/TASKS.md).
 
 ## Teamwork Graph (read-only)
 
-RecallRadar **only reads** from the Atlassian Teamwork Graph. It never writes to it (no mutations, no connection, no ingestion). It is used for one job: finding out **which team handles a ward and who is in that team**, so a recall task can go to the right people.
-
-### Exactly which Teamwork Graph API calls are made
-
-Both go through `api.asUser().requestTeamworkGraph(query, variables, operationName)` from `@forge/api`, **as the signed-in person** (the API has no app-level version, so nothing in the graph is read by background jobs). Every value is passed as a GraphQL variable, never pasted into the query text. The code is in [`src/teamGraph.js`](src/teamGraph.js); the two documents below are copied from it.
-
-**Call 1: the teams the signed-in person belongs to** (operation `recallradar_myteams`)
-
-```graphql
-query recallradar_myteams($userId: ID!, $first: Int) {
-  atlassianUserInTeams(userId: $userId, first: $first) {
-    edges { node { __typename ... on AtlassianTeam { id displayName } } }
-  }
-}
-```
-
-Variables: `userId` = `ari:cloud:identity::user/<the signed-in person's account id>`, `first` = 25. Runs when you open the dashboard's **Ward teams** tab (to fill the team dropdown) and when a ward-to-team choice is saved (the server checks that the team really is in this list, and takes the team's **name from the graph**, not from the browser).
-
-**Call 2: the members of one team** (operation `recallradar_teammembers`)
-
-```graphql
-query recallradar_teammembers($teamAri: ID!, $first: Int) {
-  atlassianTeamMembers(teamAri: $teamAri, first: $first) {
-    edges { node { __typename ... on AtlassianUser { accountId name } } }
-  }
-}
-```
-
-Variables: `teamAri` = a saved team's ARI (`ari:cloud:identity::team/<id>`), `first` = 25. Runs when the panel suggests an assignee, when a chosen assignee is checked before creating tasks, and when the agent or an MCP client asks `who_handles_ward`. A team is read once per request, however many tasks use it.
-
-That is all: **two read queries**. Scopes: `read:graph:team:atlassian` and `read:graph:user:atlassian`.
-
-What the API does **not** offer (found by probing it, see [`docs/teamwork-graph-findings.md`](docs/teamwork-graph-findings.md)): there is no "list every team" query, so the dropdown shows the teams **you** belong to; and teams have **no owner, manager or role field**, only members. So RecallRadar cannot say "the team's owner" and uses a stated rule instead.
-
-### What is stored, and where it shows
-
-- **Ward-to-team mapping**: one record in Forge storage (`ward-teams`): ward name, team ARI and team name. Edited in the panel under **Ward teams**. Wards are compared ignoring case and punctuation ("med surg 3w" is "Med-Surg 3W").
-- **In the panel**: every exact or likely match whose ward has a team shows **Team: <name> (from Teamwork Graph)**, so the graph's use is visible, plus the suggested assignee.
-- **In the agent and MCP**: the `who_handles_ward` tool (below) returns the team, its members and the suggestion, marked `source: Teamwork Graph`.
-
-### Suggesting an assignee, and asking first
-
-The rule (written once, in `SUGGESTION_RULE` in [`src/teamService.js`](src/teamService.js), and returned to the agent): **the team member with the fewest open RecallRadar tasks** (counted in Jira with `labels = "recallradar" AND statusCategory != Done`), **then the first name alphabetically**. That spreads work evenly and gives the same answer every time. In a batch, people already picked earlier in the same batch count too, so ten tasks for one ward are spread across the team instead of piled on one person.
-
-**Nobody is assigned without being asked.**
-
-- **Panel, one task**: two buttons, **Create task** (unassigned) and **Create & assign to <name>**.
-- **Panel, all tasks**: a checkbox in the confirmation, off by default.
-- **Agent**: assigning is only proposed when you ask for it (`assignSuggested`); the preview shows each **proposedAssignee**. The preview record stores **no person** (no account id, no name), only the flag: when you confirm, the people are **looked up again** from the ward's team with the same rule and the answer says who was assigned. The rule is deterministic, so you normally get the people you saw, unless the team or the open-task counts changed in between.
-- **Checked on the server**: the panel names an account id only for the one click, and the server re-reads the ward's team and keeps the assignee only if that person is **in the team**. The agent's confirm step looks people up fresh, so it can only ever pick **current** members. A made-up request cannot assign anyone else. If the graph cannot be reached, tasks are created **unassigned** and the answer says so.
-- A ward with no team, or a team with no members you can see, simply gets no suggestion.
-
-### What was and was not verified
-
-- **Verified against the live API** (earlier probe on the demo site): both queries return data in exactly the shape the code parses (20 teams for the demo user; members with account ids and names).
-- **Verified in unit tests** with a fake graph: query text, variables, parsing, the suggestion rule, balancing across a team, refusing someone who is not in the team, and the agent's preview-then-confirm with assignees.
-- **Verified live on the demo site** (panel and agent): the team list loads from the graph; ICU and Cath Lab were mapped to a team and the choice is saved ("1 of 14 wards mapped"); the Cath Lab row shows **Team: Team Atlas (from Teamwork Graph)**; the "create all" confirmation offers **Also assign the suggested team member (7 of 29)**, unchecked by default; the agent's `who_handles_ward` says "no team" for an unmapped ward without guessing. The live check found one real bug: the API refuses `first` above 25, so both calls now ask for 25.
-- **Verified live, Confluence button**: choosing Mobile Development and recall Z-0208-2027 updated the existing page and returned its link.
-- **Verified live, assignments**: on an ICU row the panel showed *Team: Team Atlas (from Teamwork Graph) · Suggested assignee: Casey Morgan*; **Create & assign** made MOBL-99 assigned to that person. **Create tasks for all** with **Also assign the suggested team member** ticked created 28 tasks and assigned the 8 whose ward has a team ("8 of 28" was shown before confirming); the rest were left unassigned, as intended.
-
-### Limits
-
-- Only people and teams the **signed-in person** can see in the graph are shown (the calls run as them).
-- A person who is in the team but cannot be assigned in the Jira project makes Jira refuse that task; it is reported as failed with Jira's reason and can be retried unassigned.
-- Only the first 25 teams and 25 members are read (the API refuses a larger page).
+RecallRadar reads **teams and their members** from the Teamwork Graph as the signed-in person, and never writes to it. Two queries (a person's teams, a team's members) map each hospital ward to a team and suggest, never impose, an assignee: the team member with the fewest open RecallRadar tasks. Nothing is assigned unless you choose **Create and assign to …**, and nothing about a person is stored. The exact queries, what is stored and what was verified live: [`docs/TEAMWORK_GRAPH.md`](docs/TEAMWORK_GRAPH.md).
 
 ## The Rovo agent
 
@@ -281,7 +118,7 @@ Forge has no built-in "ask first" setting for an action, so the action itself en
 2. The agent shows that preview and asks "Shall I create these N tasks?"
 3. Only after you say yes does it call the action again with `confirmed=true` and the token. The server creates **exactly the previewed tasks**, whatever else the call asks for. The token works once and expires after 10 minutes.
 
-Assigning is optional: with `assignSuggested` the preview also shows a **proposedAssignee** per task (from the ward's Teamwork Graph team) and the rule used; confirming looks the people up again from the ward's team (nothing about a person is stored in the preview), that each is still in the team. See "Teamwork Graph (read-only)".
+Assigning is optional: with `assignSuggested` the preview also shows a **proposedAssignee** per task (from the ward's Teamwork Graph team) and the rule used; confirming looks the people up again from the ward's team (nothing about a person is stored in the preview) and checks that each is still in the team. See "Teamwork Graph (read-only)".
 
 So the agent cannot create a task it has not previewed, and a made-up or reused token creates nothing. Whether the agent actually *asks you* is enforced by its prompt, and was checked in Rovo chat. Rovo also shows its own "Please review" card for any `CREATE` action, so you approve twice (in chat, then on the card). Tasks are created **as you** (the reporter is the person chatting), and at most 20 per confirmation; a larger selection says how many were left out.
 
@@ -340,45 +177,7 @@ They are the same tools as the in-Jira agent, so they read the **saved recall ch
 
 The tools can be added to agents you build in Rovo Studio, with no setup beyond installing the app.
 
-### Outside Atlassian: Claude Desktop, Claude Code, Cursor and others
-
-**1. A site admin switches it on.** External MCP exposure is **off by default**. In Atlassian Administration open **Apps**, **Sites**, your site, **Connected apps**, then **View app details** for RecallRadar and scroll to **Tools**. It shows *Expose tools to MCP-compatible apps: Disabled*; click **Enable tools**. This is per app and per site, and needs an organization admin. Read the warning on that page first: *"Enabling this gives access to perform any action the app is capable of, on behalf of users."* RecallRadar's own tools only read the saved check and create single tasks as the signed-in user, but the switch is for the whole app, so enable it only for a site you trust.
-
-**2. Use the app's MCP address.**
-
-```
-https://mcp.atlassian.com/forge/<appId>
-```
-
-`<appId>` is the UUID in `manifest.yml` after `ari:cloud:ecosystem::app/` (under `app: id:`).
-
-**3. Add it to your client and sign in.** The first connection opens Atlassian's OAuth consent screen: pick the site, review the tools, approve. No API token is involved.
-
-*Claude Desktop*, either way (Atlassian's docs do not cover Claude Desktop; this is the standard way to add a remote MCP server to it):
-
-- **Custom connector** (Settings, then Connectors, then **Add custom connector**): paste the address above.
-- **Or** the `mcp-remote` bridge, in **Settings, Developer, Edit Config** (`claude_desktop_config.json`), then restart Claude Desktop and complete the sign-in that opens:
-
-```json
-{
-  "mcpServers": {
-    "recallradar": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp.atlassian.com/forge/<appId>"]
-    }
-  }
-}
-```
-
-*Claude Code* (this is the command Atlassian documents), then run `/mcp` and sign in:
-
-```bash
-claude mcp add --transport http recallradar https://mcp.atlassian.com/forge/<appId>
-```
-
-**4. Teach the agent how to use the tools (optional but recommended).** [`integrations/claude/recallradar/SKILL.md`](integrations/claude/recallradar/SKILL.md) is a skill file for third-party agents: which tool for which question, always cite real recall numbers and device ids, say how fresh the data is, and ask the user before creating a task. In Claude Code copy the `recallradar` folder to `~/.claude/skills/`; in Claude Desktop zip the folder and add it under **Settings, Capabilities, Skills**.
-
-**5. Make sure there is a check to read.** The tools read the saved check. Open the RecallRadar dashboard (Jira, Apps, RecallRadar): a check runs by itself after **Load demo hospital**, and **Refresh** runs it again (the daily refresh then keeps it current). Without a saved check the tools say so.
+Step by step for Claude Desktop, Claude Code, Cursor and others: [`docs/MCP.md`](docs/MCP.md).
 
 ### What was and was not verified
 
@@ -386,91 +185,11 @@ claude mcp add --transport http recallradar https://mcp.atlassian.com/forge/<app
 - **Not verified:** a real external client connection (Claude Desktop, Claude Code). It needs a site admin to switch the tools on and an interactive OAuth sign-in, so it has not been run. Step-by-step instructions for a live demo are in [`docs/mcp-demo.md`](docs/mcp-demo.md). The Claude Desktop steps are the standard remote-MCP setup rather than something Atlassian documents for Forge apps, so treat them as untested.
 - Rovo shows its own "Please review" card for `CREATE` actions in chat; whether external clients get an equivalent prompt is up to the client.
 
-## How the demo hospital is built
-
-[`src/demoHospital.js`](src/demoHospital.js) holds 30 devices with **real manufacturer and model names taken from actual openFDA recalls**. Devices meant to match have serial/lot numbers that the real recall lists. Wards and the serial numbers of unaffected devices are invented. The file's header explains the groups (exact, likely, possible, none) and how it was checked.
-
-Check what the demo matches against the live API at any time:
-
-```bash
-node scripts/check-demo-matches.mjs
-```
-
-Results can drift as the FDA publishes new recalls, and recalls fall out of the one-year window.
-
-## Where devices live
-
-Devices sit behind one small interface in [`src/deviceStore.js`](src/deviceStore.js) (`listDevices`, `saveDevices`, `clear`, `removeBySource`, `replaceAll`). Today they are stored in **Forge storage** ([`src/kvAdapter.js`](src/kvAdapter.js)), one key per device, so the app works on any site with no setup.
-
-**Your own devices** come from **Import your own devices** on the dashboard (paste rows from a spreadsheet; [`src/deviceCsv.js`](src/deviceCsv.js)). **JSM Assets** is a possible extra source, but it is not built: in testing, Forge could not *create* an Assets schema as the app (403: Assets administrator rights are required), and the app does not declare any Assets scopes. A read-only import that maps Assets objects to the device shape and calls `saveDevices` is the planned route.
-
-## Project layout
-
-```
-manifest.yml              Forge modules, scopes, external fetch permission
-src/index.js              Resolvers: recalls, devices, demo hospital, check start/status; Rovo action
-src/openfda.js            openFDA URLs and parsing (display and full-text)
-src/recallSearch.js       Which recalls to fetch for a device list (firm + model queries)
-src/matchCache.js         Saved check results in Forge storage (6-hour freshness)
-src/checkJob.js           The background job record: status, progress, stale detection
-src/matchService.js       Start / run / status of the background check, saved result
-src/runtime.js            Forge wiring shared by the consumer and the daily trigger
-src/consumer.js           Queue consumer: runs the check in the background (300 s)
-src/scheduled.js          Daily trigger: refreshes the saved result
-src/matching.js           The matching rules
-src/text.js               Shared text helpers (tokenize, whole-word phrase search)
-src/deviceStore.js        Device list interface
-src/kvAdapter.js          Forge storage behind that interface
-src/agentTools.js         The Rovo agent tools (pure) and the preview/confirm store
-src/recallPage.js         The Confluence page for one recall (pure, escaped)
-src/recallPageService.js  One page per open recall: choose space, create or update
-src/confluenceClient.js   The Confluence calls: spaces, find page by title, upsert
-src/rovoActions.js        Forge handlers for the agent's actions
-src/teamGraph.js          The two read-only Teamwork Graph calls (documents + parsing)
-src/wardTeams.js          Ward-to-team mapping in Forge storage
-src/teamService.js        Assignee suggestion rule, ward lookups, checks before assigning
-skills/recall-triage/     The Rovo skill that groups the actions (SKILL.md)
-integrations/claude/      Skill file for third-party agents (Claude) using the MCP tools
-src/taskRules.js          What a task looks like: due date rule, title, labels, description
-src/taskService.js        Creating tasks without duplicates (Jira search + short guard)
-src/jiraClient.js         The Jira calls: find by label, issue type, bulk create
-src/demoHospital.js       The 30 demo devices and "Load demo hospital"
-src/*.test.mjs            Unit tests (Node's built-in runner)
-scripts/                  Developer checks that use the network; ui-smoke.cjs (jsdom UI test)
-scripts/preview/          The real app in a browser without Jira: every state, checks, screenshots
-static/hello-world/       Custom UI (React): the issue panel, the dashboard and the "Create all" pop-up
-```
-
 ## Develop
 
-Requirements: Node 22+ and the Forge CLI (`npm install -g @forge/cli`, then `forge login`).
+Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), `npm run test:ui`, `npm run test:preview` (the real bundle in headless Chrome). The app is multi-app compatible (Jira required, Confluence optional): install it in Jira first, then connect Confluence. Everything else, including the project layout: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
-```bash
-npm install
-npm test                                   # unit tests, no network needed
-
-cd static/hello-world
-npm install --legacy-peer-deps             # the template pins React 16
-npm run build                              # rebuild after any front-end change
-cd ../..
-
-forge lint
-forge deploy -e development
-forge install --upgrade -e development     # only when scopes or permissions change
-```
-
-`forge deploy` prints an approval prompt when a change makes a major version (new scopes or external domains); re-run with `--approve MAJOR_VERSION_RULE` if that is what you intended.
-
-The app is multi-app compatible (Jira required, Confluence optional): install it in Jira first (`forge install -e development -p Jira`), then connect Confluence with `forge install -e development -p Confluence`. `forge deploy` refuses an environment that still has an installation in a non-required product (an old separate Confluence installation), so run `forge uninstall -p Confluence` first in that case.
-
-### Tests
-
-`npm test` runs every `src/*.test.mjs` file with Node's built-in test runner: no extra packages. The matching tests cover each rule, each fact check, the boundaries of every threshold, ordering, and cases that must **not** match.
-
-`npm run test:ui` renders the real panel and dashboard in jsdom with a stubbed Forge bridge and clicks the main flows (it cannot judge looks).
-
-`npm run preview` and `npm run test:preview` run the **production bundle in a real browser**, without Jira, under a content security policy like the Forge iframe's, over every screen and state (first run, errors, a running check, nothing affected, and so on) in light and dark, on desktop and phone widths, plus a tour of the drawer, menus and dialogs. They fail on a policy violation, a console error, an accessibility violation (axe-core, WCAG 2.2 AA) or a panel that outgrows its frame. `npm run shots` regenerates the Marketplace screenshots from the same page. See [`scripts/preview/README.md`](scripts/preview/README.md).
-### Permissions
+## Permissions
 
 | Scope / permission | Why |
 | --- | --- |
@@ -497,3 +216,16 @@ The app is multi-app compatible (Jira required, Confluence optional): install it
 - Support contact: _to be filled in by the app owner before the Marketplace listing_ (see [`marketplace/SUBMIT.md`](marketplace/SUBMIT.md)).
 - Tests: `npm test` runs the unit tests with no network or extra packages.
 - For Forge platform help see [Get help](https://developer.atlassian.com/platform/forge/get-help/).
+
+## More documentation
+
+| Page | What is in it |
+| --- | --- |
+| [`docs/MATCHING.md`](docs/MATCHING.md) | Each fact check, every threshold and why, ordering, known limits |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The background check job, its rules and measurements |
+| [`docs/TASKS.md`](docs/TASKS.md) | The due-date rule, how duplicates are prevented, limits |
+| [`docs/TEAMWORK_GRAPH.md`](docs/TEAMWORK_GRAPH.md) | The two Teamwork Graph queries verbatim, what is stored, what was verified |
+| [`docs/MCP.md`](docs/MCP.md) | Connecting Claude Desktop, Claude Code, Cursor and others |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Demo hospital, project layout, build, deploy, tests |
+| [`docs/REVIEW.md`](docs/REVIEW.md) | Review notes, scores and what is left |
+

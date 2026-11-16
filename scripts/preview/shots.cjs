@@ -2,7 +2,7 @@
 // Regenerates the Marketplace listing screenshots (marketplace/screenshots/01-... and up) from the real production bundle,
 // so they always show the current UI, in light and dark, on desktop and phone, with invented (never real) data:
 //
-//   (cd static/hello-world && npm run build)
+//   (cd static/ui && npm run build)
 //   node scripts/preview/shots.cjs                  all of them
 //   node scripts/preview/shots.cjs --only=03,11      just those numbers
 //   node scripts/preview/shots.cjs --out=/tmp/shots  somewhere else
@@ -92,6 +92,11 @@ const SHOTS = [
       const opened = await open(s, spec);
       await steps(opened);
       await sleep(300);
+      // A dialog puts the focus on its close button; the ring is right for a keyboard user and noise in a listing image.
+      await opened.frame.evaluate(() => {
+        const a = document.activeElement;
+        if (a && a.blur && /close/i.test(a.getAttribute('aria-label') || '') && document.querySelector('[role="dialog"]')) a.blur();
+      }).catch(() => {});
       const file = path.join(outDir, `${number}-${name}.jpg`);
       await opened.page.screenshot({ path: file, type: 'jpeg', quality: 88 });
       console.log(`${path.relative(process.cwd(), file)}  ${(fs.statSync(file).size / 1024).toFixed(0)} KB`);
