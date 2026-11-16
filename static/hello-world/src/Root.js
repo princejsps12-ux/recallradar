@@ -3,12 +3,14 @@ import { view } from '@forge/bridge';
 import { token } from '@atlaskit/tokens';
 import App from './App';
 import Dashboard from './Dashboard';
+import CreateAllWindow from './CreateAllWindow';
 
-// One bundle serves two modules: the issue panel (App) and the full-page dashboard. The module type says which.
+// One bundle serves three views: the issue panel (App), the full-page dashboard (Dashboard), and the "Create all"
+// pop-up the panel opens (CreateAllWindow, told apart by the context the panel passes to the Forge Modal).
 // view.theme.enable() switches on Atlassian design tokens (light and dark); the page background and text come
 // from tokens too.
 export default function Root() {
-  const [type, setType] = useState(null);
+  const [info, setInfo] = useState(null);
   useEffect(() => {
     view.theme.enable().catch(() => {});
     document.body.style.background = token('elevation.surface');
@@ -16,9 +18,13 @@ export default function Root() {
     document.body.style.margin = '0';
     view
       .getContext()
-      .then((context) => setType((context && context.extension && context.extension.type) || 'jira:issuePanel'))
-      .catch(() => setType('jira:issuePanel'));
+      .then((context) => {
+        const extension = (context && context.extension) || {};
+        setInfo({ type: extension.type || 'jira:issuePanel', modal: extension.modal || (context && context.modal) || null });
+      })
+      .catch(() => setInfo({ type: 'jira:issuePanel', modal: null }));
   }, []);
-  if (type === null) return null;
-  return type === 'jira:globalPage' ? <Dashboard /> : <App />;
+  if (info === null) return null;
+  if (info.modal && info.modal.view === 'create-all') return <CreateAllWindow projectKey={info.modal.projectKey} />;
+  return info.type === 'jira:globalPage' ? <Dashboard /> : <App />;
 }

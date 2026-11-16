@@ -114,7 +114,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                       <div style={muted}>{first.deviceManufacturer} {first.deviceModel}</div>
                     </div>
                     <span ref={closeWrap}>
-                      <Button appearance="subtle" spacing="compact" aria-label="Close details" onClick={onClose} iconBefore={CrossIcon} />
+                      <Button appearance="subtle" aria-label="Close details" onClick={onClose} iconBefore={CrossIcon} />
                     </span>
                   </div>
                   <div role="group" aria-label="Device facts" style={{ margin: `0 0 ${sp(300)}`, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: sp(200) }}>
@@ -125,7 +125,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: sp(100) }}>
                     <Heading size="medium">Recalls that affect it ({matches.length})</Heading>
                     {missing.length > 1 && (
-                      <Button appearance="primary" spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreateMany(missing)}>{`Create ${missing.length} tasks`}</Button>
+                      <Button appearance="primary" isDisabled={!canCreate || busy} onClick={() => onCreateMany(missing)}>{`Create ${missing.length} tasks`}</Button>
                     )}
                   </div>
                   {matches.map((m) => {
@@ -151,7 +151,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                                 <LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>
                               </>
                             ) : (
-                              <Button spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreate(m, false)}>Create task</Button>
+                              <Button isDisabled={!canCreate || busy} onClick={() => onCreate(m, false)}>Create task</Button>
                             )}
                           </span>
                         </div>
@@ -170,7 +170,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                             )}
                             {!key && suggestion && (
                               <div style={{ marginTop: sp(150) }}>
-                                <Button spacing="compact" isDisabled={!canCreate || busy} onClick={() => onCreate(m, true)}>
+                                <Button isDisabled={!canCreate || busy} onClick={() => onCreate(m, true)}>
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(75) }}>
                                     <Avatar size="xsmall" name={suggestion.name} />
                                     Create and assign to {suggestion.name}

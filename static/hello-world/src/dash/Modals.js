@@ -61,7 +61,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
     <ModalTransition>
       {isOpen && (
         <Modal onClose={onClose} width="medium" label={removing ? 'Remove devices' : 'Import your own devices'}>
-          <ModalHeader hasCloseButton><ModalTitle>{removing ? 'Remove devices' : 'Import your own devices'}</ModalTitle></ModalHeader>
+          <ModalHeader hasCloseButton><ModalTitle appearance={removing ? 'danger' : undefined}>{removing ? 'Remove devices' : 'Import your own devices'}</ModalTitle></ModalHeader>
           <ModalBody>
             {!removing && (<>
             <p style={{ marginTop: 0, marginBottom: sp(200) }}>Copy rows from a spreadsheet (or a .csv) and paste them here. The first row names the columns: <strong>Manufacturer</strong> and <strong>Model</strong> are required; Name, Type, Serial (or Lot) and Ward are optional. Up to 200 devices at a time. Importing replaces the devices you imported before and leaves the demo hospital alone. <strong>Do not include patient data.</strong></p>
@@ -100,37 +100,45 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import' }) {
 
 // "Create all": one confirmation for every device and recall that still has no task, with the optional
 // assignment (off by default). Tasks go in the project chosen on the dashboard.
-export function CreateAllModal({ isOpen, onClose, count, deviceCount, suggestedCount, projectName, onConfirm, running }) {
-  const [assign, setAssign] = useState(false);
+export function CreateAllBody({ count, deviceCount, suggestedCount, projectName, assign, onAssign, running }) {
   const facts = [
     ['Devices', deviceCount],
     ['Tasks', `${count} (one for each device and recall)`],
     ['Project', projectName],
   ];
   return (
+    <>
+      <p style={{ marginTop: 0, marginBottom: sp(200) }}>Each task has the ward, the reason the device matches, a link to the FDA recall and a due date from the recall class. A task is never created twice for the same device and recall.</p>
+      <div role="group" aria-label="What will be created" style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: sp(200), background: color.sunken, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: `${sp(100)} ${sp(300)}` }}>
+        {facts.map(([label, value]) => (
+          <React.Fragment key={label}>
+            <span style={muted}>{label}</span>
+            <strong>{value}</strong>
+          </React.Fragment>
+        ))}
+      </div>
+      {suggestedCount > 0 && (
+        <div style={{ marginTop: sp(200) }}>
+          <Checkbox label="Also assign the suggested team member" isChecked={assign} onChange={(e) => onAssign(e.target.checked)} />
+          <div style={{ ...muted, marginLeft: sp(300) }}>{suggestedCount} of {count} tasks have a team in the Teamwork Graph; the work is spread across each ward's team. Nobody is assigned unless you tick this.</div>
+        </div>
+      )}
+      <div role="status" aria-live="polite" style={{ marginTop: sp(150), minHeight: '24px' }}>
+        {running && <span style={muted}>Creating tasks… this takes a moment.</span>}
+      </div>
+    </>
+  );
+}
+
+export function CreateAllModal({ isOpen, onClose, count, deviceCount, suggestedCount, projectName, onConfirm, running }) {
+  const [assign, setAssign] = useState(false);
+  return (
     <ModalTransition>
       {isOpen && (
         <Modal onClose={onClose} width="medium" label="Create all tasks">
           <ModalHeader hasCloseButton><ModalTitle>{`Create ${count} task${count === 1 ? '' : 's'}?`}</ModalTitle></ModalHeader>
           <ModalBody>
-            <p style={{ marginTop: 0, marginBottom: sp(200) }}>Each task has the ward, the reason the device matches, a link to the FDA recall and a due date from the recall class. A task is never created twice for the same device and recall.</p>
-            <div role="group" aria-label="What will be created" style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: sp(200), background: color.sunken, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: `${sp(100)} ${sp(300)}` }}>
-              {facts.map(([label, value]) => (
-                <React.Fragment key={label}>
-                  <span style={muted}>{label}</span>
-                  <strong>{value}</strong>
-                </React.Fragment>
-              ))}
-            </div>
-            {suggestedCount > 0 && (
-              <div style={{ marginTop: sp(200) }}>
-                <Checkbox label="Also assign the suggested team member" isChecked={assign} onChange={(e) => setAssign(e.target.checked)} />
-                <div style={{ ...muted, marginLeft: sp(300) }}>{suggestedCount} of {count} tasks have a team in the Teamwork Graph; the work is spread across each ward's team. Nobody is assigned unless you tick this.</div>
-              </div>
-            )}
-            <div role="status" aria-live="polite" style={{ marginTop: sp(150), minHeight: '24px' }}>
-              {running && <span style={muted}>Creating tasks… this takes a moment.</span>}
-            </div>
+            <CreateAllBody count={count} deviceCount={deviceCount} suggestedCount={suggestedCount} projectName={projectName} assign={assign} onAssign={setAssign} running={running} />
           </ModalBody>
           <ModalFooter>
             <Button appearance="subtle" isDisabled={running} onClick={onClose}>Cancel</Button>

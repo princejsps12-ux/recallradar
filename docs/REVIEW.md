@@ -97,6 +97,13 @@ Target was 9.5. Not reached. Per item, final round (mean of three, then who can 
 
 Caveats about the measurement: the final set still contained a few stale shots (`light-phone-ward-teams` from before the select borders, `light-table` and `dark-table` from before the date format), the light and dark panel shots were taken in different data states, and the two loading shots were captured at different moments. Some deductions are therefore capture artefacts, not product defects. "Phone" shots are the Forge iframe forced to 360 to 390 px, not a real device.
 
+### Done since (plan items 1 and 4), checked live on the demo site in light, dark and 360 px
+
+- Item 1 (quick fixes): `niceFirm` keeps "B.V.", "USA", "GE" and company endings ("Abiomed, Inc."); `softCase` makes all-caps FDA product text readable and leaves part numbers alone ("Alphenix interventional angiography system REF: INFX-8000F"); both are unit tested in `src/textCase.test.mjs`. The remove dialog's title has the danger icon. Task buttons are one size (32 px) in rows, drawer and panel. Time reads the same everywhere ("Last checked 8 min ago", exact time in a tooltip). The panel no longer shows assignee suggestions, so nothing appears late and makes it grow.
+- Item 4 (compact issue panel): headline with the Class I count, the three most urgent devices without a task (name, ward, recall, the two lozenges, no buttons), **Open dashboard** (primary) and **Create all N tasks...** (opens the same confirmation as a Jira pop-up). Measured: `viewportSize: medium` is a 262 px frame; the card is 254 px, so there is no empty space and no clipping at desktop or 360 px width. The panel also asks for less: no recent FDA list, no task counts, no ward teams, no Teamwork Graph calls (it is on every issue).
+
+Still to do: items 2, 3, 5 and 6 below.
+
 ### Plan for the fixable (a) items, in order
 
 1. **Quick fixes (small).** Repair `niceFirm` so "B.V.", "USA" and other short or dotted tokens keep their capitals; `ModalTitle appearance="danger"` on the remove dialog; one button size in rows, drawer and panel; show time the same way everywhere ("1 h ago", absolute time in a tooltip); sentence-case all-caps product text only for plain letter words of four or more letters, never tokens with digits or hyphens; load assign suggestions with the rows so the panel does not grow.

@@ -17,7 +17,12 @@ const remembered = () => {
 
 // Everything the dashboard and the panel share: the device count, the saved check and its background
 // refresh, which matches already have tasks, suggested assignees, ward-team mappings, projects, and creating tasks.
-export default function useRecallData({ withProjects = false } = {}) {
+// `light` is for the issue panel (it shows on every issue, so it asks for as little as possible): no recent FDA
+// recalls, no task counts, and no ward teams or assignee suggestions (those call the Teamwork Graph) unless
+// `withSuggestions` says so. `projectKey` fixes the project for tasks (the create-all pop-up gets it from the panel).
+export default function useRecallData({ withProjects = false, light = false, withSuggestions, projectKey: fixedProjectKey } = {}) {
+  const wantSuggestions = withSuggestions === undefined ? !light : withSuggestions;
+  const wantWards = !light || wantSuggestions;
   const [devicesCount, setDevicesCount] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -31,7 +36,7 @@ export default function useRecallData({ withProjects = false } = {}) {
   const [wardInfo, setWardInfo] = useState({ mappings: [], wards: [], byKey: {} });
   const [recent, setRecent] = useState({ state: 'loading', recalls: [] });
   const [projects, setProjects] = useState([]);
-  const [projectKey, setProjectKeyState] = useState(remembered());
+  const [projectKey, setProjectKeyState] = useState(fixedProjectKey || remembered());
   const [creating, setCreating] = useState({ active: false, done: 0, total: 0 });
   const [note, setNote] = useState(null); // { kind: 'success' | 'warning', text }
   const timer = useRef(null);
@@ -139,10 +144,12 @@ export default function useRecallData({ withProjects = false } = {}) {
     } catch (e) {
       setError('Could not load RecallRadar. Check your connection and try again.');
     }
-    loadWardInfo();
-    invoke('fetchRecalls')
-      .then((response) => setRecent(response && response.ok ? { state: 'done', recalls: response.recalls } : { state: 'error', recalls: [] }))
-      .catch(() => setRecent({ state: 'error', recalls: [] }));
+    if (wantWards) loadWardInfo();
+    if (!light) {
+      invoke('fetchRecalls')
+        .then((response) => setRecent(response && response.ok ? { state: 'done', recalls: response.recalls } : { state: 'error', recalls: [] }))
+        .catch(() => setRecent({ state: 'error', recalls: [] }));
+    }
     if (withProjects) {
       invoke('listProjects')
         .then((response) => {
@@ -157,7 +164,7 @@ export default function useRecallData({ withProjects = false } = {}) {
         })
         .catch(() => {});
     }
-  }, [begin, poll, loadWardInfo, withProjects]);
+  }, [begin, poll, loadWardInfo, withProjects, light, wantWards]);
 
   useEffect(() => {
     load();
@@ -181,22 +188,24 @@ export default function useRecallData({ withProjects = false } = {}) {
     states.then(() => {
       if (!cancelled) setTasksReady(true);
     });
-    invoke('getTaskSummary')
-      .then((r) => {
-        if (cancelled) return;
-        setSummary(r && r.ok ? r.summary : null);
-        setSummaryState(r && r.ok ? 'ok' : 'error');
-      })
-      .catch(() => {
-        if (!cancelled) setSummaryState('error');
-      });
+    if (!light) {
+      invoke('getTaskSummary')
+        .then((r) => {
+          if (cancelled) return;
+          setSummary(r && r.ok ? r.summary : null);
+          setSummaryState(r && r.ok ? 'ok' : 'error');
+        })
+        .catch(() => {
+          if (!cancelled) setSummaryState('error');
+        });
+    }
     return () => {
       cancelled = true;
     };
   }, [checkedAt]); // eslint-disable-line
 
   useEffect(() => {
-    if (!result || wardInfo.mappings.length === 0) {
+    if (!wantSuggestions || !result || wardInfo.mappings.length === 0) {
       setSuggestions({});
       return undefined;
     }
@@ -230,14 +239,14 @@ export default function useRecallData({ withProjects = false } = {}) {
       matches,
       assign,
       suggestions,
-      projectKey: withProjects ? projectKey : undefined,
+      projectKey: withProjects || fixedProjectKey ? projectKey : undefined,
       onProgress: (done, total) => setCreating({ active: true, done, total }),
       onTasks: (known) => setTasks((previous) => ({ ...previous, ...known })),
     });
     setCreating({ active: false, done: 0, total: 0 });
     const text = summarize(totals);
     if (text) setNote({ kind: totals.stopped || totals.failed.length ? 'warning' : 'success', title: totals.stopped || totals.failed.length ? 'Some tasks were not created' : totals.created ? 'Tasks created' : 'Nothing new to create', text });
-    if (totals.created) invoke('getTaskSummary').then((r) => { setSummary(r && r.ok ? r.summary : null); setSummaryState(r && r.ok ? 'ok' : 'error'); }).catch(() => {});
+    if (totals.created && !light) invoke('getTaskSummary').then((r) => { setSummary(r && r.ok ? r.summary : null); setSummaryState(r && r.ok ? 'ok' : 'error'); }).catch(() => {});
     return totals;
   };
 

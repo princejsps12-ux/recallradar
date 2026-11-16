@@ -20,7 +20,7 @@ import DynamicTable from '@atlaskit/dynamic-table';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
-import { sp, color, card, muted, useNarrow, Progress, formatWhen, ClassLozenge, niceFirm, sentenceCase, formatDay } from './ui/kit';
+import { sp, color, card, muted, useNarrow, Progress, CheckedAt, ClassLozenge, niceFirm, softCase, formatDay } from './ui/kit';
 import { affectedMatches, heroStats, urgentMatches, taskProgress, screenFor } from './dashboardData.mjs';
 import { Hero, UrgentList, SummaryCards } from './dash/Hero';
 import DevicesTable from './dash/DevicesTable';
@@ -90,7 +90,7 @@ export default function Dashboard() {
         ) : (
           <>
             FDA device recalls matched to your hospital's devices.
-            {d.result && <> Last checked {formatWhen(d.result.checkedAt)}{d.result.stale ? ' (older than 6 hours)' : ''}.</>}
+            {d.result && <> <CheckedAt prefix="Last checked" iso={d.result.checkedAt} stale={d.result.stale} />.</>}
           </>
         )}
       </div>
@@ -151,7 +151,7 @@ export default function Dashboard() {
       { key: 'n', content: <span style={{ whiteSpace: 'nowrap' }}>{r.recallNumber}</span> },
       { key: 'c', content: <ClassLozenge recallClass={r.recallClass} /> },
       { key: 'f', content: niceFirm(r.firm) || 'Unknown firm' },
-      { key: 'p', content: <span style={clamp} title={r.product}>{sentenceCase(r.product)}</span> },
+      { key: 'p', content: <span style={clamp} title={r.product}>{softCase(r.product)}</span> },
       { key: 'd', content: <span style={{ whiteSpace: 'nowrap' }}>{r.date ? formatDay(r.date) : '–'}</span> },
     ],
   }));
@@ -184,7 +184,7 @@ export default function Dashboard() {
                     <li key={r.recallNumber} style={{ borderTop: `1px solid ${color.border}`, paddingTop: sp(100) }}>
                       <strong>{r.recallNumber}</strong> <span style={muted}>{r.recallClass ? `Class ${r.recallClass}` : ''} · {r.date ? formatDay(r.date) : ''}</span>
                       <div style={muted}>{niceFirm(r.firm) || 'Unknown firm'}</div>
-                      <div>{sentenceCase(r.product)}</div>
+                      <div>{softCase(r.product)}</div>
                     </li>
                   ))}
                 </ul>

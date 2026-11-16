@@ -3,25 +3,17 @@ import { token } from '@atlaskit/tokens';
 import Lozenge from '@atlaskit/lozenge';
 import Button from '@atlaskit/button/new';
 import Spinner from '@atlaskit/spinner';
+import Tooltip from '@atlaskit/tooltip';
 import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
+import { formatDay, ago, niceFirm, softCase } from '../textCase.mjs';
+
+// Pure text helpers live in textCase.mjs (unit tested); everything in the UI imports them from here.
+export { formatDay, ago, niceFirm, softCase };
 
 // Spacing and colours come ONLY from Atlassian design tokens (they follow light and dark mode and meet
 // contrast rules). No hex colours anywhere in the UI code.
 // Token names are zero-padded to three digits: sp(50) is space.050 (4 px), sp(200) is space.200 (16 px).
 export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-// FDA firm names often come in capitals ("PHILIPS MEDICAL SYSTEMS"): show those in normal case.
-export const niceFirm = (s) => (s && s === s.toUpperCase() && /[A-Z]{4}/.test(s) ? s.toLowerCase().replace(/(^|[\s(/-])([a-z])/g, (m, a, b) => a + b.toUpperCase()) : s);
-// All-capital product text from the FDA: show it as a sentence (only when the whole text is capitals).
-export const sentenceCase = (s) => s; // kept as-is: lower-casing would damage model and part numbers (infx-8000f)
-// "3 h ago" style age, for the panel header.
-export function ago(iso, now = Date.now()) {
-  const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
-  if (!Number.isFinite(mins)) return '';
-  if (mins < 2) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
-  const h = Math.round(mins / 60);
-  return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
-}
 export const sp = (n) => token(`space.${String(n).padStart(3, '0')}`);
 export const color = {
   text: token('color.text'),
@@ -121,12 +113,24 @@ export function Progress({ done, total, label }) {
   );
 }
 
-// "15 Nov 2026, 23:49" in the reader's own locale, never an ambiguous 15/11/2026.
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-// "4 Nov 2026" for every date in the UI (a fixed table, so the month never comes out as "Sept").
-export function formatDay(day) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(day || ''));
-  return m && MONTHS[Number(m[2]) - 1] ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : String(day || '');
+// "Last checked 3 h ago": the same wording in the dashboard header and the issue panel. The exact time is in a
+// tooltip (and in the element's own title), never the only way to read it.
+export function CheckedAt({ iso, stale, prefix = 'Checked' }) {
+  if (!iso) return null;
+  const exact = formatWhen(iso);
+  return (
+    <>
+      {prefix}{' '}
+      <Tooltip content={exact} position="bottom">
+        {(tooltipProps) => (
+          <time {...tooltipProps} dateTime={iso} title={exact} tabIndex={0} style={{ textDecoration: 'underline dotted', textUnderlineOffset: '3px', cursor: 'default' }}>
+            {ago(iso)}
+          </time>
+        )}
+      </Tooltip>
+      {stale ? ' (older than 6 hours)' : ''}
+    </>
+  );
 }
 
 export function formatWhen(iso) {

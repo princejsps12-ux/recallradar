@@ -29,7 +29,7 @@ dom.window.HTMLElement.prototype.scrollIntoView = () => {};
 Object.defineProperty(global, 'navigator', { value: dom.window.navigator, configurable: true }); // newer Node has a read-only navigator
 
 const bridge = path.join(require('os').tmpdir(), 'rr-bridge-stub.js');
-fs.writeFileSync(bridge, "module.exports={invoke:(n,p)=>global.__invoke(n,p),router:{open(){},navigate(){return Promise.resolve()}},view:{theme:{enable:()=>Promise.resolve()},getContext:()=>Promise.resolve({extension:{type:global.__type}})}};");
+fs.writeFileSync(bridge, "module.exports={invoke:(n,p)=>global.__invoke(n,p),router:{open(){},navigate(){return Promise.resolve()}},Modal:class{constructor(o){global.__modalOpts=o;}open(){global.__modalOpened=true;return Promise.resolve();}},view:{theme:{enable:()=>Promise.resolve()},close:(p)=>{global.__closed=p;return Promise.resolve();},getContext:()=>Promise.resolve({extension:{type:global.__type,modal:global.__modal}})}};");
 const resolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) { return request === '@forge/bridge' ? bridge : resolve.call(this, request, ...rest); };
 
@@ -120,10 +120,27 @@ const typeInto = async (node, value, proto) => {
     check('the import dialog opens with its options', /Import your own devices/.test(body) && /Do not include patient data/.test(body));
     check('the import button is disabled until something is pasted', [...document.querySelectorAll('button')].find((b) => b.textContent === 'Import devices').disabled);
   });
-  // 5. the issue panel still renders, with its dashboard link
-  await run('jira:issuePanel', { ...base, listDevices: { ok: true, devices: [1] }, getSavedMatches: { ok: true, result } }, async (el) => {
-    check('issue panel renders the headline, a task button and the dashboard link', /devices? need(s)? action/.test(text(el)) && /Create task/.test(text(el)) && /Open the dashboard/.test(text(el)));
+  // 5. the issue panel is a compact summary card: headline, rows without buttons, a dashboard link, "Create all" as a pop-up
+  const panelAnswers = { ...base, listDevices: { ok: true, devices: [1] }, getSavedMatches: { ok: true, result } };
+  await run('jira:issuePanel', panelAnswers, async (el, calls) => {
+    const t = text(el);
+    check('issue panel shows the headline, the urgent devices and the dashboard link', /devices? need(s)? action/.test(t) && /Open dashboard/.test(t) && /Pump d2/.test(t) && /Checked/.test(t));
+    check('issue panel rows have no per-device buttons', ![...el.querySelectorAll('button')].some((b) => /^(Create task|Details)$/.test(b.textContent.trim())));
+    check('the light panel does not call the Teamwork Graph, the recent FDA list or the task counts', !calls.includes('suggestAssignees') && !calls.includes('fetchRecalls') && !calls.includes('getTaskSummary') && !calls.includes('getWardTeams'));
+    await click(el, /^Create all/);
+    check('"Create all" opens the pop-up with the create-all context', global.__modalOpened === true && global.__modalOpts.context.view === 'create-all');
   });
+  // 6. the pop-up itself: it asks first, creates, says what happened, and tells the panel to reload
+  global.__modal = { view: 'create-all', projectKey: 'MOBL' };
+  const created = { ok: true, created: [{ pair: 'Z-2|d2', key: 'MOBL-6' }, { pair: 'Z-3|d3', key: 'MOBL-7' }], existing: [], inProgress: [], failed: [], notFound: [], assignedTo: {}, assignRefused: [] };
+  await run('jira:issuePanel', { ...panelAnswers, createTasks: created }, async (el, calls) => {
+    check('the create-all pop-up asks before creating anything', /Create 2 tasks\?/.test(text(el)) && /MOBL/.test(text(el)) && !calls.includes('createTasks'));
+    await click(el, /^Create 2$/);
+    check('confirming creates the tasks and says so', calls.includes('createTasks') && /Created 2 tasks/.test(text(el)));
+    await click(el, /^Close$/);
+    check('closing the pop-up tells the panel to reload', global.__closed && global.__closed.created === true);
+  });
+  global.__modal = undefined;
   console.log(failures.length ? `\n${failures.length} FAILED` : '\nall UI checks passed');
   process.exit(failures.length ? 1 : 0);
 })().catch((e) => { console.log('CRASH', e.stack); process.exit(1); });

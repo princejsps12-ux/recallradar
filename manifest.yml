@@ -4,7 +4,7 @@ modules:
       resource: main
       resolver:
         function: resolver
-      viewportSize: large
+      viewportSize: medium
       title: RecallRadar
       icon: https://developer.atlassian.com/platform/forge/images/issue-panel-icon.svg
   # The full-page dashboard: the same Custom UI bundle as the panel (Root.js picks the view by module type).
