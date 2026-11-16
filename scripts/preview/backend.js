@@ -49,8 +49,14 @@
   const urgency = (m) => ({ I: 0, II: 1, III: 2 }[m.recallClass] ?? 0) * 2 + (m.confidence === 'exact' ? 0 : 1);
   const byUrgency = (matches) => matches.map((m, i) => [m, i]).sort((a, b) => urgency(a[0]) - urgency(b[0]) || a[1] - b[1]).map(([m]) => m);
 
+  // What a site where the app is installed in Jira but not connected to Confluence is told (the same words as
+  // NOT_CONNECTED_MESSAGE in src/confluenceClient.js; src/previewBackend.test.mjs fails when they drift apart).
+  const NOT_CONNECTED_MESSAGE =
+    'RecallRadar is not connected to Confluence on this site yet, so it cannot write recall pages. A site admin connects it in Atlassian Administration: Apps → Sites → this site → Connected apps → RecallRadar → View app details → Connections → Connect (next to Confluence). Everything else in RecallRadar works without it.';
+
   // Starting states. `flags`: hang (nothing ever answers: the loading screen), freeze (a running check stays where it
-  // is), startFails, listDevicesFails, suggestFails (the Teamwork Graph says no), recentFails, keepStaleOnce.
+  // is), startFails, listDevicesFails, suggestFails (the Teamwork Graph says no), recentFails, keepStaleOnce,
+  // confluenceOff (the app is not connected to Confluence).
   const SCENARIOS = {
     ready: { about: 'Saved result 8 minutes old, no tasks yet, three wards have a team, the Graph suggests people.', ageMs: 8 * 60000 },
     'in-progress': { about: 'Like ready, with eight tasks created (three done): what a hospital using it for a few days sees.', ageMs: 25 * 60000, tasks: [0, 1, 3, 6, 9, 14, 20, 26], done: 3 },
@@ -63,6 +69,7 @@
     'failed-lookups': { about: 'Three FDA searches failed: the result may be incomplete.', ageMs: 6 * 60000, failedQueries: 3 },
     'none-affected': { about: 'Nothing matches an open recall with an exact or likely match.', ageMs: 8 * 60000, onlyPossible: true },
     'no-graph': { about: 'Like ready, but the Teamwork Graph refuses (no suggestions, no team list): what the demo site did on 2026-11-16.', ageMs: 8 * 60000, flags: { suggestFails: true } },
+    'no-confluence': { about: 'Like ready, but the app is installed in Jira only, not connected to Confluence: the Confluence dialog says how to connect it.', ageMs: 8 * 60000, flags: { confluenceOff: true } },
     'refresh-error': { about: 'Like ready, but Refresh cannot start a check.', ageMs: 8 * 60000, flags: { startFails: true } },
     error: { about: 'The device list cannot be read: the error screen.', flags: { listDevicesFails: true } },
     loading: { about: 'Nothing ever answers: the loading skeleton.', flags: { hang: true } },
@@ -271,9 +278,11 @@
         return { ok: true, recalls: fx.recent };
       },
       listSpaces() {
+        if (flags.confluenceOff) return { ok: false, notConnected: true, error: NOT_CONNECTED_MESSAGE };
         return { ok: true, spaces: SPACES };
       },
       createRecallPage({ payload }) {
+        if (flags.confluenceOff) return { ok: false, notConnected: true, error: NOT_CONNECTED_MESSAGE };
         const space = SPACES.find((s) => s.key === (payload && payload.spaceKey));
         if (!space) return { ok: false, error: 'Choose a Confluence space first.' };
         const open = [...new Set((st.result ? st.result.matches.filter(isAffected) : []).map((m) => m.recallNumber))];
@@ -296,5 +305,5 @@
     return { invoke, state: st, flags, scenario: name };
   }
 
-  return { createBackend, SCENARIOS, RESOLVERS, TEAMS, MEMBERS, PROJECTS, SEARCHES };
+  return { createBackend, SCENARIOS, RESOLVERS, TEAMS, MEMBERS, PROJECTS, SEARCHES, NOT_CONNECTED_MESSAGE };
 });

@@ -8,17 +8,17 @@ It runs as a panel on every Jira issue, as a Rovo agent, and as MCP tools other 
 
 **Install link:** [Install RecallRadar on your site](https://developer.atlassian.com/console/install/2e0464e9-8b4a-4388-b224-b4f05eae484f?signature=AYABeO4RTK5WoBjofwC5LLmbhsYAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucBww%2B9LK1oIgu9liOwPhgsXAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDHKMnOskwi5OXx%2FzLgIBEIA7zuERvhMx7ShEsGkCJm5Z8hk9ed%2Bt7tGaDRXY7BfQDQgmbBI9ZRnlrKpIjin2Om5ZKyqwiB1JHcdqFnsAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgGys7iVbyvKbXxP2R%2BERAnvAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM%2FVNU%2BxfhXtpy4%2BeYAgEQgDsvKNiIJmQha%2FJR9MFVh%2BPee9MRb%2BS8yIpLzcQKBiEpJmV5m14bJnObCM285wbWwmXa80cIEai5oxRxNQAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEATS%2Bkr01q3xokP63tO9y6hEAAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAydBB73g1k8hMBXv2oCARCAO39zZoIuJS%2BmBrVEmrJ6IgA8F1fJ1zjpKdaHLgS0A2U1ATDnB8LEBbE99JXX4bf6vnTBM2yrpM%2BXFlGLAgAAAAAMAAAQAAAAAAAAAAAAAAAAACbRvGQFLeROV2zy2GClH%2F%2F%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADJywqnoXY3ILklDld%2FHhPDyQrscgOSY0SSFTsEKQ8eo%2B3drtTsSIsOcDlwi9SCsXCp%2FHu8jd30aniNvAEKK7u5gOqM%3D&product=jira&product=confluence)
 
-Open it, pick your site, and install it in **Jira** and **Confluence** (Confluence is only needed for the recall pages).
+Open it, pick your site and install it in **Jira**. That is all RecallRadar needs: the app is one installation for the whole site, so the same devices and checks show up in the Jira dashboard, in a Rovo chat started in Jira or Confluence, and in Rovo Home. **Confluence is an optional connection** that only the recall pages use. To add it, a site admin opens Atlassian Administration, Apps, Sites, your site, Connected apps, **RecallRadar**, View app details, **Connections**, and clicks **Connect** next to Confluence. Without it everything else works, and the Confluence dialog says the same.
 
 **Before you start**
 - A Jira site where you can create issues, and a Jira issue to open (any issue works).
-- Optional, each unlocks one feature: **Rovo** (the chat agent), **Confluence** (recall pages), and membership of at least one **team** in your Atlassian directory (the ward-to-team feature lists the teams you belong to; with none, that dropdown is empty and everything else still works).
+- Optional, each unlocks one feature: **Rovo** (the chat agent), **Confluence** (recall pages, once connected as above), and membership of at least one **team** in your Atlassian directory (the ward-to-team feature lists the teams you belong to; with none, that dropdown is empty and everything else still works).
 
 **Five minutes, in order**
 1. Jira, **Apps**, **RecallRadar**: the dashboard. On a fresh site it shows a first-run screen. Click **Load demo hospital** (30 sample devices with real manufacturer and model names), or **Import your own devices** and paste rows from a spreadsheet. It then checks them against the last year of FDA recalls in the background (about 15 seconds).
 2. Expect the headline "N devices need action" with the Class I count and one summary line (devices monitored, open recalls by class, task counts), a **Do this first** list and a table of affected devices. With the demo hospital you should see roughly 20 to 30 open exact or likely recalls across Class I, II and III; the exact numbers drift as the FDA publishes new recalls.
 3. Click a device name for its recalls, the reason each matched and what the FDA says is wrong, then **Create task** (or **Create and assign to ...** in the small menu beside it if you mapped a ward to a team). Open any Jira issue: the **RecallRadar** panel is a compact summary with **Open dashboard** and **Create all N tasks...**.
-4. In a Jira page, ask **Rovo** (Ask Rovo, pick **RecallRadar Assistant**): "Which Cath Lab devices have open Class I recalls?"
+4. Ask **Rovo** (Ask Rovo in Jira, or Rovo Home; pick **RecallRadar Assistant**): "Which Cath Lab devices have open Class I recalls?"
 
 **Try it safely.** Tasks and Confluence pages are real. All RecallRadar tasks carry the label `recallradar`: find them with the Jira search `labels = recallradar` and delete them when you are done. Creating a task for the same recall and device twice is blocked on purpose, so delete the tasks before re-running. Assigning someone sends them a Jira notification, and nobody is assigned unless you click the assign button.
 
@@ -36,7 +36,7 @@ Open it, pick your site, and install it in **Jira** and **Confluence** (Confluen
 | **Check devices for recalls** | Finds recent recalls for the hospital's manufacturers and models and matches them to devices with a confidence level and a reason. |
 | **Create task** | For each exact or likely match, creates a Jira task (one, or all at once) with the ward, the reason, a link to the FDA recall and a due date based on the recall's class. Never twice for the same recall and device. |
 | **Ward teams** | Map each hospital ward (ICU, ER, ...) to a **Teamwork Graph team**. The team list is read from the graph; the mapping is saved in Forge storage. Match rows and the device drawer then show the team name and a suggested assignee. See "Teamwork Graph (read-only)". |
-| **Create Confluence pages** | Pick a space and a recall (or all open ones): one Confluence page per recall with what is wrong, what to do, affected devices and live task cards. Running it again updates the page. |
+| **Create Confluence pages** | Pick a space and a recall (or all open ones): one Confluence page per recall with what is wrong, what to do, affected devices and live task cards. Running it again updates the page. Needs the optional Confluence connection (see the quick start); without it the dialog says how to connect it. |
 | **RecallRadar Assistant** | A Rovo agent that answers questions about recalls from the saved check, explains them in plain English, and creates Jira tasks after you confirm. See "The Rovo agent". |
 
 ## Try it
@@ -303,14 +303,23 @@ How it behaves:
 - Up to 10 pages per call; the answer says how many were left. Every piece of FDA or hospital text is HTML-escaped before it goes in the page.
 - Only open recalls with an exact or likely match get a page; possible matches and finished recalls do not.
 
-The app must be installed in **Confluence** as well as Jira (`forge install -p Confluence -s <site> -e development`) and needs the scopes `read:space:confluence`, `read:page:confluence` and `write:page:confluence`.
+Confluence is an optional connection of the app (see "One installation for Jira, Confluence and Rovo Home" below). The page tools need it, and the scopes `read:space:confluence`, `read:page:confluence` and `write:page:confluence`. On a site where it is not connected, the dashboard dialog and the agent both say so and give the admin steps; nothing else is affected.
 
-Checked in Rovo chat on the demo site: the agent asked for a space (listing the real ones), asked to confirm, created the page in Mobile Development, and a second request updated the same page to version 2 (still one page) and returned a working link. The rendered page was inspected in Confluence.
+Checked in Rovo chat on the demo site: the agent asked for a space (listing the real ones), asked to confirm, created the page in Mobile Development, and a second request updated the same page to version 2 (still one page) and returned a working link. The rendered page was inspected in Confluence. After the move to one shared installation (2026-11-16), the same request from **Rovo Home** updated that page again (still one page).
+
+### One installation for Jira, Confluence and Rovo Home
+
+Forge keeps app storage per installation, and an app installed separately in two products gets two installations: two copies of the agent in the picker and, in Rovo Home, actions that can land in the installation that has no devices. RecallRadar avoids that with Forge's **multi-app compatibility** (`app.compatibility` in [`manifest.yml`](manifest.yml): Jira is the required app, Confluence an optional one; [Atlassian's documentation](https://developer.atlassian.com/platform/forge/app-compatibility/)). There is **one installation per site, one storage and one agent**.
+
+- **Install in Jira; connect Confluence only if you want recall pages** (admin steps in the quick start).
+- A chat in Rovo Home reads the same devices as the Jira dashboard. Its Forge log line says `runs in confluence`: that names the product context of the call, not another installation.
+- **Checked live on the demo site (2026-11-16, development environment):** one RecallRadar Assistant in the agent picker (two before); the same question in the Jira sidebar and in Rovo Home returned the same devices; "Who handles the ICU ward?" and a Confluence page update worked from Rovo Home too. Before Confluence was connected, the Create Confluence pages dialog showed the connect message (Forge's own answer was `403 The app is not installed on this instance`); after connecting through Atlassian Administration it listed the spaces.
+- **Uninstalling goes the other way round:** disconnect Confluence first, then uninstall from Jira.
 
 ### Limits
 
 - **Answers are only as fresh as the saved check** (6 hours; the answer says how old it is, and the panel refreshes it). A check saved by an older version has no per-recall reason text, so refresh it once in the panel.
-- **Ask from inside Jira.** Open **Ask Rovo** from a Jira page (the sidebar or the floating window). The devices and saved checks live in the app's **Jira** installation (Forge storage belongs to one installation: an app, a site and a product). In **Rovo Home**, the full-screen chat outside Jira, the agent's actions run in the app's **Confluence** installation instead (the Forge log says `runs in confluence`; Confluence is installed because page creation needs it), which has no devices. The agent now says exactly that and asks you to repeat the request from Jira; before 2026-11-16 it told you to load the demo hospital again. Making the data visible to both installations would mean keeping it somewhere shared, which is not built.
+- **Per site.** Devices, saved checks and ward teams belong to one Atlassian site (Forge storage is per installation). A second site starts empty.
 - **Only devices in the hospital list** can be checked, against recalls the check found for them.
 - **Action inputs are plain text, numbers or true/false** (Rovo does not allow lists), so "which matches" is chosen with filters: recall number, device id, ward, class.
 
@@ -451,6 +460,8 @@ forge install --upgrade -e development     # only when scopes or permissions cha
 ```
 
 `forge deploy` prints an approval prompt when a change makes a major version (new scopes or external domains); re-run with `--approve MAJOR_VERSION_RULE` if that is what you intended.
+
+The app is multi-app compatible (Jira required, Confluence optional): install it in Jira first (`forge install -e development -p Jira`), then connect Confluence with `forge install -e development -p Confluence`. `forge deploy` refuses an environment that still has an installation in a non-required product (an old separate Confluence installation), so run `forge uninstall -p Confluence` first in that case.
 
 ### Tests
 

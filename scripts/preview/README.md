@@ -60,6 +60,7 @@ and imports answer the way the dialogs read them. People, teams and projects are
 | `failed-lookups` | Three FDA searches failed: "Result may be incomplete" |
 | `none-affected` | Nothing matches an open recall |
 | `no-graph` | The Teamwork Graph refuses (no suggestions, no team list): what the demo site did on 2026-11-16 |
+| `no-confluence` | Like `ready`, but the app is installed in Jira only, not connected to Confluence: the Create Confluence pages dialog says how to connect it |
 | `refresh-error` | **Refresh** cannot start a check |
 | `error` | The device list cannot be read: the error screen |
 | `loading` | Nothing ever answers: the loading skeleton |
@@ -74,7 +75,7 @@ preview cannot quietly fall behind the app.
   dialog, both tabs, the pager, sorting, filters, selects) and fails on: a content security policy violation, a console
   error, an axe-core violation of impact serious or critical (WCAG 2.0 to 2.2 AA and best practice: contrast, names,
   roles, headings), issue-panel content taller than its 262 px frame, anything wider than the screen, or a phone run
-  whose frame is not really that wide. Targets under 24 x 24 px are warnings. Last run: 104 screens, all clean.
+  whose frame is not really that wide. Targets under 24 x 24 px are warnings. Last run: 106 screens, all clean.
   - One known, accepted violation: opening a dialog makes `@atlaskit/modal-dialog` (through `react-scrolllock`) write a
     `body { box-sizing ... }` style, which the policy blocks. The only effect is that the page behind a dialog can still
     scroll. Any other violation fails the run.

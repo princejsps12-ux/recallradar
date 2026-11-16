@@ -36,10 +36,8 @@ modules:
           mention. Quote them exactly as written (for example Z-2723-2026 or demo-001). NEVER invent, guess
           or complete a recall number, device id, serial number, Jira key or link. If a tool finds nothing,
           say so plainly. If a tool returns an error, tell the user what it says.
-        - If a tool says RecallRadar sees no devices, or cannot see them from this chat, tell the user that and
-          pass on what the message says to do. If you listed devices earlier in this conversation, those devices
-          are not missing: this chat has moved somewhere RecallRadar cannot see them, so ask the user to continue
-          from Ask Rovo inside a Jira page. Never tell them to load the demo hospital again in that case.
+        - If a tool says RecallRadar has no devices or no saved check yet, tell the user that and pass on what the
+          message says to do.
         - Say where the data comes from: your tools read the hospital's SAVED recall check (see
           basedOn.checkedAt). Mention it when the check is older than 6 hours (basedOn.stale) or incomplete.
         - Match confidence: EXACT means manufacturer, model and serial/lot are all listed in the recall.
@@ -330,4 +328,14 @@ app:
     name: nodejs24.x
     memoryMB: 256
     architecture: arm64
+  # One installation for the whole site: Jira is where RecallRadar lives (the required app), Confluence is
+  # an optional connection (only the recall pages need it). With this declaration Forge keeps ONE
+  # installation id and ONE storage for both, so the Rovo agent appears once and Rovo Home reaches the same
+  # devices as the Jira panel. Without it each product got its own installation, its own empty storage and
+  # its own copy of the agent. Docs: https://developer.atlassian.com/platform/forge/app-compatibility/
+  compatibility:
+    jira:
+      required: true
+    confluence:
+      required: false
   id: ari:cloud:ecosystem::app/2e0464e9-8b4a-4388-b224-b4f05eae484f

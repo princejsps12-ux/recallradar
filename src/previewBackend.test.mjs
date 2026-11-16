@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 // the shapes the UI reads, and its scenarios must behave the way their descriptions say.
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
-const { createBackend, SCENARIOS, RESOLVERS, SEARCHES } = require('../scripts/preview/backend.js');
+const { createBackend, SCENARIOS, RESOLVERS, SEARCHES, NOT_CONNECTED_MESSAGE } = require('../scripts/preview/backend.js');
 const fixtures = JSON.parse(readFileSync(join(here, '..', 'scripts', 'preview', 'fixtures', 'demo.json'), 'utf8'));
 
 let clock = 1_700_000_000_000;
@@ -182,4 +182,19 @@ test('the recent FDA list answers, or fails when the scenario says so', async ()
   const bad = make('ready');
   bad.flags.recentFails = true;
   assert.equal((await bad.invoke('fetchRecalls')).ok, false);
+});
+
+test('the "not connected to Confluence" state says what the real app says', async () => {
+  const { NOT_CONNECTED_MESSAGE: real } = await import('./confluenceClient.js');
+  assert.equal(NOT_CONNECTED_MESSAGE, real, 'the preview repeats the real message word for word');
+  const off = make('no-confluence');
+  for (const [resolver, payload] of [['listSpaces', {}], ['createRecallPage', { spaceKey: 'BIOMED' }]]) {
+    const answer = await off.invoke(resolver, payload);
+    assert.equal(answer.ok, false, resolver);
+    assert.equal(answer.notConnected, true, resolver);
+    assert.equal(answer.error, real, resolver);
+  }
+  const connected = await make('ready').invoke('listSpaces', {});
+  assert.equal(connected.ok, true, 'every other state has Confluence connected');
+  assert.ok(connected.spaces.length > 0);
 });

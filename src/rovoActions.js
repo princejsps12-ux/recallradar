@@ -8,8 +8,6 @@ import {
   createRemediationTasks,
   createRemediationTask,
   readInputs,
-  installProduct,
-  notVisibleHere,
 } from './agentTools';
 import { createRecallPages } from './recallPageService';
 import { whoHandlesWard } from './teamService';
@@ -36,40 +34,36 @@ export function projectKeyFrom(payload, context) {
   return (context && context.extension && context.extension.project && context.extension.project.key) || '';
 }
 
-async function runTool(name, payload, context, tool) {
+async function runTool(name, payload, tool) {
   try {
-    // Log the NAMES of the inputs only (never the values) and the product whose installation runs this call (never the
-    // site id): "runs in confluence" is how a chat in Rovo Home looks in the logs, "runs in jira" a chat inside Jira.
-    const product = installProduct(context);
-    console.info(`Rovo action ${name}: input keys`, Object.keys(payload || {}), 'runs in', product);
-    // The product rides on the snapshot so that "no devices" can say whether this is simply not the Jira installation.
-    const snapshot = { ...(await loadSnapshot()), product };
-    return await tool(snapshot, readInputs(payload));
+    // Log the NAMES of the inputs only, never the values.
+    console.info(`Rovo action ${name}: input keys`, Object.keys(payload || {}));
+    return await tool(await loadSnapshot(), readInputs(payload));
   } catch (error) {
     console.error(`Rovo action ${name} failed`, error);
     return { ok: false, error: 'RecallRadar could not complete that. Please try again.' };
   }
 }
 
-export const listOpenRecallsAction = (payload, context) =>
-  runTool('list_open_recalls', payload, context, (snapshot, inputs) =>
+export const listOpenRecallsAction = (payload) =>
+  runTool('list_open_recalls', payload, (snapshot, inputs) =>
     snapshot.result
       ? listOpenRecalls({ snapshot, inputs, deps: { getTaskKeys: taskKeyLookup(snapshot) } })
       : listOpenRecalls({ snapshot, inputs }),
   );
 
-export const checkDeviceAction = (payload, context) =>
-  runTool('check_device', payload, context, (snapshot, inputs) => checkDevice({ snapshot, inputs }));
+export const checkDeviceAction = (payload) =>
+  runTool('check_device', payload, (snapshot, inputs) => checkDevice({ snapshot, inputs }));
 
-export const recallDetailsAction = (payload, context) =>
-  runTool('recall_details', payload, context, (snapshot, inputs) =>
+export const recallDetailsAction = (payload) =>
+  runTool('recall_details', payload, (snapshot, inputs) =>
     snapshot.result
       ? recallDetails({ snapshot, inputs, deps: { getTaskKeys: taskKeyLookup(snapshot) } })
       : recallDetails({ snapshot, inputs }),
   );
 
 export const createRemediationTasksAction = (payload, context) =>
-  runTool('create_remediation_tasks', payload, context, (snapshot, inputs) =>
+  runTool('create_remediation_tasks', payload, (snapshot, inputs) =>
     createRemediationTasks({
       snapshot,
       inputs,
@@ -86,7 +80,7 @@ export const createRemediationTasksAction = (payload, context) =>
 
 // ONE task, for external agents (see the rovo:mcp module). Creates a single task as the calling user.
 export const createRemediationTaskAction = (payload, context) =>
-  runTool('create_remediation_task', payload, context, (snapshot, inputs) =>
+  runTool('create_remediation_task', payload, (snapshot, inputs) =>
     createRemediationTask({
       snapshot,
       inputs,
@@ -95,8 +89,8 @@ export const createRemediationTaskAction = (payload, context) =>
   );
 
 // One Confluence page per open recall (create, or update the page that is already there).
-export const createRecallPageAction = (payload, context) =>
-  runTool('create_recall_page', payload, context, (snapshot, inputs) =>
+export const createRecallPageAction = (payload) =>
+  runTool('create_recall_page', payload, (snapshot, inputs) =>
     createRecallPages({
       snapshot,
       inputs,
@@ -106,13 +100,10 @@ export const createRecallPageAction = (payload, context) =>
 
 // Which Teamwork Graph team handles a ward, who is in it, and who to suggest (read-only). Needs no saved
 // check, so it does not go through runTool. The mapping itself is saved in the RecallRadar panel.
-export const whoHandlesWardAction = async (payload, context) => {
+export const whoHandlesWardAction = async (payload) => {
   try {
     const inputs = readInputs(payload);
-    const product = installProduct(context);
-    console.info('Rovo action who_handles_ward: input keys', Object.keys(payload || {}), 'runs in', product);
-    // The ward-to-team mapping is saved in the Jira installation: anywhere else it would wrongly say "no team is mapped".
-    if (product !== 'jira' && product !== 'unknown') return notVisibleHere(product);
+    console.info('Rovo action who_handles_ward: input keys', Object.keys(payload || {}));
     return await whoHandlesWard({ ward: inputs.ward, store: wardTeams, graph: teamGraph, openCounts: await openTaskCounts() });
   } catch (error) {
     console.error('Rovo action who_handles_ward failed', error);

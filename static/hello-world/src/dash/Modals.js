@@ -160,6 +160,9 @@ export function CreateAllModal({ isOpen, onClose, count, deviceCount, suggestedC
 export function ConfluenceModal({ isOpen, onClose, result }) {
   const [spaces, setSpaces] = useState(null);
   const [error, setError] = useState('');
+  // Confluence is an optional connection of the app: a site that only installed it in Jira is the normal case, so this is
+  // told as "connect it first, here is how" and not as a failure.
+  const [notConnected, setNotConnected] = useState(false);
   const [space, setSpace] = useState(null);
   const [recall, setRecall] = useState({ label: 'All open recalls', value: '' });
   const [busy, setBusy] = useState(false);
@@ -168,7 +171,14 @@ export function ConfluenceModal({ isOpen, onClose, result }) {
   useEffect(() => {
     if (!isOpen || spaces !== null) return;
     invoke('listSpaces')
-      .then((r) => (r && r.ok ? setSpaces(r.spaces) : setError((r && r.error) || 'Could not read Confluence spaces.')))
+      .then((r) => {
+        if (r && r.ok) {
+          setSpaces(r.spaces);
+          return;
+        }
+        setNotConnected(Boolean(r && r.notConnected));
+        setError((r && r.error) || 'Could not read Confluence spaces.');
+      })
       .catch(() => setError('Could not reach RecallRadar.'));
   }, [isOpen, spaces]);
 
@@ -196,8 +206,12 @@ export function ConfluenceModal({ isOpen, onClose, result }) {
           <ModalHeader hasCloseButton><ModalTitle>Create Confluence recall page</ModalTitle></ModalHeader>
           <ModalBody>
             <p style={{ marginTop: 0, marginBottom: sp(200) }}>One page per recall: what is wrong, what to do, the affected devices and links to their tasks. Running it again updates the page instead of making a second one. The pages list device ids and wards, so choose the space yourself.</p>
-            {error && <SectionMessage appearance="error" title="Could not load spaces">{error}</SectionMessage>}
-            {spaces === null && !error ? (
+            {error && (
+              <SectionMessage appearance={notConnected ? 'information' : 'error'} title={notConnected ? 'Connect RecallRadar to Confluence first' : 'Could not load spaces'}>
+                {error}
+              </SectionMessage>
+            )}
+            {error ? null : spaces === null ? (
               <div style={{ display: 'flex', gap: sp(100), alignItems: 'center' }}><Spinner size="small" label="Loading spaces" /> Loading spaces…</div>
             ) : (
               <>

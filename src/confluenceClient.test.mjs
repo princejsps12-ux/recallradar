@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createConfluenceClient, pageUrl, SPACE_LIST_LIMIT } from './confluenceClient.js';
+import { createConfluenceClient, pageUrl, isNotConnected, NOT_CONNECTED_MESSAGE, SPACE_LIST_LIMIT } from './confluenceClient.js';
 
 // A stand-in for Forge's route`...` tag: glue the pieces together, encoding interpolated values like Forge does.
 const route = (strings, ...values) => strings.reduce((out, s, i) => out + s + (i < values.length ? encodeURIComponent(values[i]) : ''), '');
@@ -101,4 +101,39 @@ test('Confluence errors become Errors carrying the status and a short detail', a
   await assert.rejects(client([{ status: 500, text: 'boom' }]).findSpace('MD'), /500/);
   await assert.rejects(client([{ status: 200, json: { results: [] } }, { status: 400, text: 'bad body' }]).upsertPage({ spaceId: '9', title: 't', body: 'b' }), /400.*bad body/);
   await assert.rejects(client([{ status: 200, json: { results: [{ id: 5 }] } }, { status: 409, text: 'version conflict' }]).upsertPage({ spaceId: '9', title: 't', body: 'b' }), /409/);
+});
+
+// What Forge's gateway answers on a site where the app is installed in Jira but not connected to Confluence (seen in the
+// Forge log of the demo site on 2026-11-16, before Confluence was connected).
+const NOT_CONNECTED_ANSWER = { status: 403, text: '{"code":403,"message":"The app is not installed on this instance"}' };
+
+test('"the app is not installed on this instance" is recognised, from any of the three calls', async () => {
+  const client = (answers) => createConfluenceClient({ request: fakeRequest(answers).request, route });
+  for (const attempt of [
+    () => client([NOT_CONNECTED_ANSWER]).listSpaces(),
+    () => client([NOT_CONNECTED_ANSWER]).findSpace('MD'),
+    () => client([NOT_CONNECTED_ANSWER]).upsertPage({ spaceId: '9', title: 't', body: 'b' }),
+  ]) {
+    const error = await attempt().then(() => null, (e) => e);
+    assert.ok(error, 'the call fails');
+    assert.equal(isNotConnected(error), true);
+    assert.match(error.message, /403/, 'the original answer is kept for the log');
+  }
+});
+
+test('a 403 that means "you may not do this" is NOT taken for "not connected"', async () => {
+  const client = (answers) => createConfluenceClient({ request: fakeRequest(answers).request, route });
+  const denied = await client([{ status: 403, text: '{"message":"Current user not permitted to use Confluence"}' }]).listSpaces().then(() => null, (e) => e);
+  assert.equal(isNotConnected(denied), false);
+  const wrongStatus = await client([{ status: 404, text: 'The app is not installed on this instance' }]).listSpaces().then(() => null, (e) => e);
+  assert.equal(isNotConnected(wrongStatus), false, 'only a 403 counts');
+  assert.equal(isNotConnected(new Error('boom')), false);
+  assert.equal(isNotConnected(undefined), false);
+  assert.equal(isNotConnected(null), false);
+});
+
+test('the not-connected message names the real admin path and says the rest keeps working', () => {
+  assert.match(NOT_CONNECTED_MESSAGE, /not connected to Confluence/);
+  for (const step of ['Atlassian Administration', 'Connected apps', 'View app details', 'Connections', 'Connect']) assert.ok(NOT_CONNECTED_MESSAGE.includes(step), step);
+  assert.match(NOT_CONNECTED_MESSAGE, /Everything else in RecallRadar works without it/);
 });

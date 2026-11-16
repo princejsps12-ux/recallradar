@@ -96,41 +96,15 @@ export function readInputs(payload) {
 const NO_SAVED_CHECK =
   'There is no saved recall check yet. Ask the user to open the RecallRadar panel on a Jira issue and click "Check devices for recalls" (or wait for the daily refresh), then ask again.';
 
-// Which product's installation is running this call: "jira", "confluence", another product's name, or "unknown".
-// Forge keeps storage per INSTALLATION (the app, one site and one product), so the hospital's devices and saved checks,
-// which live in the Jira installation, are out of reach of a call that runs in any other one: the Confluence installation
-// that page creation needs, another site's, or whichever one Rovo Home picks. The function context carries
-// `installContext`, the installation's ARI ("ari:cloud:jira::site/<id>"); only the product part is read, never the site id.
-export function installProduct(context) {
-  const ari = context && typeof context.installContext === 'string' ? context.installContext : '';
-  const match = /^ari:cloud:([a-z-]+)::/.exec(ari);
-  if (!match) return 'unknown';
-  return match[1].startsWith('jira') ? 'jira' : match[1];
-}
-
-// When a call runs somewhere that is surely not the Jira installation. Said plainly because the model repeats it to the
-// user: the first wording ("the hospital has no devices yet, load the demo hospital") sent people to reload devices that
-// were fine, after the same agent had listed them a minute earlier from Jira.
-export function notVisibleHere(product) {
-  const where = product === 'confluence' ? 'Confluence' : 'a place outside Jira';
-  return {
-    ok: false,
-    error: `RecallRadar keeps the hospital's devices and saved checks in Jira, and this chat is running in ${where}, where it cannot see them. Do NOT ask the user to load the demo hospital: the devices are not missing, they are out of reach from here. Ask them to repeat the request from Ask Rovo inside a Jira page.`,
-  };
-}
-
-// No devices visible at all, and the product is Jira or not known: either none were ever loaded, or this is another
-// installation (another site, Rovo Home). Both are said, so the answer is right whichever it is.
+// No devices means none were loaded on this site yet. The app has ONE installation per site (Jira is the required app,
+// Confluence an optional connection: see `app.compatibility` in manifest.yml), so the Jira dashboard, a chat in the
+// Jira sidebar and a chat in Rovo Home all read the same devices and saved checks.
 const NO_DEVICES =
-  'RecallRadar sees no devices in this chat. Devices and saved checks belong to one Atlassian site and product, so if the user has already loaded devices, this chat is probably running somewhere else (for example Rovo Home, Confluence or another site) where RecallRadar has none: do NOT ask them to load the demo hospital again, ask them to repeat the request from Ask Rovo inside a Jira page on the site where RecallRadar is set up. If no devices have been loaded yet, they open the RecallRadar dashboard in Jira, click "Load demo hospital" (or import their own devices) and run a check, then ask again.';
+  'RecallRadar has no devices on this site yet. Ask the user to open the RecallRadar dashboard in Jira, click "Load demo hospital" (or import their own devices) and run a check, then ask again.';
 
-// What a tool answers when there is no saved check. `snapshot.product` (see installProduct) is set by the Forge handler.
+// What a tool answers when there is no saved check.
 export function noData(snapshot) {
-  if (snapshot.devices.length === 0) {
-    const product = snapshot.product || 'unknown';
-    return product === 'jira' || product === 'unknown' ? { ok: false, error: NO_DEVICES } : notVisibleHere(product);
-  }
-  return { ok: false, error: NO_SAVED_CHECK };
+  return { ok: false, error: snapshot.devices.length === 0 ? NO_DEVICES : NO_SAVED_CHECK };
 }
 
 // Where the data came from, so every answer can say how fresh it is.

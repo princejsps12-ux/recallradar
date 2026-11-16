@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRecallPages, MAX_PAGES_PER_CALL } from './recallPageService.js';
+import { NOT_CONNECTED_MESSAGE } from './confluenceClient.js';
 import { pairKey } from './taskRules.js';
 
 const match = (deviceId, recallNumber, extra = {}) => ({
@@ -72,11 +73,8 @@ test('without a saved check it says how to get one', async () => {
   assert.match((await run(fakeConfluence(), { spaceKey: 'MD' }, withDevices)).error, /saved recall check/);
 });
 
-test('with no devices in sight it says they may be out of reach, and outside Jira that they surely are', async () => {
-  assert.match((await run(fakeConfluence(), { spaceKey: 'MD' }, snapshot(null))).error, /no devices/);
-  const outside = (await run(fakeConfluence(), { spaceKey: 'MD' }, { ...snapshot(null), product: 'confluence' })).error;
-  assert.match(outside, /running in Confluence/);
-  assert.doesNotMatch(outside, /click "Load demo hospital"/);
+test('with no devices it says how to load them', async () => {
+  assert.match((await run(fakeConfluence(), { spaceKey: 'MD' }, snapshot(null))).error, /no devices on this site yet/);
 });
 
 test('without a space it lists the spaces and asks, instead of guessing', async () => {
@@ -200,4 +198,26 @@ test('the summary counts created and updated pages and names the space', async (
   await run(fake, { spaceKey: 'MD', recallNumber: 'Z-1-2026' });
   const out = await run(fake, { spaceKey: 'MD' });
   assert.match(out.message, /1 page\(s\) created and 1 updated in the Mobile Development space/);
+});
+
+test('on a site where the app is not connected to Confluence it answers once, plainly, and writes nothing', async () => {
+  const notConnected = Object.assign(new Error('Confluence answered 403: {"code":403,"message":"The app is not installed on this instance"}'), { notConnected: true });
+  let calls = 0;
+  const confluence = {
+    async listSpaces() { calls += 1; throw notConnected; },
+    async findSpace() { calls += 1; throw notConnected; },
+    async upsertPage() { calls += 1; throw notConnected; },
+  };
+  for (const inputs of [{}, { spaceKey: 'MD' }]) {
+    const out = await createRecallPages({ snapshot: snapshot(), inputs, deps: { confluence } });
+    assert.equal(out.ok, false);
+    assert.equal(out.notConnected, true);
+    assert.equal(out.error, NOT_CONNECTED_MESSAGE);
+  }
+  assert.ok(calls >= 2);
+});
+
+test('any other Confluence failure is not hidden behind the not-connected message', async () => {
+  const confluence = { async listSpaces() { throw new Error('Confluence answered 500: boom'); }, async findSpace() { throw new Error('Confluence answered 500: boom'); }, async upsertPage() {} };
+  await assert.rejects(createRecallPages({ snapshot: snapshot(), inputs: { spaceKey: 'MD' }, deps: { confluence } }), /500/);
 });

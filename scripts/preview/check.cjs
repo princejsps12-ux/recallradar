@@ -128,6 +128,31 @@ async function tour(s, theme) {
   await opened.page.close();
 }
 
+// The Confluence dialog on a site where the app is installed in Jira only (Confluence is an optional connection): it must say
+// how to connect it and offer nothing to choose, instead of an empty form or a failure.
+async function notConnectedTour(s, theme) {
+  const opened = await open(s, { view: 'dashboard', state: 'no-confluence', theme, axe: true });
+  const { frame } = opened;
+  const name = `tour/${theme}/confluence dialog, not connected`;
+  try {
+    await click(frame, 'More actions', { selector: 'button' });
+    await click(frame, 'Create Confluence pages', { selector: '[role="menuitem"], button' });
+    await waitFor(frame, 'Connect RecallRadar to Confluence first');
+    await sleep(350);
+    const offersChoices = await frame.evaluate(() => /Choose a space|Confluence space/.test(document.body.innerText));
+    await inspect(opened, name);
+    if (offersChoices) {
+      const entry = results.find((r) => r.name === name);
+      entry.problems.push('the dialog still offers a space to choose although Confluence is not connected');
+      console.log(`FAIL ${name}\n       the dialog still offers a space to choose although Confluence is not connected`);
+    }
+  } catch (error) {
+    results.push({ name, problems: [`step failed: ${error.message}`], warnings: [] });
+    console.log(`FAIL ${name}\n       step failed: ${error.message}`);
+  }
+  await opened.page.close();
+}
+
 (async () => {
   const s = await session({ scale: 1 });
   try {
@@ -141,7 +166,10 @@ async function tour(s, theme) {
         console.log(`FAIL ${label(spec)}\n       did not open or settle: ${error.message}`);
       }
     }
-    for (const theme of quick ? ['light'] : ['light', 'dark']) await tour(s, theme);
+    for (const theme of quick ? ['light'] : ['light', 'dark']) {
+      await tour(s, theme);
+      await notConnectedTour(s, theme);
+    }
   } finally {
     await s.close();
   }

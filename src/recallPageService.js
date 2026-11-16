@@ -14,6 +14,7 @@ import { compact } from './text.js';
 import { isTaskWorthy, pairKey } from './taskRules.js';
 import { CLOSED_STATUSES, noData } from './agentTools.js';
 import { recallPageTitle, buildRecallPageBody } from './recallPage.js';
+import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient.js';
 
 // Each page costs two Confluence calls (look for it, then write it), roughly a second. Ten per call keeps
 // a request well inside the time a function gets; the answer says how many were left for another call.
@@ -28,7 +29,17 @@ function isClosed(details) {
 }
 
 // inputs: spaceKey (the Confluence space to write in), recallNumber (optional: just that recall).
-export async function createRecallPages({ snapshot, inputs = {}, deps }) {
+// A site where the app is not connected to Confluence gets one plain answer (the first Confluence call is where it shows).
+export async function createRecallPages(args) {
+  try {
+    return await writeRecallPages(args);
+  } catch (error) {
+    if (isNotConnected(error)) return { ok: false, notConnected: true, error: NOT_CONNECTED_MESSAGE };
+    throw error;
+  }
+}
+
+async function writeRecallPages({ snapshot, inputs = {}, deps }) {
   const { result } = snapshot;
   if (!result) return noData(snapshot);
 

@@ -13,6 +13,7 @@ import {
 } from './taskService';
 import { assigneesForMatches, checkExplicitAssignees, setWardTeam } from './teamService';
 import { createRecallPages } from './recallPageService';
+import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient';
 import { importDevices } from './deviceCsv';
 import {
   deviceStore,
@@ -315,8 +316,10 @@ resolver.define('listSpaces', async () => {
     const spaces = await confluenceAsUser.listSpaces();
     return { ok: true, spaces: spaces.map((s) => ({ key: s.key, name: s.name })) };
   } catch (error) {
+    // A site that only installed the app in Jira is the normal case, not a failure worth an error log.
+    if (isNotConnected(error)) return { ok: false, notConnected: true, error: NOT_CONNECTED_MESSAGE };
     console.error('Failed to list Confluence spaces', error);
-    return { ok: false, error: 'Could not read Confluence spaces. Is RecallRadar installed in Confluence?' };
+    return { ok: false, error: 'Could not read Confluence spaces. Please try again.' };
   }
 });
 

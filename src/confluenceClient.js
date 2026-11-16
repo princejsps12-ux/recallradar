@@ -13,6 +13,22 @@ const JSON_HEADERS = { 'Content-Type': 'application/json', Accept: 'application/
 // How many spaces to list when the user has not said which one to use.
 export const SPACE_LIST_LIMIT = 25;
 
+// What the app says about a site where it is installed in Jira but NOT connected to Confluence (Confluence is an optional
+// connection, see `app.compatibility` in manifest.yml, so a site that only installed it in Jira is the normal case).
+// Confluence's own answer is only "403 The app is not installed on this instance", which means nothing to a person, so it
+// is recognised (isNotConnected) and replaced by this. The dashboard shows it, and the agent repeats it. The admin
+// steps are the real ones in Atlassian Administration, checked on the demo site on 2026-11-16.
+export const NOT_CONNECTED_MESSAGE =
+  'RecallRadar is not connected to Confluence on this site yet, so it cannot write recall pages. A site admin connects it in Atlassian Administration: Apps → Sites → this site → Connected apps → RecallRadar → View app details → Connections → Connect (next to Confluence). Everything else in RecallRadar works without it.';
+
+// The text Forge's gateway answers with in that case (HTTP 403, body {"code":403,"message":"The app is not installed on
+// this instance"}). It is matched on the sentence, not on 403 alone: a 403 also means "you may not write in this space".
+const NOT_CONNECTED_ANSWER = /app is not installed on this instance/i;
+
+export function isNotConnected(error) {
+  return Boolean(error && error.notConnected);
+}
+
 async function readError(response) {
   let detail = '';
   try {
@@ -20,7 +36,9 @@ async function readError(response) {
   } catch (error) {
     // no body is fine
   }
-  return new Error(`Confluence answered ${response.status}${detail ? `: ${detail}` : ''}`);
+  const failure = new Error(`Confluence answered ${response.status}${detail ? `: ${detail}` : ''}`);
+  if (response.status === 403 && NOT_CONNECTED_ANSWER.test(detail)) failure.notConnected = true;
+  return failure;
 }
 
 // The full address of a page. Confluence gives each page only a relative path (`webui`); the site's
