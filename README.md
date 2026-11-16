@@ -41,7 +41,7 @@ Open it, pick your site, and install it in **Jira** and **Confluence** (Confluen
 
 ## Try it
 
-1. Open Jira, **Apps**, **RecallRadar** (the dashboard). The compact **RecallRadar** panel on an issue shows the same result; on an issue it is added from the panel menu next to the issue's toolbar.
+1. Open Jira, **Apps**, **RecallRadar** (the dashboard). The compact **RecallRadar** panel on an issue shows the same result.
 2. Click **Load demo hospital**. It adds 30 devices. Running it again replaces only the demo devices and leaves any other devices in storage alone.
 3. The check runs by itself ("Checked N of M FDA searches"); **Refresh** runs it again. The result reads "N devices need action", strongest match first.
 4. Open the **Ward teams** tab, and for each ward pick the team that handles it (the list comes from the Teamwork Graph).
