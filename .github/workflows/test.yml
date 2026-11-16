@@ -1,14 +1,15 @@
-# Runs the checks that need no Atlassian site, no network and no browser: the unit tests, the production build of the
-# Custom UI and the jsdom smoke test of the real panel and dashboard. (The headless-Chrome preview check,
-# `npm run test:preview`, needs Chrome and is run by hand: see docs/DEVELOPMENT.md.)
+# Everything that can be checked without an Atlassian site: lint, the unit tests, the production build of the Custom UI,
+# the jsdom smoke test of the real panel and dashboard, and the real-browser preview check (content security policy,
+# console errors, accessibility, panel height; see scripts/preview/README.md).
 name: tests
 on:
   push:
     branches: [main]
   pull_request:
 jobs:
-  test:
+  checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,6 +20,7 @@ jobs:
             package-lock.json
             static/ui/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm test
       - run: npm ci --legacy-peer-deps
         working-directory: static/ui
@@ -27,3 +29,6 @@ jobs:
         env:
           CI: 'false'
       - run: npm run test:ui
+      - run: npm run test:preview
+        env:
+          CHROME: /usr/bin/google-chrome

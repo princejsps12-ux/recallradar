@@ -96,10 +96,6 @@ const pickOption = async (el, inputId, optionText) => {
   if (option) await act(async () => { option.click(); await wait(150); });
   return Boolean(option);
 };
-const typeInto = async (node, value, proto) => {
-  const set = Object.getOwnPropertyDescriptor(proto, 'value').set;
-  await act(async () => { set.call(node, value); node.dispatchEvent(new window.Event(proto === window.HTMLSelectElement.prototype ? 'change' : 'input', { bubbles: true })); await wait(40); });
-};
 
 (async () => {
   // 1. first run: one big button, loads the demo hospital and starts a check

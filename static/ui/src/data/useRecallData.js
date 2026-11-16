@@ -165,7 +165,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
         })
         .catch(() => {});
     }
-  }, [begin, poll, loadWardInfo, withProjects, wantWards]);
+  }, [begin, poll, loadWardInfo, withProjects, wantWards, light]);
 
   useEffect(() => {
     load();

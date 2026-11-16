@@ -23,7 +23,7 @@ function chromePath() {
 async function session({ scale = 1 } = {}) {
   if (!fs.existsSync(path.join(app, 'build', 'asset-manifest.json'))) throw new Error('No build yet: run "npm run build" in static/ui first.');
   const { server, port } = await start(0);
-  const browser = await puppeteer.launch({ executablePath: chromePath(), headless: true, args: ['--hide-scrollbars'] });
+  const browser = await puppeteer.launch({ executablePath: chromePath(), headless: true, args: ['--hide-scrollbars', ...(process.env.CI ? ['--no-sandbox'] : [])] });
   return { port, scale, browser, close: async () => { await browser.close(); server.close(); } };
 }
 

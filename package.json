@@ -9,10 +9,12 @@
     "test:ui": "node scripts/ui-smoke.cjs",
     "preview": "node scripts/preview/server.cjs",
     "test:preview": "node scripts/preview/check.cjs",
-    "shots": "node scripts/preview/shots.cjs"
+    "shots": "node scripts/preview/shots.cjs",
+    "lint": "eslint . --max-warnings=0"
   },
   "devDependencies": {
     "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^4.6.0"
   },
   "dependencies": {

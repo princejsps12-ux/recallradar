@@ -15,7 +15,6 @@ import WarningIcon from '@atlaskit/icon/core/warning';
 import RefreshIcon from '@atlaskit/icon/core/refresh';
 import PageIcon from '@atlaskit/icon/core/page';
 import UploadIcon from '@atlaskit/icon/core/upload';
-import VisuallyHidden from '@atlaskit/visually-hidden';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
 import { sp, color, card, muted, Progress, CheckedAt } from './ui/kit';
