@@ -71,16 +71,39 @@ Written 15 November 2026 by the assistant, scored hard on purpose. Evidence is i
 - Panel moved to design tokens (dark mode); dashboard polish (skeletons, focus, hover, responsive, accessible table, success state); a browser-free UI smoke test.
 - Marketplace listing, privacy, terms and MCP demo guides written.
 
-## Design score history (fresh screenshot-only reviewer each round)
+## Design review: method, scores and what is left
 
-| Round | Score | Main changes after it |
+**Method.** Each round, three fresh reviewers (no context, screenshots only, same fixed rubric of eight items, 1 to 10, "10 = indistinguishable from Atlassian's best work") scored a full set of screenshots: light, dark and phone width, the dashboard, drawer, ward tab, issue panel, dialogs, loading and error states. The score is the average of the three. Earlier rounds used ONE reviewer: those scores (6.5, 7.2, 7.4, 7.5, 8.3, 8.0) swung by about 0.5 from reviewer to reviewer, so the 8.3 was luck. The honest level is about 7.1 to 7.2.
+
+| Round (screenshots) | Reviewer averages | Mean |
 | --- | --- | --- |
-| 1 | 6.5 | Clearer units, one primary action, consistent buttons |
-| 2 | 7.2 | Links as links, wider actions column, new screenshots |
-| 3 | 7.4 | Quieter hero and cards, stronger drawer scrim |
-| 4 | 7.5 | Aligned lozenge columns, one date format, compact drawer facts |
-| 5 | 8.3 | Partial-list note, calmer ward tab, sticky drawer header |
-| 6 | 8.0 | Matching loading skeleton, three stat cards, capitalised names |
-| 7 | not scored | Tab label constant, no loading layout shift, 240 px team selects |
+| A (`marketplace/screenshots/r8`) | 6.50, 6.81, 6.94 | 6.75 |
+| B (`r9`) | 7.13, 7.38, 6.81 | 7.10 |
+| C (`r10`) | 7.19, 7.19, 6.94 | 7.10 |
+| Final (`r11`) | 7.00, 7.50, 7.06 | **7.19** |
 
-Target is 9.5. Not reached: reviewer scores vary by about 0.5 between rounds and keep finding new points. Dark mode, the issue panel and phone width have not been re-captured for the latest build.
+Target was 9.5. Not reached. Per item, final round (mean of three, then who can move it):
+
+| Item | Mean | Kind | Why |
+| --- | --- | --- | --- |
+| Visual hierarchy | 7.8 | (a) fixable, partly (c) | Stat cards repeat the hero; "Recent FDA recalls" table is as loud as the work list |
+| Clarity of main action | 8.0 | (a), partly (c) | Several secondary buttons per row; drawer has a second primary |
+| Consistency with Atlassian design | 7.2 | (b) and (a) | Lozenge look, dark primary colour and scrim are stock Atlaskit tokens; pagination, danger dialog title icon and button heights are ours to fix |
+| States (loading, empty, error) | 6.7 | (a) | Only loading and one error shot exist; no empty, failed-check or stale shot; the two loading shots were taken at different moments |
+| Dark mode | 8.0 | (b) and (c) | Lozenge saturation, primary button colour, blanket strength come from tokens |
+| Responsiveness (phone) | 6.5 | (a), plus (b) for the panel | Phone drawer header; the issue panel frame has a fixed height (`viewportSize: large`), so it leaves empty space on desktop and clips on phone |
+| Accessibility | 6.7 | (a), partly (b) | Targets under 32 px (pagination, chevrons, radios), 12 to 13 px grey meta text; lozenge text size is the library's |
+| Polish | 6.7 | (a) | Date and time formats mixed, a firm-name casing regression ("B.v."), all-caps FDA product text, layout shift when the assign suggestion arrives |
+
+Caveats about the measurement: the final set still contained a few stale shots (`light-phone-ward-teams` from before the select borders, `light-table` and `dark-table` from before the date format), the light and dark panel shots were taken in different data states, and the two loading shots were captured at different moments. Some deductions are therefore capture artefacts, not product defects. "Phone" shots are the Forge iframe forced to 360 to 390 px, not a real device.
+
+### Plan for the fixable (a) items, in order
+
+1. **Quick fixes (small).** Repair `niceFirm` so "B.V.", "USA" and other short or dotted tokens keep their capitals; `ModalTitle appearance="danger"` on the remove dialog; one button size in rows, drawer and panel; show time the same way everywhere ("1 h ago", absolute time in a tooltip); sentence-case all-caps product text only for plain letter words of four or more letters, never tokens with digits or hyphens; load assign suggestions with the rows so the panel does not grow.
+2. **Pagination and targets (medium).** Render the affected-devices table's pages ourselves and use the standalone `@atlaskit/pagination` (32 px targets, clear selected page) instead of the one built into `DynamicTable`; Atlaskit `Radio` in the remove dialog; make the whole drawer card header the toggle; 14 px for meta text.
+3. **Dashboard hierarchy (medium).** Fold the stat cards into the hero as one summary line (devices, open recalls by class, tasks open); put "Recent FDA device recalls" behind a disclosure or its own tab; one action per row (the device name opens the drawer, the row keeps a single "Create task"); a split button for "Create and assign to ...".
+4. **Issue panel as a compact summary card (medium to large).** Headline ("21 devices need action, 2 Class I"), three fixed-height rows with name, ward and the two lozenges (text truncates, no wrapping, no per-row buttons, no assign suggestion), and one footer: primary "Open dashboard", secondary "Create all N tasks..." (opens the same confirmation). Fixed content height means `viewportSize` can be set to fit, which removes the empty space and the clipping without needing auto-resize.
+5. **Preview harness (medium).** A static page that mounts the dashboard and panel with a stubbed `@forge/bridge` and fixtures (webpack alias), driven by URL parameters (`view`, `state`, `theme`, `width`). It makes first-run, running check, empty, failed check, stale and all-done states capturable without touching demo data, gives identical light and dark shots, and lets us run axe-core in a real browser. It also regenerates the Marketplace screenshots.
+6. **Bigger replacement, only if 2 does not settle it.** Replace `DynamicTable` with a plain semantic table (own sorting and paging, token styling). Do not replace `Lozenge`, `Select` or `Modal`: restyling them would make the app less Atlassian, not more.
+
+Estimate (not measured): with 1 to 5 done, items (a) should reach about 8 to 8.5. Items (b) and (c) keep the average below 9.5 with this rubric and screenshot-only reviewers. Single-reviewer noise is about +/-0.5, so objective checks (axe, target sizes, contrast) are a better finish line than a score.

@@ -30,23 +30,23 @@ Open it, pick your site, and install it in **Jira** and **Confluence** (Confluen
 
 | Part | What it does |
 | --- | --- |
-| **Dashboard** | A full-page app (Apps, RecallRadar): summary cards (devices, open recalls by class, tasks open and done), a table of affected devices you can filter by ward and class, the latest FDA recalls, a first-run screen with **Load demo hospital**, and **Import your own devices** (paste from a spreadsheet). The issue panel links to it. |
+| **Dashboard** | A full-page app (Apps, RecallRadar): "N devices need action" with the Class I count, a **Do this first** list (top 5 devices, one-click **Create task**, **Create all N tasks…**), summary cards (devices, open recalls by class, tasks open), a table of affected devices you can filter by ward and class with a side drawer (device facts, each recall collapsed to one line, the reason we matched it, what the FDA says, the task), a **Ward teams** tab, the latest FDA recalls, and a first-run screen with **Load demo hospital**. A **...** menu holds **Import devices** (paste from a spreadsheet), **Create Confluence pages** and **Remove devices…**. The issue panel is a compact version and links to it. |
 | **Latest recalls** | Lists the 20 newest FDA device recalls: recall number, firm, product, model/lot info, class, date. |
 | **Hospital devices** | Stores the hospital's devices in Forge storage. **Load demo hospital** adds 30 sample devices. |
 | **Check devices for recalls** | Finds recent recalls for the hospital's manufacturers and models and matches them to devices with a confidence level and a reason. |
 | **Create task** | For each exact or likely match, creates a Jira task (one, or all at once) with the ward, the reason, a link to the FDA recall and a due date based on the recall's class. Never twice for the same recall and device. |
-| **Ward teams** | Map each hospital ward (ICU, ER, ...) to a **Teamwork Graph team**. The team list is read from the graph; the mapping is saved in Forge storage. Match rows then show *Team: <name> (from Teamwork Graph)* and a suggested assignee. See "Teamwork Graph (read-only)". |
-| **Create Confluence recall page** | Pick a space and a recall (or all open ones): one Confluence page per recall with what is wrong, what to do, affected devices and live task cards. Running it again updates the page. |
+| **Ward teams** | Map each hospital ward (ICU, ER, ...) to a **Teamwork Graph team**. The team list is read from the graph; the mapping is saved in Forge storage. Match rows and the device drawer then show the team name and a suggested assignee. See "Teamwork Graph (read-only)". |
+| **Create Confluence pages** | Pick a space and a recall (or all open ones): one Confluence page per recall with what is wrong, what to do, affected devices and live task cards. Running it again updates the page. |
 | **RecallRadar Assistant** | A Rovo agent that answers questions about recalls from the saved check, explains them in plain English, and creates Jira tasks after you confirm. See "The Rovo agent". |
 
 ## Try it
 
-1. Open any Jira issue on a site where the app is installed and find the **RecallRadar** panel.
+1. Open Jira, **Apps**, **RecallRadar** (the dashboard). The compact **RecallRadar** panel on an issue shows the same result; on an issue it is added from the panel menu next to the issue's toolbar.
 2. Click **Load demo hospital**. It adds 30 devices. Running it again replaces only the demo devices and leaves any other devices in storage alone.
-3. Click **Check devices for recalls**. Results are grouped by device, strongest match first.
-4. Open **Ward teams**, and for each ward pick the team that handles it (the list comes from the Teamwork Graph).
-5. Click **Create task** under an exact or likely match, or **Create tasks for all** (it asks you to confirm). Tasks are created in the project of the issue the panel is open on, as you, so Jira applies your permissions. If the ward has a team, the row shows **Team: <name> (from Teamwork Graph)** and a **suggested assignee**; **Create & assign to <name>** assigns only if you click it. In the "create all" confirmation, **Also assign the suggested team member** is a checkbox that starts **off**.
-6. Click **Create Confluence recall page**, choose a space and a recall, and click **Create page**.
+3. The check runs by itself ("Checked N of M FDA searches"); **Refresh** runs it again. The result reads "N devices need action", strongest match first.
+4. Open the **Ward teams** tab, and for each ward pick the team that handles it (the list comes from the Teamwork Graph).
+5. Click **Create task** on a row, **Create all N tasks…** (it asks you to confirm), or open **Details** for a device and use **Create N tasks**. Tasks are created as you, so Jira applies your permissions, in the project chosen next to the button (on the issue panel: the project of that issue). If the ward has a team, the drawer offers **Create and assign to <name>**, which assigns only if you click it. In the "create all" confirmation, **Also assign the suggested team member** is a checkbox that starts **off**.
+6. Open the **...** menu, click **Create Confluence pages**, choose a space and a recall, and click **Create page**.
 
 ## How matching works
 
@@ -262,7 +262,7 @@ The rule (written once, in `SUGGESTION_RULE` in [`src/teamService.js`](src/teamS
 | `check_device` | Given a model, serial/lot or device id, says whether the device matches any recall. Only devices in the hospital list can be checked. |
 | `create_remediation_tasks` | Creates Jira tasks (the same code as the panel's buttons, so never a duplicate). **Preview first, then confirm** (see below). |
 | `recall_details` | Explains one recall: what is wrong (the FDA's own reason text), how serious, which devices and wards, what to do, links, and any existing task. |
-| `create_recall_page` | Writes a **Confluence page per open recall** (see below). The panel's **Create Confluence recall page** button runs the same code. |
+| `create_recall_page` | Writes a **Confluence page per open recall** (see below). The dashboard's **...** menu item **Create Confluence pages** runs the same code. |
 | `who_handles_ward` | Which **Teamwork Graph** team handles a ward, who is in it, and who to suggest. Read-only; if the ward has no team it says so and never guesses. |
 
 Each action is an `action` module (a reusable Rovo action other agents can call) and all six are grouped in one `rovo:skill`, `recall-triage` ([`skills/recall-triage/SKILL.md`](skills/recall-triage/SKILL.md)). The logic is in [`src/agentTools.js`](src/agentTools.js) (pure, unit tested); [`src/rovoActions.js`](src/rovoActions.js) is the thin Forge handler layer.

@@ -60,6 +60,15 @@ A Forge **UI function is cut off at 25 s and cannot be given a longer timeout** 
 
 Rules that keep this correct: a result with failed lookups is shown but never saved; only the running job with the matching id may be updated (late or duplicate queue deliveries are skipped); a job with no update for 6 minutes counts as failed; the search has its own 240 s deadline inside the 300 s limit.
 
+### UI layer (Atlaskit, tokens only)
+
+Custom UI (React 18) built from real Atlaskit components. Shared look lives in `static/hello-world/src/ui/kit.js` (`sp(n)` zero-padded space tokens, `color`, `card`, lozenges, `useNarrow`, `formatDay`, `formatWhen`, `ago`, `niceFirm`, `LinkLike`, `Progress`). **Colours and spacing come only from `token()`; no hex.** Screens are in `src/dash/` (`Hero.js` = hero, urgent list, stat cards; `DevicesTable.js`; `DeviceDrawer.js` = custom right-hand drawer with collapsed recall cards and a bulk "Create N tasks"; `WardTeamsTab.js`; `Modals.js` where `ImportModal mode="remove"` is the separate remove-devices dialog; `FirstRun.js`), data in `src/data/useRecallData.js`. The header keeps only Refresh; Import devices, Create Confluence pages and Remove devices live in the "..." menu (`@atlaskit/dropdown-menu`; `@atlaskit/badge` is the Ward teams count).
+
+- Gotcha: CSS like `margin: -${sp(300)}` is **invalid** (`-var(...)`); use `calc(-1 * ${sp(300)})`. This cost one review round.
+- Gotcha: the issue panel has a fixed height (`viewportSize: large` in the manifest), so it shows empty space on desktop and clips on phone width. The planned fix is a compact summary card (see `docs/REVIEW.md`).
+- Phone-width check in Chrome: run `document.querySelector('iframe').style.setProperty('width','390px','important')` on the Jira page; the app switches layout from its own width (`useNarrow`).
+- `npm run test:ui` is the jsdom smoke test; it cannot judge looks. Design reviews, scores and the remaining plan: `docs/REVIEW.md`; screenshot sets: `marketplace/screenshots/r8` to `r11` (r11 is the latest, but a few shots in it are stale, see REVIEW.md).
+
 ### The Rovo agent (RecallRadar Assistant)
 
 Six actions (`list_open_recalls`, `check_device`, `create_remediation_tasks`, `recall_details`, `create_recall_page`, `who_handles_ward`) plus a `rovo:skill` (`recall-triage`, `skills/recall-triage/SKILL.md`). Logic is pure in `src/agentTools.js`; `src/rovoActions.js` is the Forge handler layer.
