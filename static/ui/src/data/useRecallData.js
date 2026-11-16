@@ -25,6 +25,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
   const wantSuggestions = withSuggestions === undefined ? !light : withSuggestions;
   const wantWards = !light || wantSuggestions;
   const [devicesCount, setDevicesCount] = useState(null);
+  const [canManageTeams, setCanManageTeams] = useState(true); // may this person change the ward-to-team mapping? (Jira or project administrator)
   const [canManage, setCanManage] = useState(true); // may this person change the device list? (a Jira administrator may; the server decides)
   const [importedCount, setImportedCount] = useState(0); // devices the person pasted in (the rest are the demo hospital)
   const [result, setResult] = useState(null);
@@ -134,7 +135,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
       if (!devices || !devices.ok) throw new Error('devices');
       setDevicesCount(devices.devices.length);
       setImportedCount(devices.devices.filter((d) => d.source === 'manual').length);
-      if (!light) invoke('getCapabilities').then((r) => { if (r && r.ok) setCanManage(Boolean(r.canManageDevices)); }).catch(() => {});
+      if (!light) invoke('getCapabilities').then((r) => { if (r && r.ok) { setCanManage(Boolean(r.canManageDevices)); setCanManageTeams(r.canManageTeams !== false); } }).catch(() => {});
       const savedResult = saved && saved.ok ? saved.result : null;
       setResult(savedResult);
       const job = status && status.ok ? status.job : null;
@@ -305,7 +306,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
   };
 
   return {
-    devicesCount, importedCount, canManage, result, error, progress, tasks, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, loadRecent, projects, projectKey, creating, note,
+    devicesCount, importedCount, canManage, canManageTeams, result, error, progress, tasks, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, loadRecent, projects, projectKey, creating, note,
     setProjectKey, setNote, load, begin, createTasks, loadDemo, loadWardInfo, afterDevicesChanged,
   };
 }

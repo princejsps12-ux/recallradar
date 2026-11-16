@@ -189,7 +189,7 @@ export default function Dashboard() {
           </div>
         </TabPanel>
         <TabPanel>
-          <WardTeamsTab wardInfo={d.wardInfo} onChanged={d.loadWardInfo} result={d.result} />
+          <WardTeamsTab wardInfo={d.wardInfo} onChanged={d.loadWardInfo} result={d.result} canManage={d.canManageTeams} />
         </TabPanel>
       </Tabs>
       <DeviceDrawer deviceId={drawerDevice} result={d.result} tasks={d.tasks} suggestions={d.suggestions} teams={teams} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onCreateMany={(ms) => d.createTasks(ms, false)} onClose={() => setDrawerDevice(null)} />

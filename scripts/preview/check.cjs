@@ -13,7 +13,7 @@
 const { session, open, click, waitFor, press, choose, axe, measure, sleep } = require('./lib.cjs');
 
 const quick = process.argv.includes('--quick');
-const DASHBOARD_STATES = ['ready', 'in-progress', 'all-done', 'first-run', 'no-check', 'running', 'refreshing', 'stale', 'failed-lookups', 'none-affected', 'no-graph', 'not-admin', 'first-run-not-admin', 'refresh-error', 'error', 'loading'];
+const DASHBOARD_STATES = ['ready', 'in-progress', 'all-done', 'first-run', 'no-check', 'running', 'refreshing', 'stale', 'failed-lookups', 'none-affected', 'no-graph', 'not-admin', 'project-admin', 'first-run-not-admin', 'refresh-error', 'error', 'loading'];
 const PANEL_STATES = ['ready', 'in-progress', 'all-done', 'first-run', 'no-check', 'running', 'stale', 'failed-lookups', 'none-affected', 'refresh-error', 'error', 'loading'];
 
 function matrix() {

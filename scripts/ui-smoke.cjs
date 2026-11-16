@@ -209,6 +209,12 @@ const typeInto = async (node, value, proto) => {
     const buttons = [...el.querySelectorAll('button')].filter((b) => /Load demo hospital|Import your own devices/.test(b.textContent));
     check('a person who is not a Jira administrator is told who can add devices, and both buttons are shut', /A Jira administrator adds the devices/.test(text(el)) && buttons.length === 2 && buttons.every((b) => b.disabled));
   });
+  // Not allowed to choose teams: the Ward teams tab says so and its selects are shut.
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result }, getCapabilities: { ok: true, canManageDevices: false, canManageTeams: false } }, async (el) => {
+    const tab = [...el.querySelectorAll('[role="tab"]')].find((t) => /^Ward teams/.test(t.textContent.trim()));
+    await act(async () => { tab.click(); await wait(400); });
+    check('a person who may not choose teams is told who may, and the team choices are shut', /A Jira or project administrator chooses the teams/.test(text(el)) && [...el.querySelectorAll('input[id^="rr-team-"]')].every((i) => i.disabled));
+  });
   // 3. error screen
   await run('jira:globalPage', { ...base, listDevices: { ok: false }, getSavedMatches: { ok: true, result: null } }, async (el) => {
     check('error screen offers Try again', /Something went wrong/.test(text(el)) && [...el.querySelectorAll('button')].some((b) => /Try again/.test(b.textContent)));

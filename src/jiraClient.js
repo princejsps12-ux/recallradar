@@ -193,12 +193,19 @@ export function createJiraClient({ request, route }) {
 
   // Whether the signed-in person holds Jira's global "Administer Jira" permission. Jira answers
   // { permissions: { ADMINISTER: { havePermission: true | false } } }; anything else counts as "no".
-  async function isAdministrator() {
-    const response = await request(route`/rest/api/3/mypermissions?permissions=ADMINISTER`, { headers: { Accept: 'application/json' } });
+  // ADMINISTER_PROJECTS is a project permission; asked without a project, Jira answers whether the person holds it in at
+  // least one project (that is what "project administrator" means here). One call answers both questions.
+  async function adminRoles() {
+    const response = await request(route`/rest/api/3/mypermissions?permissions=ADMINISTER,ADMINISTER_PROJECTS`, { headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error(`Jira answered ${response.status} when asked for the permissions`);
     const body = await response.json();
-    return Boolean(body && body.permissions && body.permissions.ADMINISTER && body.permissions.ADMINISTER.havePermission === true);
+    const has = (key) => Boolean(body && body.permissions && body.permissions[key] && body.permissions[key].havePermission === true);
+    return { administrator: has('ADMINISTER'), projectAdministrator: has('ADMINISTER_PROJECTS') };
   }
 
-  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, isAdministrator };
+  async function isAdministrator() {
+    return (await adminRoles()).administrator;
+  }
+
+  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, isAdministrator, adminRoles };
 }

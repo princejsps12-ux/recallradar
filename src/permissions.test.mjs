@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { refuseUnlessAdministrator, NOT_ADMIN_MESSAGE, PERMISSION_CHECK_FAILED } from './permissions.js';
+import { refuseUnlessAdministrator, refuseUnlessTeamManager, NOT_ADMIN_MESSAGE, NOT_TEAM_MANAGER_MESSAGE, PERMISSION_CHECK_FAILED } from './permissions.js';
 import { createJiraClient } from './jiraClient.js';
 
 const route = (strings, ...values) => strings.reduce((out, s, i) => out + s + (i < values.length ? encodeURIComponent(values[i]) : ''), '');
@@ -30,10 +30,31 @@ test('the Jira client reads the ADMINISTER permission, and only a clear "true" c
   };
   const yes = await ask(200, { permissions: { ADMINISTER: { havePermission: true } } });
   assert.equal(yes.result, true);
-  assert.equal(yes.fake.asked, '/rest/api/3/mypermissions?permissions=ADMINISTER');
+  assert.equal(yes.fake.asked, '/rest/api/3/mypermissions?permissions=ADMINISTER,ADMINISTER_PROJECTS');
   assert.equal((await ask(200, { permissions: { ADMINISTER: { havePermission: false } } })).result, false);
   assert.equal((await ask(200, { permissions: {} })).result, false);
   assert.equal((await ask(200, null)).result, false);
   assert.equal((await ask(200, { permissions: { ADMINISTER: { havePermission: 'true' } } })).result, false, 'a string is not a yes');
   assert.match((await ask(403, {})).result.message, /403/);
+});
+
+test('who may change the ward-to-team mapping: a Jira administrator or a project administrator, nobody else', async () => {
+  const roles = (administrator, projectAdministrator) => ({ adminRoles: async () => ({ administrator, projectAdministrator }) });
+  assert.equal(await refuseUnlessTeamManager(roles(true, false)), null);
+  assert.equal(await refuseUnlessTeamManager(roles(false, true)), null, 'a project administrator may');
+  assert.equal(await refuseUnlessTeamManager(roles(true, true)), null);
+  assert.deepEqual(await refuseUnlessTeamManager(roles(false, false)), { ok: false, notAllowed: true, error: NOT_TEAM_MANAGER_MESSAGE });
+  const failed = await refuseUnlessTeamManager({ adminRoles: async () => { throw new Error('Jira answered 500'); } });
+  assert.equal(failed.error, PERMISSION_CHECK_FAILED);
+  assert.notEqual(failed.notAllowed, true);
+});
+
+test('the Jira client answers both admin questions from one permissions call', async () => {
+  const fake = answering(200, { permissions: { ADMINISTER: { havePermission: false }, ADMINISTER_PROJECTS: { havePermission: true } } });
+  const client = createJiraClient({ request: (p, o) => fake.request.call(fake, p, o), route });
+  assert.deepEqual(await client.adminRoles(), { administrator: false, projectAdministrator: true });
+  assert.equal(await client.isAdministrator(), false);
+  const none = answering(200, { permissions: {} });
+  const noClient = createJiraClient({ request: (p, o) => none.request.call(none, p, o), route });
+  assert.deepEqual(await noClient.adminRoles(), { administrator: false, projectAdministrator: false });
 });

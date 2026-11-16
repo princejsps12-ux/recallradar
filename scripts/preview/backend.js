@@ -59,9 +59,14 @@
   const NOT_ADMIN_MESSAGE =
     "Only a Jira administrator can change the hospital's device list, because it is shared by the whole site. Ask one to do it, or to make you an administrator.";
 
+  // The same for the ward-to-team mapping (Jira administrators or project administrators; NOT_TEAM_MANAGER_MESSAGE in
+  // src/permissions.js).
+  const NOT_TEAM_MANAGER_MESSAGE =
+    'Only a Jira administrator or a project administrator can change which team handles a ward, because the assignee suggestions for the whole site depend on it. Ask one to do it.';
+
   // Starting states. `flags`: hang (nothing ever answers: the loading screen), freeze (a running check stays where it
   // is), startFails, listDevicesFails, suggestFails (the Teamwork Graph says no), recentFails, keepStaleOnce,
-  // confluenceOff (the app is not connected to Confluence), notAdmin (the signed-in person is not a Jira administrator).
+  // confluenceOff (the app is not connected to Confluence), notAdmin (the signed-in person is not a Jira administrator), notTeamManager (nor a project administrator).
   const SCENARIOS = {
     ready: { about: 'Saved result 8 minutes old, no tasks yet, three wards have a team, the Graph suggests people.', ageMs: 8 * 60000 },
     'in-progress': { about: 'Like ready, with eight tasks created (three done): what a hospital using it for a few days sees.', ageMs: 25 * 60000, tasks: [0, 1, 3, 6, 9, 14, 20, 26], done: 3 },
@@ -75,8 +80,9 @@
     'none-affected': { about: 'Nothing matches an open recall with an exact or likely match.', ageMs: 8 * 60000, onlyPossible: true },
     'no-graph': { about: 'Like ready, but the Teamwork Graph refuses (no suggestions, no team list): what the demo site did on 2026-11-16.', ageMs: 8 * 60000, flags: { suggestFails: true } },
     'no-confluence': { about: 'Like ready, but the app is installed in Jira only, not connected to Confluence: the Confluence dialog says how to connect it.', ageMs: 8 * 60000, flags: { confluenceOff: true } },
-    'not-admin': { about: 'Like ready, but the signed-in person is not a Jira administrator: the devices menu items are shut and the server would refuse them.', ageMs: 8 * 60000, flags: { notAdmin: true } },
-    'first-run-not-admin': { about: 'No devices yet, and the person is not a Jira administrator: the welcome screen says who can add devices.', devices: 'none', flags: { notAdmin: true } },
+    'not-admin': { about: 'Like ready, but the signed-in person is neither a Jira administrator nor a project administrator: the devices menu items and the ward team choices are shut and the server would refuse them.', ageMs: 8 * 60000, flags: { notAdmin: true, notTeamManager: true } },
+    'project-admin': { about: 'Like ready, but the person is a project administrator, not a Jira administrator: devices are shut, ward teams can be chosen.', ageMs: 8 * 60000, flags: { notAdmin: true } },
+    'first-run-not-admin': { about: 'No devices yet, and the person is not a Jira administrator: the welcome screen says who can add devices.', devices: 'none', flags: { notAdmin: true, notTeamManager: true } },
     'refresh-error': { about: 'Like ready, but Refresh cannot start a check.', ageMs: 8 * 60000, flags: { startFails: true } },
     error: { about: 'The device list cannot be read: the error screen.', flags: { listDevicesFails: true } },
     loading: { about: 'Nothing ever answers: the loading skeleton.', flags: { hang: true } },
@@ -169,7 +175,7 @@
         return { ok: true, devices: st.devices };
       },
       getCapabilities() {
-        return { ok: true, canManageDevices: !flags.notAdmin };
+        return { ok: true, canManageDevices: !flags.notAdmin, canManageTeams: !flags.notTeamManager };
       },
       loadDemoHospital() {
         if (flags.notAdmin) return { ok: false, notAllowed: true, error: NOT_ADMIN_MESSAGE };
@@ -266,6 +272,7 @@
         return { ok: true, teams: TEAMS.map(({ ari, name }) => ({ ari, name })) };
       },
       setWardTeam({ payload }) {
+        if (flags.notTeamManager) return { ok: false, notAllowed: true, error: NOT_TEAM_MANAGER_MESSAGE };
         const ward = payload && payload.ward;
         if (!payload || !payload.teamAri) {
           st.mappings = st.mappings.filter((m) => compact(m.ward) !== compact(ward));
@@ -329,5 +336,5 @@
     return { invoke, state: st, flags, scenario: name };
   }
 
-  return { createBackend, SCENARIOS, RESOLVERS, TEAMS, MEMBERS, PROJECTS, SEARCHES, NOT_CONNECTED_MESSAGE, NOT_ADMIN_MESSAGE };
+  return { createBackend, SCENARIOS, RESOLVERS, TEAMS, MEMBERS, PROJECTS, SEARCHES, NOT_CONNECTED_MESSAGE, NOT_ADMIN_MESSAGE, NOT_TEAM_MANAGER_MESSAGE };
 });

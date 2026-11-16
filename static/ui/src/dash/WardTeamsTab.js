@@ -14,7 +14,7 @@ const WARD_PAGE_SIZE = 20;
 
 // Ward to team mapping: the team list is read from the Teamwork Graph (read-only) and the choice is saved
 // in RecallRadar. Each change is saved at once and announced.
-export default function WardTeamsTab({ wardInfo, onChanged, result }) {
+export default function WardTeamsTab({ wardInfo, onChanged, result, canManage = true }) {
   const [teams, setTeams] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState('');
@@ -70,7 +70,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
   const classI = (w) => (needs[w] && needs[w].classI ? 1 : 0);
   const ordered = [...wardInfo.wards].sort((a, b) => classI(b) - classI(a) || count(b) - count(a) || a.localeCompare(b));
   const teamSelect = (ward, mapping, value) => (
-    <Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" placeholder="No team" isDisabled={busy === ward || noTeams} isLoading={busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" />
+    <Select inputId={`rr-team-${ward}`} aria-label={`Team for ${ward}`} spacing="compact" placeholder="No team" isDisabled={busy === ward || noTeams || !canManage} isLoading={busy === ward} options={options} value={value} onChange={(o) => choose(ward, o.value)} menuPosition="fixed" />
   );
   const needsText = (ward, n) => (n ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100) }}>{`${n} ${n === 1 ? 'device' : 'devices'}`}{needs[ward].classI ? <Lozenge appearance="removed">Class I</Lozenge> : null}</span>) : <span style={muted}>None</span>);
   const rows = ordered.map((ward) => {
@@ -93,6 +93,7 @@ export default function WardTeamsTab({ wardInfo, onChanged, result }) {
         Choose the team for each ward. We suggest assignees from it, and nobody is assigned unless you choose. {wardInfo.mappings.length} of {wardInfo.wards.length} wards have a team; wards with a Class I recall come first.
       </p>
       <div role="status" aria-live="polite">
+        {!canManage && <SectionMessage appearance="information" title="A Jira or project administrator chooses the teams">The ward-to-team mapping decides who is suggested for tasks across the whole site, so only a Jira administrator or a project administrator can change it. You can still see it.</SectionMessage>}
         {loadError && <SectionMessage appearance="error" title="Could not load teams">{loadError}</SectionMessage>}
         {message && <SectionMessage appearance={message.kind}>{message.text}</SectionMessage>}
         {teams && teams.length === 0 && <SectionMessage appearance="information" title="No teams yet">You are not in any team in your Atlassian directory, so there is nothing to choose from yet. Create a team (Teams in Jira's left sidebar), add yourself, then reopen this tab.</SectionMessage>}

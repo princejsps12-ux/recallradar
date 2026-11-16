@@ -62,6 +62,7 @@ and imports answer the way the dialogs read them. People, teams and projects are
 | `no-graph` | The Teamwork Graph refuses (no suggestions, no team list): what the demo site did on 2026-11-16 |
 | `no-confluence` | Like `ready`, but the app is installed in Jira only, not connected to Confluence: the Create Confluence pages dialog says how to connect it |
 | `not-admin` | Like `ready`, but the person is not a Jira administrator: Import devices and Remove devices are shut in the menu |
+| `project-admin` | A project administrator, not a Jira administrator: devices are shut, ward teams can be chosen |
 | `first-run-not-admin` | The welcome screen for a person who is not a Jira administrator: it says who can add devices |
 | `refresh-error` | **Refresh** cannot start a check |
 | `error` | The device list cannot be read: the error screen |

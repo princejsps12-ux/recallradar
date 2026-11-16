@@ -15,7 +15,7 @@ import { assigneesForMatches, checkExplicitAssignees, setWardTeam } from './team
 import { createRecallPages } from './recallPageService';
 import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient';
 import { importDevices } from './deviceCsv';
-import { refuseUnlessAdministrator } from './permissions';
+import { refuseUnlessAdministrator, refuseUnlessTeamManager } from './permissions';
 import {
   deviceStore,
   matchCache,
@@ -76,7 +76,8 @@ function defineForAdministrators(name, handler) {
 
 resolver.define('getCapabilities', async () => {
   try {
-    return { ok: true, canManageDevices: await jiraAsUser.isAdministrator() };
+    const roles = await jiraAsUser.adminRoles();
+    return { ok: true, canManageDevices: roles.administrator, canManageTeams: roles.administrator || roles.projectAdministrator };
   } catch (error) {
     console.error('Failed to read the permissions', error);
     return { ok: false };
@@ -254,6 +255,8 @@ resolver.define('listTeams', async ({ context }) => {
 // Save (or, with an empty teamAri, remove) one ward's team. The server checks the team in the graph.
 resolver.define('setWardTeam', async ({ payload, context }) => {
   try {
+    const refused = await refuseUnlessTeamManager(jiraAsUser);
+    if (refused) return refused;
     const ward = payload && typeof payload.ward === 'string' ? payload.ward : '';
     const teamAri = payload && typeof payload.teamAri === 'string' && payload.teamAri ? payload.teamAri : null;
     return await setWardTeam({ ward, teamAri, accountId: context.accountId, graph: teamGraph, store: wardTeams });

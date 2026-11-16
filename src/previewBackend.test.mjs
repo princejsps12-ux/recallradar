@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 // the shapes the UI reads, and its scenarios must behave the way their descriptions say.
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
-const { createBackend, SCENARIOS, RESOLVERS, SEARCHES, NOT_CONNECTED_MESSAGE } = require('../scripts/preview/backend.js');
+const { createBackend, SCENARIOS, RESOLVERS, SEARCHES, NOT_CONNECTED_MESSAGE, NOT_TEAM_MANAGER_MESSAGE } = require('../scripts/preview/backend.js');
 const fixtures = JSON.parse(readFileSync(join(here, '..', 'scripts', 'preview', 'fixtures', 'demo.json'), 'utf8'));
 
 let clock = 1_700_000_000_000;
@@ -204,7 +204,7 @@ test('the "not a Jira administrator" states refuse device changes in the words o
   assert.equal((await import('node:module').then(() => require('../scripts/preview/backend.js'))).NOT_ADMIN_MESSAGE, real);
   for (const name of ['not-admin', 'first-run-not-admin']) {
     const backend = make(name);
-    assert.deepEqual(await backend.invoke('getCapabilities', {}), { ok: true, canManageDevices: false }, name);
+    assert.deepEqual(await backend.invoke('getCapabilities', {}), { ok: true, canManageDevices: false, canManageTeams: false }, name);
     for (const [resolver, payload] of [['loadDemoHospital', {}], ['importDevices', { text: 'Manufacturer\tModel\nA\tB' }], ['removeImportedDevices', {}], ['clearDevices', {}]]) {
       const answer = await backend.invoke(resolver, payload);
       assert.equal(answer.ok, false, `${name} ${resolver}`);
@@ -212,5 +212,15 @@ test('the "not a Jira administrator" states refuse device changes in the words o
       assert.equal(answer.error, real, `${name} ${resolver}`);
     }
   }
-  assert.deepEqual(await make('ready').invoke('getCapabilities', {}), { ok: true, canManageDevices: true });
+  assert.deepEqual(await make('ready').invoke('getCapabilities', {}), { ok: true, canManageDevices: true, canManageTeams: true });
+});
+
+test('the ward team mapping is refused for a person who is neither a Jira administrator nor a project administrator', async () => {
+  const { NOT_TEAM_MANAGER_MESSAGE: real } = await import('./permissions.js');
+  assert.equal(NOT_TEAM_MANAGER_MESSAGE, real);
+  const denied = await make('not-admin').invoke('setWardTeam', { ward: 'ICU', teamAri: '' });
+  assert.deepEqual(denied, { ok: false, notAllowed: true, error: real });
+  const projectAdmin = make('project-admin');
+  assert.equal((await projectAdmin.invoke('getCapabilities', {})).canManageTeams, true);
+  assert.notEqual((await projectAdmin.invoke('setWardTeam', { ward: 'ICU', teamAri: '' })).notAllowed, true);
 });

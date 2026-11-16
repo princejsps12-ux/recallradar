@@ -1,3 +1,10 @@
+// Who may change what is shared by the whole site. Two levels:
+//   * the hospital's DEVICE LIST (demo hospital, import, remove): Jira administrators only;
+//   * the WARD-TO-TEAM mapping (who the assignee suggestions come from): Jira administrators or project administrators
+//     (the people who own the projects the tasks land in).
+// Reading, checking for recalls and creating tasks stay open to everyone who can use the app (Jira's own permissions
+// decide who may create issues).
+//
 // Who may change the hospital's device list. The list is shared by the whole site (every person who opens the issue
 // panel or the dashboard reads it), so loading the demo hospital, importing devices and removing them are for Jira
 // administrators. Reading, checking for recalls and creating tasks stay open to everyone who can use the app (Jira's
@@ -20,4 +27,19 @@ export async function refuseUnlessAdministrator(jira) {
     return { ok: false, error: PERMISSION_CHECK_FAILED };
   }
   return { ok: false, notAllowed: true, error: NOT_ADMIN_MESSAGE };
+}
+
+export const NOT_TEAM_MANAGER_MESSAGE =
+  'Only a Jira administrator or a project administrator can change which team handles a ward, because the assignee suggestions for the whole site depend on it. Ask one to do it.';
+
+// Same shape as refuseUnlessAdministrator, but a project administrator passes too. `jira.adminRoles()` answers
+// { administrator, projectAdministrator }.
+export async function refuseUnlessTeamManager(jira) {
+  try {
+    const roles = await jira.adminRoles();
+    if (roles.administrator || roles.projectAdministrator) return null;
+  } catch (error) {
+    return { ok: false, error: PERMISSION_CHECK_FAILED };
+  }
+  return { ok: false, notAllowed: true, error: NOT_TEAM_MANAGER_MESSAGE };
 }
