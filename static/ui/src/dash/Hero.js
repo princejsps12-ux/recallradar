@@ -43,10 +43,12 @@ function SummaryLine({ devicesCount, stats, result, progressTasks, summaryState,
 
 // The one big number: how many devices need action, with Class I called out in red, then the summary line.
 // Every number says what it counts.
-export function Hero({ stats, devicesCount, result, progressTasks, summaryState, capped }) {
+export function Hero({ stats, devicesCount, result, progressTasks, summaryState, capped, covered = false }) {
   const none = stats.devices === 0;
+  // Every device that needs action already has a task: the work is tracked, so no alarm colour and no "need action".
+  const tracked = covered && !none;
   return (
-    <section aria-label="What needs action" style={{ ...card, borderLeft: `4px solid ${none ? color.borderSuccess : stats.classIDevices ? color.borderDanger : color.borderBrand}` }}>
+    <section aria-label="What needs action" style={{ ...card, borderLeft: `4px solid ${none ? color.borderSuccess : tracked ? color.borderBrand : stats.classIDevices ? color.borderDanger : color.borderBrand}` }}>
       <div style={{ display: 'flex', gap: sp(300), alignItems: 'center', flexWrap: 'nowrap', minHeight: '72px' }}>
         {none ? (
           <>
@@ -62,7 +64,7 @@ export function Hero({ stats, devicesCount, result, progressTasks, summaryState,
               {stats.devices}
             </div>
             <div style={{ minWidth: 0 }}>
-              <Heading size="large">{stats.devices === 1 ? 'device needs action' : 'devices need action'}</Heading>
+              <Heading size="large">{tracked ? (stats.devices === 1 ? 'device has a task' : 'devices have a task') : stats.devices === 1 ? 'device needs action' : 'devices need action'}</Heading>
               <div style={{ marginTop: sp(50) }}>
                 {stats.classIDevices > 0 ? (
                   <span style={{ fontWeight: 600 }}>

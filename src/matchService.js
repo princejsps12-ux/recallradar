@@ -38,17 +38,22 @@ export async function getLatestResult({ devices, cache, jobs }) {
 //   { state: 'running', job }      a check is already running, or was just queued
 // `enqueue({ jobId, trigger })` puts the work on the queue. If that fails the job is marked
 // failed (so nothing looks "running" forever) and the error is passed up.
-export async function requestCheck({ devices, cache, jobs, enqueue, refresh = false }) {
+// Pressing Refresh again right after a check finished is answered with that check: a full check is about 24 openFDA
+// requests, openFDA's anonymous allowance is about 1,000 a day shared by everybody behind the same address, and a result
+// a minute or two old cannot be improved by asking again. A changed device list has a different fingerprint, so it never
+// counts as "just checked".
+export const MIN_REFRESH_INTERVAL_MS = 2 * 60 * 1000;
+
+export async function requestCheck({ devices, cache, jobs, enqueue, refresh = false, nowMs = () => Date.now() }) {
   if (devices.length === 0) return { state: 'no-devices' };
 
-  if (!refresh) {
-    const saved = await cache.read(devices);
-    if (saved) {
-      return {
-        state: 'saved',
-        result: { ...saved.result, checkedAt: saved.checkedAt, fromCache: true, stale: false },
-      };
-    }
+  const saved = await cache.read(devices);
+  const justChecked = saved && nowMs() - Date.parse(saved.checkedAt) < MIN_REFRESH_INTERVAL_MS;
+  if (saved && (!refresh || justChecked)) {
+    return {
+      state: 'saved',
+      result: { ...saved.result, checkedAt: saved.checkedAt, fromCache: true, stale: false },
+    };
   }
 
   const { started, job } = await jobs.start('user');

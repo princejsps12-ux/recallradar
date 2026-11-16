@@ -34,7 +34,7 @@ function LoadingScreen({ quiet }) {
   const row = { display: 'flex', alignItems: 'center', gap: sp(150), padding: `${sp(150)} 0` };
   return (
     <div role={quiet ? undefined : 'status'} aria-live="polite" aria-busy="true">
-      {!quiet && <VisuallyHidden>Loading your devices and recalls…</VisuallyHidden>}
+      {!quiet && <div style={{ ...muted, marginBottom: sp(150) }}>Loading your devices and recalls…</div>}
       <div style={{ display: 'grid', gap: sp(200) }} aria-hidden="true">
         <section style={card}>
           <div style={{ display: 'grid', gap: sp(100) }}>
@@ -175,7 +175,7 @@ export default function Dashboard() {
         </TabList>
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300), width: '100%' }}>
-            <Hero stats={stats} devicesCount={d.devicesCount} result={d.result} progressTasks={progressTasks} summaryState={d.summaryState} capped={Boolean(d.summary && d.summary.capped)} />
+            <Hero stats={stats} devicesCount={d.devicesCount} result={d.result} progressTasks={progressTasks} summaryState={d.summaryState} capped={Boolean(d.summary && d.summary.capped)} covered={d.tasksReady && missing.length === 0} />
             {/* Nothing matches an open recall: the hero says so. A "do this first" list and a table of zero rows with
                 filters would only repeat it (the table's empty state even asked to "clear filters" when none was set). */}
             {all.length > 0 && <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} loading={!d.tasksReady} />}

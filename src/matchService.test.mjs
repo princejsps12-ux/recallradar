@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getSavedMatches, getLatestResult, requestCheck, getCheckStatus, performCheck } from './matchService.js';
+import { getSavedMatches, getLatestResult, requestCheck, getCheckStatus, performCheck, MIN_REFRESH_INTERVAL_MS } from './matchService.js';
 import { createMatchCache, CACHE_TTL_MS, MATCH_CACHE_KEY } from './matchCache.js';
 import { createCheckJobs, JOB_KEY, STALE_JOB_MS } from './checkJob.js';
 import { fakeKv } from './fakeKv.mjs';
@@ -74,7 +74,28 @@ test('requestCheck returns a fresh saved result without queueing anything', asyn
 test('requestCheck with refresh ignores a fresh saved result and queues a job', async () => {
   const s = setup();
   await s.cache.write(devices, found(), new Date(T0).toISOString());
-  const out = await requestCheck({ devices, cache: s.cache, jobs: s.jobs, enqueue: s.enqueue, refresh: true });
+  const later = () => T0 + MIN_REFRESH_INTERVAL_MS + 1000;
+  const out = await requestCheck({ devices, cache: s.cache, jobs: s.jobs, enqueue: s.enqueue, refresh: true, nowMs: later });
+  assert.equal(out.state, 'running');
+  assert.equal(s.state.queued.length, 1);
+});
+
+test('Refresh pressed right after a check is answered with that check: no new job, no new openFDA requests', async () => {
+  const s = setup();
+  await s.cache.write(devices, found(), new Date(T0).toISOString());
+  for (const waited of [0, 30 * 1000, MIN_REFRESH_INTERVAL_MS - 1]) {
+    const out = await requestCheck({ devices, cache: s.cache, jobs: s.jobs, enqueue: s.enqueue, refresh: true, nowMs: () => T0 + waited });
+    assert.equal(out.state, 'saved', `after ${waited} ms`);
+    assert.equal(out.result.fromCache, true);
+  }
+  assert.equal(s.state.queued.length, 0);
+});
+
+test('a changed device list is never "just checked": Refresh after an import starts a job at once', async () => {
+  const s = setup();
+  await s.cache.write(devices, found(), new Date(T0).toISOString());
+  const changed = [...devices, { id: 'b', name: 'B', type: 'pump', manufacturer: 'Baxter', model: '35700BAX2', lotOrSerial: '2', ward: 'ICU' }];
+  const out = await requestCheck({ devices: changed, cache: s.cache, jobs: s.jobs, enqueue: s.enqueue, refresh: true, nowMs: () => T0 + 1000 });
   assert.equal(out.state, 'running');
   assert.equal(s.state.queued.length, 1);
 });

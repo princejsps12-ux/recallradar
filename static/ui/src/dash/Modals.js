@@ -149,7 +149,7 @@ export function CreateAllModal({ isOpen, onClose, count, deviceCount, suggestedC
           </ModalBody>
           <ModalFooter>
             <Button appearance="subtle" isDisabled={running} onClick={onClose}>Cancel</Button>
-            <Button appearance="primary" isLoading={running} onClick={() => onConfirm(assign)}>{`Create ${count}`}</Button>
+            <Button appearance="primary" isLoading={running} onClick={() => onConfirm(assign)}>{`Create ${count} ${count === 1 ? 'task' : 'tasks'}`}</Button>
           </ModalFooter>
         </Modal>
       )}

@@ -9,8 +9,9 @@ allowed-tools: list_open_recalls check_device create_remediation_tasks recall_de
 Use this skill when someone asks which hospital devices are affected by an FDA recall, whether one
 device is affected, what a recall means, or wants follow-up work created in Jira.
 
-All four tools read the hospital's **saved recall check** from RecallRadar. They do not call openFDA,
-so answers are fast and always come from the same data the RecallRadar panel shows.
+The tools read the hospital's **saved recall check** from RecallRadar (only `who_handles_ward` reads the
+Teamwork Graph instead). None of them calls openFDA, so answers are fast and always come from the same
+data the RecallRadar dashboard shows.
 
 ## Which tool for which question
 

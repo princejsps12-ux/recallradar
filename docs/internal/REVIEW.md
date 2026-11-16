@@ -161,4 +161,14 @@ None reaches 9.5. What blocked it, by criterion (developer-fixable items were wo
 
 Administrator check on loading, importing and removing devices (server-side, shown in the dashboard); stable `@forge/api`; `who_handles_ward` added to the MCP tool list; an unguessable confirmation token; one retry for openFDA 429 and 5xx answers; `static/hello-world` renamed to `static/ui` and the panel module key to `recallradar-panel`; loading screen shaped like the page; the all-done state; the Open dashboard icon; no focus ring on close buttons in generated shots; the README cut to about 230 lines with the detail in `docs/`; the stale wording and the personal name removed; listing and submission text corrected, with a caption for live versus generated screenshots; old review screenshots removed from the tree and the plan file moved to `docs/PLAN.md`.
 
-Not re-scored after these fixes.
+### Second round (same day, 15 new reviewers, same rubric, after the fixes above)
+
+| Criterion | Reviewer scores | Mean | Round 1 |
+| --- | --- | --- | --- |
+| Technical implementation | 8.1, 8.4, 8.0 | **8.17** | 8.17 |
+| Design | 8.4, 8.0, 8.3 | **8.23** | 8.20 |
+| Potential impact | 7.9, 7.4, 7.6 | **7.63** | 7.53 |
+| Innovation | 7.3, 7.6, 7.6 | **7.50** | 7.70 |
+| Presentation | 7.8, 8.3, 7.9 | **8.00** | 7.77 |
+
+The mean of the five moved from 7.87 to 7.91. Single reviewers differ by up to 0.6, so the changes in a single criterion are within the noise; the one clear gain is presentation. New blockers named in this round: the hero still said "21 devices need action" in red when every device already had a task (all three design reviewers); `setWardTeam` has no administrator check (all three technical reviewers; its only limit is that the team must be one of the caller's own); anyone could press Refresh back to back and spend the shared openFDA allowance; the README had no picture and mixed installation history into the judge path; the internal notes were linked from the README; "All four tools" in the skill text. Everything except the `setWardTeam` question was fixed afterwards (hero, "Create N tasks" label, loading label, a two-minute refresh cooldown, README picture and why-it-matters paragraph, the installation page, internal notes moved to `docs/internal`). Not re-scored again.
