@@ -20,6 +20,14 @@
 //   * The record is deleted when nobody has updated it for STATE_TTL_MS (the daily trigger updates it every day), and by the
 //     daily cleanup. Its "last run" summary holds Jira issue keys and counts only.
 //
+// Two rules about the storage itself:
+//   * Every change (track, markAlerted, setLast, ...) reads the whole record, changes it and writes it back, so two invocations at
+//     the same moment could lose one update. Each change therefore runs inside a short lease lock (lock.js, on the storage's
+//     atomic set-if-absent): they take turns instead.
+//   * A record that CANNOT BE READ is not the same as one that is not there. "Not there" (or too old, or damaged) starts a new
+//     baseline; "could not be read" throws and writes nothing, so a storage hiccup can never reset the baseline or drop the
+//     alerts that were waiting.
+//
 // `kv` is any object with get(key), set(key, value) and delete(key) (see kvAdapter.js). No Forge imports, so this is unit tested.
 
 export const ALERT_STATE_KEY = 'alerts:state';
@@ -42,9 +50,11 @@ export const ALERT_WINDOW_MS = 2 * DAY_MS;
 // A pair that is no longer affected is forgotten after this long (see above).
 export const FORGET_AFTER_MS = STATE_TTL_MS;
 
-// Forge storage rejects values over 240 KiB. A result that can be saved (200 KiB) holds a few hundred pairs, at about 70 bytes
-// each here; this keeps the record far below the limit even for an unusually large one.
+// Forge storage rejects a single value over 240 KiB. At about 70 bytes a pair, 2,500 pairs are about 175 KB, so the record stays under
+// the limit; a hospital with more affected pairs than that has the first 2,500 tracked (the check itself is not limited by this).
 export const MAX_TRACKED_PAIRS = 2500;
+
+import { createLock } from './lock.js';
 
 const FIRST_SEEN = 0;
 const LAST_SEEN = 1;
@@ -68,6 +78,15 @@ const KIND = 3;
  * @param {() => number} [nowMs]
  */
 export function createAlertState(kv, nowMs = () => Date.now()) {
+  const lock = createLock(kv);
+  /**
+   * @template {any[]} A
+   * @template R
+   * @param {(...args: A) => Promise<R>} change
+   * @returns {(...args: A) => Promise<R>}
+   */
+  const locked = (change) => (...args) => lock.run('alert-state', () => change(...args));
+
   // The stored record if it is intact and not too old; otherwise null (and an old or damaged one is deleted).
   /** @returns {Promise<AlertRecord | null>} */
   async function read() {
@@ -76,7 +95,7 @@ export function createAlertState(kv, nowMs = () => Date.now()) {
     try {
       state = await kv.get(ALERT_STATE_KEY);
     } catch (error) {
-      return null; // storage trouble never blocks a check
+      throw new Error('The alert record could not be read, so nothing was changed.'); // never "no record": that would reset it
     }
     if (!state || typeof state !== 'object' || state.v !== 1 || typeof state.updatedAt !== 'number' || !state.pairs || typeof state.pairs !== 'object') {
       if (state) kv.delete(ALERT_STATE_KEY).catch(() => {});
@@ -235,5 +254,5 @@ export function createAlertState(kv, nowMs = () => Date.now()) {
     return 1;
   }
 
-  return { track, devicesChanged, rebaseline, pendingAlerts, markAlerted, newSince, overview, setLast, clear, purgeExpired };
+  return { track: locked(track), devicesChanged: locked(devicesChanged), rebaseline: locked(rebaseline), pendingAlerts, markAlerted: locked(markAlerted), newSince, overview, setLast: locked(setLast), clear, purgeExpired };
 }

@@ -19,6 +19,13 @@ export function fakeKv(initial = {}) {
     async delete(key) {
       data.delete(key);
     },
+    // Like the real storage: set only when absent. (The real one also expires the key after ttlMs; tests delete it by hand.)
+    async setIfAbsent(key, value) {
+      await new Promise((resolve) => setImmediate(resolve));
+      if (data.has(key)) return false;
+      data.set(key, value);
+      return true;
+    },
     async listByPrefix(prefix) {
       return [...data.entries()]
         .filter(([key]) => key.startsWith(prefix))

@@ -69,6 +69,26 @@ export function createTaskGuard(kv, nowMs = () => Date.now()) {
   }
 
   const reserve = (label) => kv.set(storageKey(label), { at: nowMs() });
+
+  // Take the claim on a label ATOMICALLY (the storage's set-if-absent), so two requests that both found no task cannot both create
+  // one: true means this request owns the label, false that another request already does (it is in progress). Without an atomic
+  // set it falls back to read-then-write, as before.
+  async function claim(label) {
+    const key = storageKey(label);
+    const fallback = async () => {
+      if (await read(label)) return false;
+      await reserve(label);
+      return true;
+    };
+    if (typeof kv.setIfAbsent !== 'function') return fallback();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const taken = await kv.setIfAbsent(key, { at: nowMs() }, GUARD_TTL_MS);
+      if (taken === null) return fallback();
+      if (taken) return true;
+      if (await read(label)) return false; // a fresh claim: read() also deletes one that has expired, and then we try again
+    }
+    return false;
+  }
   const record = (label, key) => kv.set(storageKey(label), { at: nowMs(), key });
   const release = (label) => kv.delete(storageKey(label));
 
@@ -86,7 +106,7 @@ export function createTaskGuard(kv, nowMs = () => Date.now()) {
     return deleted;
   }
 
-  return { read, readMany, reserve, record, release, purgeExpired };
+  return { read, readMany, reserve, claim, record, release, purgeExpired };
 }
 
 // The most pairs one request may ask for. Measured on the demo site: creating 34 tasks in one
@@ -237,10 +257,15 @@ export async function createTasks({ matches, jira, guard, projectKey, today, ass
     return result;
   }
 
-  // Claim every label first, so a second click made while we are working sees "in progress".
-  await Promise.all(toCreate.map((item) => guard.reserve(item.label)));
+  // Claim every label first, so a second click made while we are working sees "in progress". The claim is atomic: when two requests
+  // got this far at the same moment, only one of them gets each label, and the other reports it as in progress.
+  const claimed = [];
+  for (const item of toCreate) {
+    if (guard.claim ? await guard.claim(item.label) : (await guard.reserve(item.label), true)) claimed.push(item);
+    else result.inProgress.push(item.pair);
+  }
 
-  for (const group of chunk(toCreate, BULK_CREATE_LIMIT)) {
+  for (const group of chunk(claimed, BULK_CREATE_LIMIT)) {
     const fields = group.map((item) => {
       const assignee = assignees.get(item.pair);
       return buildIssueFields({ match: item.match, projectKey, issueTypeId, today, assigneeAccountId: assignee && assignee.accountId });

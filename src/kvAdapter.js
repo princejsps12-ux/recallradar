@@ -10,6 +10,20 @@ export const forgeKv = {
   set: (key, value) => kvs.set(key, value),
   delete: (key) => kvs.delete(key),
 
+  // Set `value` only when the key does not exist yet, and let it expire after `ttlMs` (the primitive under lock.js). true: taken,
+  // false: it already exists, null: the storage refused for another reason, so the caller must not rely on it.
+  async setIfAbsent(key, value, ttlMs) {
+    try {
+      await kvs.set(key, value, { keyPolicy: 'FAIL_IF_EXISTS', ttl: { value: Math.max(1, Math.ceil(ttlMs / 1000)), unit: 'SECONDS' } });
+      return true;
+    } catch (error) {
+      const text = `${(error && error.code) || ''} ${(error && error.message) || ''}`;
+      if (/exist/i.test(text)) return false;
+      console.warn('Storage could not take a lock, carrying on without one', text.slice(0, 120));
+      return null;
+    }
+  },
+
   // Return every { key, value } whose key starts with `prefix`, following paging cursors.
   async listByPrefix(prefix) {
     const items = [];

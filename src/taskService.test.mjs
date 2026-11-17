@@ -490,3 +490,24 @@ test('creating tasks clears out expired guards on the way', async () => {
   await run(s, [match(1)]);
   assert.equal(s.kv.data.has('task-guard:stale'), false);
 });
+
+test('two requests for the same pair at the same moment create ONE task: the claim is atomic', async () => {
+  const s = setup();
+  const [a, b] = await Promise.all([run(s, [match(1)]), run(s, [match(1)])]);
+  assert.equal(s.state.created.length, 1, 'Jira got one task');
+  assert.equal(a.created.length + b.created.length, 1);
+  assert.equal(a.inProgress.length + b.inProgress.length, 1, 'the other request is told it is in progress');
+});
+
+test('guard.claim: a fresh claim is refused, an expired one can be taken, and a failed creation releases it', async () => {
+  const clock = { now: T0 };
+  const kv = fakeKv();
+  const guard = createTaskGuard(kv, () => clock.now);
+  assert.equal(await guard.claim('a'), true);
+  assert.equal(await guard.claim('a'), false);
+  clock.now += GUARD_TTL_MS;
+  assert.equal(await guard.claim('a'), true, 'the claim expired (the real storage deletes it by ttl; read() does here)');
+  await guard.release('a');
+  assert.equal(await guard.claim('a'), true);
+});
+

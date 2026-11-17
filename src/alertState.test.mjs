@@ -152,10 +152,39 @@ test('setLast and overview: the last run is kept with the record; clear removes 
   assert.equal((await state.overview()).watching, false);
 });
 
-test('a storage failure never throws out of reading', async () => {
-  const kv = { get: async () => { throw new Error('storage down'); }, set: async () => {}, delete: async () => {} };
-  const state = createAlertState(kv, () => T0);
-  assert.deepEqual(await state.newSince(), []);
-  assert.deepEqual(await state.pendingAlerts(new Set(['a|b'])), { due: [], expired: [] });
+test('a record that cannot be READ never resets the baseline: reading throws and nothing is written', async () => {
+  const kv = fakeKv();
+  const clock = { now: T0 };
+  const state = createAlertState(kv, () => clock.now);
+  await state.track(['Z-1|d1']);
+  clock.now += HOUR;
+  await state.track(['Z-1|d1', 'Z-2|d1']); // news: Z-2 is waiting for its alert
+  const before = JSON.stringify(kv.data.get(ALERT_STATE_KEY));
+  const get = kv.get;
+  kv.get = async (key) => { if (key === ALERT_STATE_KEY) throw new Error('storage hiccup'); return get(key); };
+  await assert.rejects(state.track(['Z-1|d1', 'Z-2|d1', 'Z-3|d1']), /could not be read/);
+  await assert.rejects(state.pendingAlerts(new Set(['Z-2|d1'])), /could not be read/);
+  await assert.rejects(state.markAlerted(['Z-2|d1']), /could not be read/);
+  kv.get = get;
+  assert.equal(JSON.stringify(kv.data.get(ALERT_STATE_KEY)), before, 'the stored record was not touched');
+  assert.deepEqual((await state.pendingAlerts(new Set(['Z-2|d1']))).due, ['Z-2|d1'], 'the waiting alert is still waiting');
   assert.equal(await state.purgeExpired(), 0);
 });
+
+test('changes made at the same moment all survive (they take turns under the lock)', async () => {
+  const kv = fakeKv();
+  const state = createAlertState(kv, () => T0);
+  await state.track(['Z-1|d1']);
+  await Promise.all([
+    state.track(['Z-1|d1', 'Z-2|d1']),
+    state.setLast({ news: 7 }),
+    state.markAlerted(['Z-1|d1']),
+    state.rebaseline(['Z-9|d9']),
+  ]);
+  const record = kv.data.get(ALERT_STATE_KEY);
+  assert.ok(record.pairs['Z-2|d1'], 'the pair the track added is there');
+  assert.deepEqual(record.last, { news: 7 }, 'the last run is there');
+  assert.equal(record.pairs['Z-1|d1'][2], 1, 'the alerted flag is there');
+  assert.ok(record.pairs['Z-9|d9'], 'the rebaselined pair is there');
+});
+
