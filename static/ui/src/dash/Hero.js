@@ -4,7 +4,7 @@ import Button from '@atlaskit/button/new';
 import Select from '@atlaskit/select';
 import Skeleton from '@atlaskit/skeleton';
 import CheckCircleIcon from '@atlaskit/icon/core/check-circle';
-import { sp, cap, color, card, muted, noBreak, ClassLozenge, MatchLozenge, NameLink } from '../ui/kit';
+import { sp, cap, color, card, muted, noBreak, ClassLozenge, MatchLozenge, NameLink, useNarrow } from '../ui/kit';
 import { openRecallsByClass, UNKNOWN_CLASS, CLASSES, taskSummaryParts } from '../dashboardData.mjs';
 
 // One line of facts under the big number. It replaces three separate stat cards: devices monitored, open recalls by
@@ -87,6 +87,9 @@ export function Hero({ stats, devicesCount, result, progressTasks, summaryState,
 // (create them all, with a confirmation). Each row has ONE action, "Create task"; the device name opens its details.
 export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, projects, projectKey, onProject, hasAll, onCreateAll, pendingCount, deviceCount, loading }) {
   const options = projects.map((p) => ({ label: `${p.name} (${p.key})`, value: p.key }));
+  // On a phone the project choice and the button fill the width, one under the other, instead of a narrow box with a button
+  // hanging off its left edge.
+  const narrow = useNarrow();
   return (
     <section aria-labelledby="rr-urgent" style={{ ...card, minHeight: '120px' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(200), justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: sp(200) }}>
@@ -96,13 +99,13 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
           </div>
           {(loading || pendingCount > 0) && <div style={muted}>{`Most urgent first. ${pendingCount} ${pendingCount === 1 ? 'task' : 'tasks'} for ${deviceCount} ${deviceCount === 1 ? 'device' : 'devices'}, one per device and recall.`}</div>}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'flex-end' }}>
-          {(loading || pendingCount > 0) && <div style={{ minWidth: '240px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'flex-end', ...(narrow ? { width: '100%' } : {}) }}>
+          {(loading || pendingCount > 0) && <div style={{ minWidth: '240px', ...(narrow ? { width: '100%' } : {}) }}>
             <label style={muted} htmlFor="rr-project">Create tasks in project</label>
             <Select inputId="rr-project" aria-label="Jira project for new tasks" spacing="compact" options={options} value={options.find((o) => o.value === projectKey) || null} placeholder="Choose a project" onChange={(o) => onProject(o.value)} menuPosition="fixed" />
           </div>}
           {pendingCount > 0 && (
-            <Button appearance="primary" isDisabled={loading || !canCreate || busy} onClick={onCreateAll}>
+            <Button appearance="primary" shouldFitContainer={narrow} isDisabled={loading || !canCreate || busy} onClick={onCreateAll}>
               {`Create all ${pendingCount} tasks…`}
             </Button>
           )}

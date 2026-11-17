@@ -18,7 +18,7 @@ import { runAlerts, friendlyJiraError, friendlyIssueError } from './alertService
 import { assigneesForMatches, checkExplicitAssignees, setWardTeam, wardOwnership } from './teamService.js';
 import { createRecallPages } from './recallPageService.js';
 import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient.js';
-import { importDevices } from './deviceCsv.js';
+import { importDevices, previewDeviceCsv } from './deviceCsv.js';
 import { refuseUnlessAdministrator, refuseUnlessTeamManager } from './permissions.js';
 
 // Jira project keys: letters, digits and underscores, starting with a letter (for example MOBL).
@@ -129,6 +129,16 @@ export function createHandlers(deps) {
     }),
 
     // "Import your own devices": pasted spreadsheet text. All or nothing; the answer lists every problem line.
+    // What a paste would import, before anything is imported: how the columns were read, the first rows, and the line-numbered
+    // problems. It changes nothing, so it needs no permission beyond opening the dialog (which is for administrators).
+    async previewImport({ payload }) {
+      try {
+        return { ok: true, ...previewDeviceCsv(payload && typeof payload.text === 'string' ? payload.text : '') };
+      } catch (error) {
+        log.error('Failed to preview the import', error);
+        return { ok: false, error: 'Could not read what you pasted.' };
+      }
+    },
     importDevices: forAdministrators(async ({ payload }) => {
       try {
         const text = payload && typeof payload.text === 'string' ? payload.text : '';

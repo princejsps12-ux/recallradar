@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDeviceCsv, splitLine, detectDelimiter, importDevices, MAX_IMPORT_ROWS } from './deviceCsv.js';
+import { parseDeviceCsv, previewDeviceCsv, splitLine, detectDelimiter, importDevices, MAX_IMPORT_ROWS, MAX_PREVIEW_TEXT, PREVIEW_ROWS } from './deviceCsv.js';
 
 const csv = 'Device,Manufacturer,Model,Serial,Ward\nSigma pump,Baxter Healthcare,35700BAX2,SP-1,Med-Surg 4E\nVentilator,Getinge,6487800,SI-7,ICU';
 
@@ -102,3 +102,59 @@ test('the UDI-DI is optional, and an empty cell is fine', () => {
   assert.deepEqual(errors, []);
   assert.equal(devices[0].udiDi, '');
 });
+
+// --- the preview ----------------------------------------------------------------------------------------------------
+
+test('previewDeviceCsv shows how each pasted column was read, the first rows, and how many devices have no UDI-DI', () => {
+  const text = 'Asset,Maker,Model no,Serial no,Location,UDI,Notes\nPump A,Baxter Healthcare,35700BAX2,SP-1,ICU,00884838085282,old\nPump B,Getinge,6487800,SI-7,ICU,,\n';
+  const out = previewDeviceCsv(text);
+  assert.equal(out.valid, true);
+  assert.equal(out.count, 2);
+  assert.deepEqual(out.columns.map((c) => [c.header, c.label]), [['Asset', 'Name'], ['Maker', 'Manufacturer'], ['Model no', 'Model'], ['Serial no', 'Serial or lot'], ['Location', 'Ward'], ['UDI', 'UDI-DI'], ['Notes', '']]);
+  assert.deepEqual(out.rows[0], { name: 'Pump A', manufacturer: 'Baxter Healthcare', model: '35700BAX2', lotOrSerial: 'SP-1', ward: 'ICU', udiDi: '00884838085282' });
+  assert.equal(out.withoutUdi, 1);
+  assert.deepEqual(out.errors, []);
+});
+
+test('previewDeviceCsv: a second column for the same field is ignored, as the import does', () => {
+  const out = previewDeviceCsv('Maker,Manufacturer,Model\nAcme,Other,M1');
+  assert.deepEqual(out.columns.map((c) => c.label), ['Manufacturer', '', 'Model']);
+  assert.equal(out.rows[0].manufacturer, 'Acme', 'the first of the two columns wins');
+});
+
+test('previewDeviceCsv shows only the first rows but counts them all', () => {
+  const rows = Array.from({ length: 12 }, (_, i) => `Acme,M${i}`).join('\n');
+  const out = previewDeviceCsv(`Manufacturer,Model\n${rows}`);
+  assert.equal(out.count, 12);
+  assert.equal(out.rows.length, PREVIEW_ROWS);
+  assert.equal(out.rows[4].model, 'M4');
+});
+
+test('previewDeviceCsv gives the same line-numbered problems as the import, and no rows when anything is wrong', () => {
+  const text = 'Manufacturer,Model,UDI\nAcme,M1,00884838085282\n,M2,\nAcme,,\nAcme,M4,123';
+  const out = previewDeviceCsv(text);
+  assert.equal(out.valid, false);
+  assert.equal(out.count, 0);
+  assert.deepEqual(out.rows, []);
+  assert.deepEqual(out.errors, parseDeviceCsv(text).errors);
+  assert.match(out.errors[0], /^Line 3: manufacturer is empty/);
+  assert.match(out.errors.join(' '), /UDI-DI "123" is not a valid GTIN/);
+  assert.equal(out.columns.length, 3, 'the column reading is still shown, so the person can see why');
+});
+
+test('previewDeviceCsv: nothing pasted, no header, and far too much text', () => {
+  assert.equal(previewDeviceCsv('').valid, false);
+  assert.match(previewDeviceCsv('').errors[0], /Paste your device list first/);
+  assert.deepEqual(previewDeviceCsv('').columns, []);
+  assert.match(previewDeviceCsv('Name,Colour\nPump,blue').errors[0], /needs a "manufacturer" column/);
+  const huge = previewDeviceCsv(`Manufacturer,Model\n${'x'.repeat(MAX_PREVIEW_TEXT + 1)}`);
+  assert.equal(huge.valid, false);
+  assert.match(huge.errors[0], /too much text/);
+  assert.equal(previewDeviceCsv(undefined).valid, false);
+});
+
+test('a column header is cut so a pasted paragraph cannot flood the preview', () => {
+  const out = previewDeviceCsv(`${'h'.repeat(300)},Manufacturer,Model\nx,Acme,M1`);
+  assert.equal(out.columns[0].header.length, 40);
+});
+

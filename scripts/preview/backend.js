@@ -37,7 +37,7 @@
   const RESOLVERS = [
     'listDevices', 'loadDemoHospital', 'importDevices', 'removeImportedDevices', 'clearDevices', 'getSavedMatches', 'startCheck', 'getCheckStatus',
     'getTaskStates', 'getProgress', 'getTaskSummary', 'createTasks', 'getWardTeams', 'listTeams', 'setWardTeam', 'suggestAssignees', 'listProjects', 'fetchRecalls',
-    'listSpaces', 'createRecallPage', 'getCapabilities', 'getAlerts', 'saveAlertSettings', 'runAlertsNow', 'getWardPeople',
+    'listSpaces', 'createRecallPage', 'getCapabilities', 'getAlerts', 'saveAlertSettings', 'runAlertsNow', 'getWardPeople', 'previewImport',
   ];
 
   const HOUR = 3600000;
@@ -259,6 +259,50 @@
         st.tasks = {};
         st.alerts.news = [];
         return { ok: true, count: st.devices.length };
+      },
+      // What a paste would import (the same answer as previewDeviceCsv in src/deviceCsv.js; src/previewBackend.test.mjs compares the
+      // two on a few pastes, so the preview cannot drift).
+      previewImport({ payload }) {
+        const raw = String((payload && payload.text) || '');
+        const lines = raw.split(/\r?\n/).filter((l) => l.trim());
+        const empty = (errors, columns) => ({ ok: true, valid: false, count: 0, rows: [], columns: columns || [], errors, withoutUdi: 0 });
+        if (lines.length === 0) return empty(['Paste your device list first: one row per device, with a header row.']);
+        const delimiter = (lines[0].match(/\t/g) || []).length >= (lines[0].match(/,/g) || []).length && lines[0].includes('\t') ? '\t' : ',';
+        const headers = lines[0].split(delimiter).map((h) => h.trim());
+        const aliases = {
+          name: ['name', 'device', 'devicename', 'description', 'asset'],
+          type: ['type', 'kind', 'category', 'devicetype'],
+          manufacturer: ['manufacturer', 'maker', 'make', 'vendor', 'brand', 'firm'],
+          model: ['model', 'modelnumber', 'modelno', 'catalog', 'catalognumber', 'catalogno', 'partnumber'],
+          lotOrSerial: ['serial', 'lot', 'serialnumber', 'lotnumber', 'seriallot', 'lotserial', 'lotorserial', 'serialno'],
+          ward: ['ward', 'location', 'unit', 'department', 'room', 'area'],
+          udiDi: ['udi', 'udidi', 'di', 'gtin', 'deviceidentifier', 'udideviceidentifier'],
+        };
+        const labels = { name: 'Name', type: 'Type', manufacturer: 'Manufacturer', model: 'Model', lotOrSerial: 'Serial or lot', ward: 'Ward', udiDi: 'UDI-DI' };
+        const seen = new Set();
+        const columns = headers.map((header) => {
+          const field = Object.keys(aliases).find((f) => aliases[f].includes(compact(header)));
+          const used = field && !seen.has(field);
+          if (used) seen.add(field);
+          return { header: header.slice(0, 40), field: used ? field : null, label: used ? labels[field] : '' };
+        });
+        const missing = ['manufacturer', 'model'].filter((f) => !seen.has(f)).map((f) => `The header row needs a "${f}" column (found: ${headers.join(', ') || 'nothing'}).`);
+        if (missing.length) return empty(missing, columns);
+        if (lines.length < 2) return empty(['There is a header row but no devices under it.'], columns);
+        const index = (field) => columns.findIndex((c) => c.field === field);
+        const errors = [];
+        const devices = [];
+        raw.split(/\r?\n/).map((line, i) => ({ line, number: i + 1 })).filter(({ line }) => line.trim()).slice(1).forEach(({ line, number }) => {
+          const cells = line.split(delimiter).map((c) => c.trim());
+          const cell = (field) => (index(field) >= 0 ? cells[index(field)] || '' : '');
+          const problems = [];
+          if (!cell('manufacturer')) problems.push('manufacturer is empty');
+          if (!cell('model')) problems.push('model is empty');
+          if (problems.length) errors.push(`Line ${number}: ${problems.join(', ')}.`);
+          else devices.push({ name: cell('name') || `${cell('manufacturer')} ${cell('model')}`, manufacturer: cell('manufacturer'), model: cell('model'), lotOrSerial: cell('lotOrSerial'), ward: cell('ward'), udiDi: cell('udiDi') });
+        });
+        if (errors.length) return empty(errors, columns);
+        return { ok: true, valid: true, count: devices.length, rows: devices.slice(0, 5), columns, errors: [], withoutUdi: devices.filter((d) => !d.udiDi).length };
       },
       importDevices({ payload }) {
         if (flags.notAdmin) return { ok: false, notAllowed: true, error: NOT_ADMIN_MESSAGE };

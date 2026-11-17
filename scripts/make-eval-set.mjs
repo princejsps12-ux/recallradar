@@ -29,6 +29,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeDi, gs1CheckDigitValid } from '../src/udi.js';
+import { fetchJson } from './fetchJson.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const RECALLS_FILE = join(root, 'eval', 'recalls.json');
@@ -85,9 +86,7 @@ async function pull() {
   const out = {};
   for (const { recall } of SPEC) {
     const url = `https://api.fda.gov/device/enforcement.json?search=recall_number:"${recall}"&limit=3`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`openFDA answered ${res.status} for ${recall}`);
-    const record = (await res.json()).results.find((r) => r.recall_number === recall);
+    const record = (await fetchJson(url)).results.find((r) => r.recall_number === recall);
     if (!record) throw new Error(`${recall} was not found`);
     out[recall] = Object.fromEntries(FIELDS.filter((f) => record[f] != null).map((f) => [f, record[f]]));
     await new Promise((resolve) => setTimeout(resolve, 250));

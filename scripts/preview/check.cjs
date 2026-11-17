@@ -94,7 +94,8 @@ async function tour(s, theme) {
     await click(frame, 'Recent FDA device recalls', { selector: 'button' });
     await waitFor(frame, 'Z-');
   });
-  await step('device drawer', () => click(frame, 'Details for', { exact: false, selector: 'button' }));
+  // A device in a ward that has a team, so the drawer offers the split button and a people card with something in it.
+  await step('device drawer', () => click(frame, 'Details for Impella Controller', { exact: false, selector: 'button' }));
   await step('drawer card open', () => frame.evaluate(() => document.querySelector('[role="dialog"] section[aria-label^="Recall"] button[aria-expanded="false"]').click()));
   await step('drawer: who handles this ward', async () => {
     await click(frame, 'Who handles this ward', { exact: false, selector: 'button' });
@@ -174,16 +175,42 @@ async function alertsTour(s, theme) {
 // The "Who handles this ward" card for a ward with two projects, one with no project and a person whose work cannot be read, and
 // for a graph that refuses: every state must be readable, keyboard reachable and inside the drawer.
 async function peopleTour(s, theme) {
-  const cases = [['in-progress', 'Details for Impella Controller', 'Cath Lab, two projects'], ['in-progress', 'Details for Digital ECG', 'Cardiology, no project and one person unread'], ['no-graph', 'Details for Impella Controller', 'the graph refuses']];
-  for (const [state, label, what] of cases) {
+  const cases = [['in-progress', 'Cath Lab', 'Cath Lab, two projects'], ['in-progress', 'Cardiology', 'Cardiology, no project and one person unread'], ['no-graph', 'Cath Lab', 'the graph refuses']];
+  for (const [state, ward, what] of cases) {
     const name = `tour/${theme}/who handles this ward, ${what}`;
     try {
       const opened = await open(s, { view: 'dashboard', state, theme, axe: true });
       const { frame } = opened;
-      await click(frame, label, { exact: false, selector: 'button' });
+      await choose(frame, 'rr-ward-filter', ward);
+      await click(frame, 'Details for', { exact: false, selector: 'tbody button' }); // the table, which the filter narrowed
       await sleep(400);
       await click(frame, 'Who handles this ward', { exact: false, selector: 'button' });
       await frame.waitForFunction(() => /Team: |No team is set|Could not read the Teamwork Graph/.test(document.body.innerText), { timeout: 8000 });
+      await sleep(350);
+      await inspect(opened, name);
+      await opened.page.close();
+    } catch (error) {
+      results.push({ name, problems: [`step failed: ${error.message}`], warnings: [] });
+      console.log(`FAIL ${name}\n       step failed: ${error.message}`);
+    }
+  }
+}
+
+// The import dialog with something pasted: a paste that imports (how the columns were read, the first rows) and one with problems,
+// on a desktop and on a phone. The preview is read from the server a moment after the last key.
+async function importTour(s, theme) {
+  const valid = 'Asset,Maker,Model no,Serial,Location,Notes\nPump A,Baxter Healthcare,35700BAX2,SP-1,ICU,old\nPump B,Getinge,6487800,SI-7,ICU,';
+  const invalid = 'Maker,Model\nAcme,M1\n,M2';
+  const cases = [['valid paste', valid, 'will be imported', null], ['paste with problems', invalid, 'Nothing can be imported yet', null], ['valid paste, phone', valid, 'will be imported', { width: 390, height: 844 }]];
+  for (const [what, text, expected, size] of cases) {
+    const name = `tour/${theme}/import dialog, ${what}`;
+    try {
+      const opened = await open(s, { view: 'dashboard', state: 'ready', theme, axe: true, ...(size || {}) });
+      const { frame } = opened;
+      await click(frame, 'More actions', { selector: 'button' });
+      await click(frame, 'Import devices', { selector: '[role="menuitem"], button' });
+      await frame.type('textarea[aria-label="Devices to import"]', text);
+      await waitFor(frame, expected);
       await sleep(350);
       await inspect(opened, name);
       await opened.page.close();
@@ -253,6 +280,7 @@ async function notConnectedTour(s, theme) {
       await tour(s, theme);
       await progressPhone(s, theme);
       await peopleTour(s, theme);
+      await importTour(s, theme);
       await alertsTour(s, theme);
       await notConnectedTour(s, theme);
     }

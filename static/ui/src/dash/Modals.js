@@ -8,8 +8,68 @@ import Checkbox from '@atlaskit/checkbox';
 import { RadioGroup } from '@atlaskit/radio';
 import SectionMessage from '@atlaskit/section-message';
 import Spinner from '@atlaskit/spinner';
+import VisuallyHidden from '@atlaskit/visually-hidden';
 import { sp, color, muted, LinkLike } from '../ui/kit';
+import Lozenge from '@atlaskit/lozenge';
 import { affectedMatches } from '../dashboardData.mjs';
+
+// How long to wait after the last key before reading what was pasted (each reading is a call to the server).
+const PREVIEW_DELAY_MS = 400;
+
+// What the paste would import, read by the server (src/deviceCsv.js previewDeviceCsv): how each of the person's columns was
+// understood, the first rows as devices, and the line-numbered problems. Nothing is imported from here.
+function ImportPreview({ state }) {
+  const { status, data, error } = state;
+  if (status === 'idle') return null;
+  if (status === 'error') return <SectionMessage appearance="warning" title="Could not read what you pasted">{error}</SectionMessage>;
+  const d = data;
+  return (
+    <div aria-busy={status === 'loading'} style={{ marginTop: sp(200), opacity: status === 'loading' ? 0.6 : 1 }}>
+      {d && d.columns.length > 0 && (
+        <div>
+          <div style={muted}>How your columns were read</div>
+          <ul aria-label="How your columns were read" style={{ listStyle: 'none', margin: `${sp(50)} 0 0`, padding: 0, display: 'flex', flexWrap: 'wrap', gap: sp(75) }}>
+            {d.columns.map((c, i) => (
+              <li key={`${c.header}-${i}`} style={{ display: 'inline-flex', alignItems: 'center', gap: sp(50) }}>
+                <span>{c.header || '(empty)'}</span>
+                <span aria-hidden="true" style={muted}>→</span>
+                <VisuallyHidden>is read as</VisuallyHidden>
+                {c.label ? <Lozenge appearance="success">{c.label}</Lozenge> : <Lozenge>ignored</Lozenge>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {d && d.valid && (
+        <div style={{ marginTop: sp(150) }}>
+          <div role="status"><strong>{d.count} {d.count === 1 ? 'device' : 'devices'}</strong> will be imported{d.count > d.rows.length ? `, the first ${d.rows.length} are shown` : ''}.{d.withoutUdi > 0 ? <span style={muted}>{` ${d.withoutUdi} ${d.withoutUdi === 1 ? 'has' : 'have'} no UDI-DI: add one to match by identifier.`}</span> : null}</div>
+          <div role="region" aria-label="The first devices that will be imported" tabIndex={0} style={{ overflowX: 'auto', marginTop: sp(75) }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '520px', tableLayout: 'fixed', fontSize: '14px' }}>
+              <caption style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Devices to import</caption>
+              <thead>
+                <tr>{['Name', 'Manufacturer', 'Model', 'Serial or lot', 'Ward'].map((h) => <th key={h} scope="col" style={{ textAlign: 'left', padding: `${sp(50)} ${sp(100)} ${sp(50)} 0`, color: color.subtle, fontWeight: 500, borderBottom: `1px solid ${color.border}`, whiteSpace: 'nowrap' }}>{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {d.rows.map((r, i) => (
+                  <tr key={i}>
+                    {[r.name, r.manufacturer, r.model, r.lotOrSerial, r.ward].map((cell, j) => <td key={j} style={{ padding: `${sp(50)} ${sp(100)} ${sp(50)} 0`, borderBottom: `1px solid ${color.border}`, overflowWrap: 'anywhere', verticalAlign: 'top' }} title={cell}>{cell || <span style={muted}>-</span>}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {d && !d.valid && (
+        <div style={{ marginTop: sp(150) }} role="status">
+          <SectionMessage appearance="error" title="Nothing can be imported yet">
+            <ul style={{ margin: 0, paddingLeft: '20px' }}>{d.errors.map((e) => <li key={e}>{e}</li>)}</ul>
+          </SectionMessage>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const EXAMPLE = 'Name\tManufacturer\tModel\tSerial\tWard\nSigma Spectrum pump\tBaxter Healthcare\t35700BAX2\tSP-30977\tMed-Surg 4E';
 
@@ -22,10 +82,35 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
   const [problems, setProblems] = useState([]);
   const [removeAsk, setRemoveAsk] = useState(''); // '' | 'imported' | 'all'
   const [done, setDone] = useState('');
+  const [preview, setPreview] = useState({ status: 'idle', data: null, error: '' });
   // With nothing imported the only thing left to remove is everything, so that is the preselected choice.
   const defaultChoice = importedCount > 0 ? 'imported' : 'all';
   const mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
+
+  // Read the paste a moment after the last key, so what will be imported is on screen before the button is pressed. A reading that
+  // arrives after the text changed again is dropped.
+  useEffect(() => {
+    if (removing || !isOpen) return undefined;
+    if (!text.trim()) {
+      setPreview({ status: 'idle', data: null, error: '' });
+      return undefined;
+    }
+    let cancelled = false;
+    setPreview((previous) => ({ ...previous, status: 'loading' }));
+    const timer = setTimeout(() => {
+      invoke('previewImport', { text })
+        .then((r) => {
+          if (cancelled) return;
+          setPreview(r && r.ok ? { status: 'ready', data: r, error: '' } : { status: 'error', data: null, error: (r && r.error) || 'Try pasting again.' });
+        })
+        .catch(() => !cancelled && setPreview({ status: 'error', data: null, error: 'Could not reach RecallRadar.' }));
+    }, PREVIEW_DELAY_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [text, isOpen, removing]);
 
   const submit = async () => {
     setBusy(true);
@@ -68,7 +153,8 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
           <ModalBody>
             {!removing && (<>
             <p style={{ marginTop: 0, marginBottom: sp(200) }}>Copy rows from a spreadsheet (or a .csv) and paste them here. The first row names the columns: <strong>Manufacturer</strong> and <strong>Model</strong> are required; Name, Type, Serial (or Lot) and Ward are optional. Up to 200 devices at a time. Importing replaces the devices you imported before and leaves the demo hospital alone. <strong>Do not include patient data.</strong></p>
-            <Textarea isInvalid={problems.length > 0} aria-label="Devices to import" placeholder={EXAMPLE} minimumRows={8} resize="vertical" value={text} onChange={(e) => setText(e.target.value)} />
+            <Textarea isInvalid={problems.length > 0 || (preview.status === 'ready' && !preview.data.valid)} aria-label="Devices to import" placeholder={EXAMPLE} minimumRows={6} resize="vertical" value={text} onChange={(e) => setText(e.target.value)} />
+            <ImportPreview state={preview} />
             </>)}
             <div role="status" aria-live="polite" style={{ marginTop: sp(100) }}>
               {problems.length > 0 && (
@@ -97,7 +183,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
           <ModalFooter>
             <Button appearance="subtle" onClick={onClose}>Cancel</Button>
             {removing && <Button appearance="danger" isLoading={busy} onClick={remove}>{(removeAsk || defaultChoice) === 'all' ? `Remove all ${total} devices` : `Remove ${importedCount} imported ${importedCount === 1 ? 'device' : 'devices'}`}</Button>}
-            {!removing && <Button appearance="primary" isLoading={busy && !removeAsk} isDisabled={!text.trim()} onClick={submit}>Import devices</Button>}
+            {!removing && <Button appearance="primary" isLoading={busy && !removeAsk} isDisabled={!text.trim() || preview.status !== 'ready' || !preview.data.valid} onClick={submit}>{preview.status === 'ready' && preview.data.valid ? `Import ${preview.data.count} ${preview.data.count === 1 ? 'device' : 'devices'}` : 'Import devices'}</Button>}
           </ModalFooter>
         </Modal>
       )}

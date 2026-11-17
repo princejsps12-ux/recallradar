@@ -50,11 +50,13 @@ Try it in about ten minutes (install, then): open the dashboard and click **Load
 
 **The app's own screenshots are generated** (`npm run shots`, see [`scripts/preview/README.md`](../scripts/preview/README.md)) from the real production bundle, with invented data, so they always match the current UI. They are in [`marketplace/screenshots/`](screenshots/) at 1440 x 900 CSS pixels (the issue panel at 680 x 262, phone at 390 x 844), captured at 2x. Upload them in this order, the first five are the ones a gallery shows first:
 
-1. `01-dashboard-overview-light.jpg`: "21 devices need action", the summary line and **Do this first**.
+1. `01-dashboard-overview-light.jpg`: "25 devices need action", the summary line and **Do this first**.
 2. `03-device-drawer-light.jpg`: one device's recalls, each with the reason it matched and what the FDA says is wrong.
 3. `15-assign-menu-light.jpg`: **Create task**, with the Teamwork Graph's suggested assignee in the menu (nobody is assigned unless you choose).
 4. `02-affected-devices-light.jpg`: the table you can filter, sort and page through.
 5. `09-issue-panel-light.jpg`: the compact panel on every Jira issue.
+
+The newer ones follow (`24` to `28`; `20` to `23` below are taken on the demo site, so the generated set resumes at 24): `24-progress-light.jpg` (how much of the work is done, per recall and per ward), `25-new-since-yesterday-light.jpg` (the devices a recall started to affect in the last day, and their tasks), `26-daily-alerts-dialog-light.jpg` (the daily alerts: where the tasks go, what the last run did), `27-who-handles-ward-light.jpg` (the ward's team, the Jira project it works in and who leads it, and each person's open work, from the Teamwork Graph) and `28-import-preview-light.jpg` (a pasted list read before it is imported: how each column was understood, the first rows).
 
 Then `16-create-all-confirm-light.jpg` (it asks before creating), `04-ward-teams-light.jpg`, `06-confluence-dialog-light.jpg`, `05-import-dialog-light.jpg`, `07-first-run-light.jpg`, the dark ones (`10`, `11`, `12`), the phone ones (`13`, `14`) and the states (`17-check-refreshing`, `18-all-tasks-created`, `19-no-devices-need-action`). `08-loading-state-light.jpg` is for the README, not the gallery.
 

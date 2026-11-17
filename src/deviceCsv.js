@@ -116,6 +116,51 @@ export function parseDeviceCsv(text) {
   return errors.length ? { devices: [], errors } : { devices, errors: [] };
 }
 
+// --- The preview -----------------------------------------------------------------------------------------------------
+
+// A paste is read before anything is imported, so the person sees what RecallRadar understood: which of their columns became
+// which field, and the first rows as devices. It changes nothing and stores nothing.
+export const PREVIEW_ROWS = 5;
+// The longest paste the preview reads. 200 rows of 120-character fields in 7 columns is about 170 KB; more than this is refused
+// without parsing it, so a huge paste cannot make the server work for nothing.
+export const MAX_PREVIEW_TEXT = 200 * 1000;
+
+const FIELD_LABELS = { name: 'Name', type: 'Type', manufacturer: 'Manufacturer', model: 'Model', lotOrSerial: 'Serial or lot', ward: 'Ward', udiDi: 'UDI-DI' };
+
+/**
+ * @returns { valid, count, rows, columns, errors, withoutUdi }
+ *   valid    true when the paste would import (no problems); the resolver's own `ok` means only that the question was answered
+ *   rows     the first PREVIEW_ROWS devices as they would be imported: { name, manufacturer, model, lotOrSerial, ward, udiDi }
+ *   columns  how each pasted header was read: { header, field, label }; label is '' for one that is ignored (a column RecallRadar
+ *            has no use for, or a second column for a field that already has one)
+ *   errors   the same line-numbered problems the import would give; with any, nothing would be imported
+ */
+export function previewDeviceCsv(text) {
+  const raw = String(text || '');
+  if (raw.length > MAX_PREVIEW_TEXT) {
+    return { valid: false, count: 0, rows: [], columns: [], errors: [`That is too much text for one paste. Paste at most ${MAX_IMPORT_ROWS} devices at a time.`], withoutUdi: 0 };
+  }
+  const { devices, errors } = parseDeviceCsv(raw);
+  const firstLine = raw.split(/\r?\n/).find((line) => line.trim() !== '');
+  const seen = new Set();
+  const columns = firstLine
+    ? splitLine(firstLine, detectDelimiter(firstLine)).map((header) => {
+        const field = fieldFor(header);
+        const used = field && !seen.has(field);
+        if (used) seen.add(field);
+        return { header: header.slice(0, 40), field: used ? field : null, label: used ? FIELD_LABELS[field] : '' };
+      })
+    : [];
+  return {
+    valid: errors.length === 0,
+    count: devices.length,
+    rows: devices.slice(0, PREVIEW_ROWS).map(({ name, manufacturer, model, lotOrSerial, ward, udiDi }) => ({ name, manufacturer, model, lotOrSerial, ward, udiDi })),
+    columns,
+    errors,
+    withoutUdi: devices.filter((device) => !device.udiDi).length,
+  };
+}
+
 // Replace the earlier pasted list (manual devices) with this one; demo devices are left alone.
 // Returns { ok: true, count } or { ok: false, errors }.
 export async function importDevices(store, text) {

@@ -324,3 +324,25 @@ test('ward people in the preview: the real shape, an unmapped ward, a partial an
   assert.equal(down.ok, false);
 });
 
+test('the preview reads a paste the way the real importer does (columns, rows, problems)', async () => {
+  const { previewDeviceCsv } = await import('./deviceCsv.js');
+  const backend = make('ready');
+  const pastes = [
+    'Name\tManufacturer\tModel\tSerial\tWard\nSigma Spectrum pump\tBaxter Healthcare\t35700BAX2\tSP-30977\tMed-Surg 4E',
+    'Asset,Maker,Model no,Serial no,Location,UDI,Notes\nPump A,Baxter Healthcare,35700BAX2,SP-1,ICU,00884838085282,old\nPump B,Getinge,6487800,SI-7,ICU,,',
+    'Maker,Manufacturer,Model\nAcme,Other,M1',
+    'Colour,Size\nblue,big',
+    'Manufacturer,Model\nAcme,M1\n,M2\nAcme,',
+    'Manufacturer,Model',
+    '',
+    `Manufacturer,Model\n${Array.from({ length: 9 }, (_, i) => `Acme,M${i}`).join('\n')}`,
+  ];
+  for (const text of pastes) {
+    const fake = await backend.invoke('previewImport', { text });
+    const real = previewDeviceCsv(text);
+    assert.equal(fake.ok, true);
+    const { ok, ...rest } = fake; // eslint-disable-line no-unused-vars
+    assert.deepEqual(rest, real, `the preview and the importer read this paste differently: ${JSON.stringify(text.slice(0, 40))}`);
+  }
+});
+

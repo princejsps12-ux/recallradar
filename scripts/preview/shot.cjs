@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One screenshot of one view in one state, for looking at it (or for a bug report):
 //
-//   node scripts/preview/shot.cjs <view> <state> <theme> [width height] [--out=path.png] [--scale=2] [--full] [--tab=Progress] [--menu="Daily alerts"] [--run="Run now"] [--drawer="Impella Controller" [--people]]
+//   node scripts/preview/shot.cjs <view> <state> <theme> [width height] [--out=path.png] [--scale=2] [--full] [--system-font] [--tab=Progress] [--menu="Daily alerts"] [--paste="csv text, \\n for new lines"] [--run="Run now"] [--drawer="Impella Controller" [--people]]
 //   node scripts/preview/shot.cjs dashboard none-affected light
 //   node scripts/preview/shot.cjs panel first-run dark 360 262 --out=/tmp/panel.png
 //
@@ -17,7 +17,7 @@ const [view = 'dashboard', state = 'ready', theme = 'light', width, height] = po
 
 (async () => {
   const out = path.resolve(flag('out') || `/tmp/recallradar-${view}-${state}-${theme}.png`);
-  const s = await session({ scale: Number(flag('scale')) || 1 });
+  const s = await session({ scale: Number(flag('scale')) || 1, font: !args.includes('--system-font') });
   try {
     const opened = await open(s, { view, state, theme, width: Number(width) || undefined, height: Number(height) || undefined });
     if (flag('tab')) {
@@ -39,6 +39,11 @@ const [view = 'dashboard', state = 'ready', theme = 'light', width, height] = po
         item.click();
       }, flag('menu'));
       await new Promise((resolve) => setTimeout(resolve, 700));
+    }
+    if (flag('paste')) {
+      // Types into the import dialog's text box (a literal \\n in the text is a new line) and waits for the preview to be read.
+      await opened.frame.type('textarea[aria-label="Devices to import"]', flag('paste').replace(/\\n/g, '\n'));
+      await new Promise((resolve) => setTimeout(resolve, 1100));
     }
     if (flag('drawer')) {
       // Opens the details drawer of a device by its name, and with --people also expands "Who handles this ward".

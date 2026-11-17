@@ -87,12 +87,22 @@ preview cannot quietly fall behind the app.
     scroll. Any other violation fails the run.
   - Judged on the dashboard only: "one main landmark" and "everything in a landmark" (the panel and the pop-up are
     fragments of Jira's page), and "a level-one heading" (Jira's page has it).
-- **`shots.cjs`** (`npm run shots`, `--only=03,11`, `--out=dir`). The Marketplace screenshots in `marketplace/screenshots/01-...`
-  to `19-...`, captured at 2x (desktop 1440 x 900, panel 680 x 262, phone 390 x 844). The steps for each one (open the
-  drawer, open the menu, choose a space) are in the file, so they can be regenerated after any UI change.
+- **`shots.cjs`** (`npm run shots`, `--only=03,11`, `--out=dir`, `--system-font`). The Marketplace screenshots in
+  `marketplace/screenshots/01-...` to `19-...` and `24-...` to `28-...` (20 to 23 are taken on the demo site), captured at 2x
+  (desktop 1440 x 900, panel 680 x 262, phone 390 x 844). The steps for each one (open the drawer, open the menu, choose a
+  space, paste a list) are in the file, so they can be regenerated after any UI change.
 - **`shot.cjs`** one image of one state, for looking at it: `node scripts/preview/shot.cjs dashboard none-affected dark --out=/tmp/x.png`.
-- **`make-fixtures.mjs`** regenerates `fixtures/demo.json` from the live openFDA API (about 25 requests). The snapshot is
-  committed; run it only when the demo data should move on.
+  Also `--tab=Progress`, `--menu="Daily alerts"` (opens a dialog from the "..." menu), `--run="Run now"`, `--drawer="Impella Controller" --people`
+  and `--paste='csv text'` (types into the import dialog), so one command reaches any screen.
+- **`font.cjs`** draws the pictures in **Atlassian Sans**, the typeface Jira uses (the design tokens name it first, and a plain browser
+  does not have it, so the preview otherwise falls back to the system font). It fetches the Latin subset from the design-system CDN
+  that Jira's own pages load it from and keeps it in `scripts/preview/.cache/` (git-ignored: the font is not ours and is never
+  committed). Only `shots.cjs` and `shot.cjs` use it, never the checks; offline they say so and use the system font
+  (`--system-font` forces that).
+- **`make-fixtures.mjs`** regenerates `fixtures/demo.json` from the live openFDA API (about 25 requests, more with the three-year
+  window and paging). The snapshot is committed; run it only when the demo data should move on. It (and `check-demo-matches.mjs`)
+  uses `scripts/fetchJson.mjs`, which falls back to asking the DNS servers directly when the operating system's own lookup
+  cannot resolve `api.fda.gov` (a quirk seen on one machine; nothing is changed on the machine).
 
 ## What it does and does not tell you
 

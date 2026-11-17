@@ -121,7 +121,7 @@ const ask = (h, name, request = {}) => h.handlers[name]({ payload: {}, context: 
 
 test('every resolver the pages call exists', () => {
   const names = Object.keys(setup().handlers).sort();
-  for (const expected of ['clearDevices', 'createRecallPage', 'createTasks', 'fetchRecalls', 'getCapabilities', 'getCheckStatus', 'getSavedMatches', 'getAlerts', 'getProgress', 'getTaskStates', 'getTaskSummary', 'getWardTeams', 'importDevices', 'listDevices', 'listProjects', 'listSpaces', 'listTeams', 'loadDemoHospital', 'removeImportedDevices', 'runAlertsNow', 'saveAlertSettings', 'setWardTeam', 'startCheck', 'suggestAssignees']) {
+  for (const expected of ['clearDevices', 'createRecallPage', 'createTasks', 'fetchRecalls', 'getCapabilities', 'getCheckStatus', 'getSavedMatches', 'getAlerts', 'getProgress', 'getTaskStates', 'getTaskSummary', 'getWardTeams', 'importDevices', 'listDevices', 'previewImport', 'listProjects', 'listSpaces', 'listTeams', 'loadDemoHospital', 'removeImportedDevices', 'runAlertsNow', 'saveAlertSettings', 'setWardTeam', 'startCheck', 'suggestAssignees']) {
     assert.ok(names.includes(expected), expected);
   }
 });
@@ -413,3 +413,18 @@ test('getWardPeople: the ward\'s team, projects and people from the graph; an un
   assert.deepEqual(failed, { ok: false, error: 'The Teamwork Graph could not be read. Try again in a moment.' });
   assert.equal(h.calls.logged.length, 1, 'the real reason is logged, not shown');
 });
+
+test('previewImport reads a paste without importing anything, for any signed-in person', async () => {
+  const h = setup({ roles: { administrator: false, projectAdministrator: false } });
+  const out = await ask(h, 'previewImport', { payload: { text: 'Manufacturer,Model\nAcme,M1\nAcme,M2' } });
+  assert.equal(out.ok, true);
+  assert.equal(out.count, 2);
+  assert.equal(out.columns.length, 2);
+  assert.deepEqual(await h.deviceStore.listDevices(), [], 'nothing was saved');
+  assert.equal((await ask(h, 'previewImport', { payload: { text: 'Colour\nblue' } })).ok, true, 'a bad paste is a normal answer with errors, not a failure');
+  assert.equal((await ask(h, 'previewImport', { payload: { text: 'Colour\nblue' } })).errors.length > 0, true);
+  const empty = await ask(h, 'previewImport', { payload: {} });
+  assert.equal(empty.count, 0);
+  assert.match(empty.errors[0], /Paste your device list first/);
+});
+

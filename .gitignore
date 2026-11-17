@@ -66,3 +66,6 @@ npm-debug.log*
 
 # Claude Code local settings and hooks (not part of the app)
 .claude/
+
+# Atlassian Sans fetched for screenshots (scripts/preview/font.cjs): not ours, never committed
+scripts/preview/.cache/

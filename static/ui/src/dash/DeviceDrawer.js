@@ -56,7 +56,7 @@ function RecallCard({ m, result, tasks, taskInfo, suggestion, canCreate, busy, i
   const disabled = !canCreate || busy;
   return (
     <section aria-label={`Recall ${m.recallNumber}`} style={{ border: `1px solid ${color.border}`, borderRadius: '8px', padding: `${sp(100)} ${sp(200)}`, marginTop: sp(100), background: hover ? token('elevation.surface.raised.hovered') : color.raised }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: sp(100) }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: sp(100) }}>
         <button
           type="button"
           aria-expanded={isOpen}
@@ -64,10 +64,10 @@ function RecallCard({ m, result, tasks, taskInfo, suggestion, canCreate, busy, i
           onClick={onToggle}
           onMouseEnter={() => setHover(true)}
           onMouseLeave={() => setHover(false)}
-          style={{ flex: '1 1 0', minWidth: 0, minHeight: '32px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: sp(100), textAlign: 'left', background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}
+          style={{ flex: '1 1 220px', minWidth: 0, minHeight: '32px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: sp(100), textAlign: 'left', background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}
         >
           {isOpen ? <ChevronDownIcon label="" size="small" /> : <ChevronRightIcon label="" size="small" />}
-          <strong>{m.recallNumber}</strong>
+          <strong style={{ whiteSpace: 'nowrap' }}>{m.recallNumber}</strong>
           <VisuallyHidden>{isOpen ? 'Hide details' : 'Show details'}</VisuallyHidden>
           <ClassLozenge recallClass={m.recallClass} />
           <MatchLozenge confidence={m.confidence} />

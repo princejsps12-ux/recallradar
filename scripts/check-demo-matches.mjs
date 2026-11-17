@@ -4,14 +4,7 @@
 import { buildDemoDevices } from '../src/demoHospital.js';
 import { findRecallsForDevices } from '../src/recallSearch.js';
 import { matchDevicesToRecalls } from '../src/matching.js';
-
-// openFDA answers 404 when a search has no hits; treat that as "no results".
-async function fetchJson(url) {
-  const res = await fetch(url);
-  if (res.status === 404) return { results: [] };
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.json();
-}
+import { fetchJson } from './fetchJson.mjs'; // a 404 is "no results"; also works where the system cannot resolve api.fda.gov
 
 const devices = buildDemoDevices();
 const { recalls, queryCount, failedQueries } = await findRecallsForDevices(devices, fetchJson);

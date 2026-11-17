@@ -91,8 +91,13 @@ export function useNarrow(maxWidth = 720) {
   return narrow;
 }
 
-// A device name that opens its details: bold, link blue, underlined while hovered or focused (the browser's own
-// focus ring stays). One of these replaces a separate "Details" button in every row. `label` names the target for
+// ONE link style for the whole app: link blue and underlined (so a link is never told apart from text by colour alone),
+// the same underline offset everywhere, the darker "pressed" blue while hovered or focused, and the browser's own focus ring.
+// NameLink and LinkLike below only differ in weight (a device name is a title, so it is semi-bold) and in what they hold.
+const LINK_LOOK = { background: 'none', border: 0, font: 'inherit', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationThickness: '1px', cursor: 'pointer' };
+const linkColor = (active) => (active ? token('color.link.pressed') : color.link);
+
+// A device name that opens its details: semi-bold, in the link style above. One of these replaces a separate "Details" button in every row. `label` names the target for
 // screen readers, because the same device appears on several rows ("Details for Impella Controller, recall Z-0208-2027");
 // it always contains the visible name. The 4 px of padding (cancelled by an equal negative margin, so the layout does
 // not move) make the target 32 px tall, the size of an Atlaskit button.
@@ -107,7 +112,7 @@ export function NameLink({ children, onClick, label, style }) {
       onMouseLeave={() => setActive(false)}
       onFocus={() => setActive(true)}
       onBlur={() => setActive(false)}
-      style={{ display: 'inline-block', maxWidth: '100%', background: 'none', border: 0, padding: `${sp(50)} 0`, margin: `calc(-1 * ${sp(50)}) 0`, font: 'inherit', lineHeight: '24px', fontWeight: 600, textAlign: 'left', color: color.link, textDecoration: active ? 'underline' : 'none', cursor: 'pointer', ...style }}
+      style={{ ...LINK_LOOK, display: 'inline-block', maxWidth: '100%', padding: `${sp(50)} 0`, margin: `calc(-1 * ${sp(50)}) 0`, lineHeight: '24px', fontWeight: 600, textAlign: 'left', color: linkColor(active), ...style }}
     >
       {children}
     </button>
@@ -164,12 +169,17 @@ export function formatWhen(iso) {
 // component, shown small after the text. The 2 px of padding (cancelled by an equal negative margin, so nothing moves)
 // make the target 24 px tall, the minimum size WCAG 2.2 asks for.
 export function LinkLike({ children, onClick, iconAfter: Icon, ...rest }) {
+  const [active, setActive] = useState(false);
   return (
     <button
       type="button"
       onClick={onClick}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      onFocus={() => setActive(true)}
+      onBlur={() => setActive(false)}
       {...rest}
-      style={{ background: 'none', border: 0, padding: `${sp(25)} 0`, margin: `calc(-1 * ${sp(25)}) 0`, font: 'inherit', color: color.link, textDecoration: 'underline', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: sp(50) }}
+      style={{ ...LINK_LOOK, padding: `${sp(25)} 0`, margin: `calc(-1 * ${sp(25)}) 0`, color: linkColor(active), display: 'inline-flex', alignItems: 'center', gap: sp(50) }}
     >
       {children}
       {Icon ? <Icon label="" size="small" /> : null}

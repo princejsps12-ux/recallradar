@@ -58,7 +58,7 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 | `src/handlers.js`, `src/rovoHandlers.js` | The resolver and Rovo action logic as factories with injected dependencies (unit tested with fakes: `handlers.test.mjs`, `rovoHandlers.test.mjs`); `rovoActions.js` wraps them in explicit exported arrow functions because the Forge linter needs visible exports |
 | `src/permissions.js` | Who may change the shared device list: Jira administrators only (`refuseUnlessAdministrator`, server-side; the dashboard shows it via resolver `getCapabilities`) |
 | `static/ui/src/App.js` | The panel |
-| `src/deviceCsv.js` | Paste-in import of the hospital's own devices (all-or-nothing, line-numbered errors); resolver `importDevices`, UI in `Dashboard.js` |
+| `src/deviceCsv.js` | Paste-in import of the hospital's own devices (all-or-nothing, line-numbered errors); resolvers `previewImport` (read-only: how the columns were read, the first rows, the problems; the dialog calls it 400 ms after the last key) and `importDevices`, UI in `dash/Modals.js` (`ImportModal`) |
 
 ### The recall check is a background job
 

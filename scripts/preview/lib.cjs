@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { start } = require('./server.cjs');
+const { fontCss } = require('./font.cjs');
 
 const app = path.resolve(__dirname, '../../static/ui');
 const puppeteer = require(path.join(app, 'node_modules/puppeteer-core'));
@@ -19,12 +20,14 @@ function chromePath() {
   return found;
 }
 
-// One server and one browser for the whole run. `scale` is the device pixel ratio (2 = crisp screenshots).
-async function session({ scale = 1 } = {}) {
+// One server and one browser for the whole run. `scale` is the device pixel ratio (2 = crisp screenshots). `font: true` draws the
+// app in Atlassian Sans like Jira does (see font.cjs): for pictures only, never for the checks.
+async function session({ scale = 1, font = false } = {}) {
   if (!fs.existsSync(path.join(app, 'build', 'asset-manifest.json'))) throw new Error('No build yet: run "npm run build" in static/ui first.');
   const { server, port } = await start(0);
   const browser = await puppeteer.launch({ executablePath: chromePath(), headless: true, args: ['--hide-scrollbars', ...(process.env.CI ? ['--no-sandbox'] : [])] });
-  return { port, scale, browser, close: async () => { await browser.close(); server.close(); } };
+  const css = font ? await fontCss() : '';
+  return { port, scale, browser, fontCss: css, close: async () => { await browser.close(); server.close(); } };
 }
 
 // Opens one view in one state and waits until it has settled.
@@ -34,6 +37,8 @@ async function open(s, spec) {
   const view = spec.view || 'dashboard';
   const [defaultWidth, defaultHeight] = SIZES[view] || SIZES.dashboard;
   const page = await s.browser.newPage();
+  // The font is added as an inline style, which the preview's Forge-like content policy forbids: only a picture run lifts it.
+  if (s.fontCss) await page.setBypassCSP(true);
   await page.setViewport({ width: spec.width || defaultWidth, height: spec.height || defaultHeight, deviceScaleFactor: spec.scale || s.scale });
   const messages = [];
   page.on('console', (message) => {
@@ -51,6 +56,10 @@ async function open(s, spec) {
   const frame = await page.waitForFrame((f) => f.url().includes('/app.html'), { timeout: 20000 });
   await frame.waitForFunction(() => window.__rr && window.__rr.backend, { timeout: 20000 });
   await frame.waitForFunction(() => document.getElementById('root') && document.getElementById('root').children.length > 0, { timeout: 20000 });
+  if (s.fontCss) {
+    await frame.addStyleTag({ content: s.fontCss });
+    await frame.evaluate(() => document.fonts.load('400 16px "Atlassian Sans"').then(() => document.fonts.ready));
+  }
   // Two states are busy on purpose: the loading skeleton, and the dashboard while a check runs (a skeleton under the progress).
   const staysBusy = spec.loading || spec.state === 'loading' || spec.state === 'running';
   // ('refreshing' is not busy in this sense: it keeps the saved result on screen, with the progress in the header.)

@@ -281,6 +281,29 @@ const pickOption = async (el, inputId, optionText) => {
     check('the import dialog opens with its options', /Import your own devices/.test(body) && /Do not include patient data/.test(body));
     check('the import button is disabled until something is pasted', [...document.querySelectorAll('button')].find((b) => b.textContent === 'Import devices').disabled);
   });
+  // 4b. the paste is read before anything is imported: how the columns were understood, the first rows, the problems
+  const goodPaste = { ok: true, valid: true, count: 12, rows: [{ name: 'Pump A', manufacturer: 'Baxter', model: '35700BAX2', lotOrSerial: 'SP-1', ward: 'ICU', udiDi: '' }], columns: [{ header: 'Asset', field: 'name', label: 'Name' }, { header: 'Maker', field: 'manufacturer', label: 'Manufacturer' }, { header: 'Notes', field: null, label: '' }], errors: [], withoutUdi: 12 };
+  const badPaste = { ok: true, valid: false, count: 0, rows: [], columns: [{ header: 'Maker', field: 'manufacturer', label: 'Manufacturer' }], errors: ['Line 3: model is empty.', 'The header row needs a "model" column (found: Maker).'], withoutUdi: 0 };
+  let nextPaste = goodPaste;
+  await run('jira:globalPage', { ...imp, previewImport: () => nextPaste }, async (el, calls) => {
+    await click(el, /^Import your own devices/);
+    const area = () => document.querySelector('textarea[aria-label="Devices to import"]');
+    const typeText = async (value) => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+      await act(async () => { setter.call(area(), value); area().dispatchEvent(new window.Event('input', { bubbles: true })); await wait(700); });
+    };
+    check('nothing is read before anything is pasted', !calls.includes('previewImport'));
+    await typeText('Asset,Maker,Notes\nPump A,Baxter,x');
+    const body = () => document.body.textContent.replace(/\s+/g, ' ');
+    check('a valid paste is read once and shows how each column was understood', calls.filter((c) => c === 'previewImport').length === 1 && /How your columns were read/.test(body()) && /Asset.*Name/.test(body()) && /Notes.*ignored/.test(body()));
+    check('it shows how many devices will be imported, the first rows and the missing UDI-DIs', /12 devices will be imported, the first 1 are shown/.test(body()) && /Pump A/.test(body()) && /12 have no UDI-DI/.test(body()));
+    const importButton = () => [...document.querySelectorAll('button')].find((b) => /^Import (12 devices|devices)$/.test(b.textContent.trim()));
+    check('the button says how many and is open', Boolean(importButton()) && importButton().textContent.trim() === 'Import 12 devices' && !importButton().disabled);
+    nextPaste = badPaste;
+    await typeText('Maker\nBaxter');
+    check('a paste with problems lists them with their line numbers and keeps the button shut', /Nothing can be imported yet/.test(body()) && /Line 3: model is empty/.test(body()) && !/Import 12 devices/.test(body()) && [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Import devices').disabled);
+    check('typing quickly reads once after the last key, not on every key', calls.filter((c) => c === 'previewImport').length === 2);
+  });
   // 5. the issue panel is a compact summary card: headline, rows without buttons, a dashboard link, "Create all" as a pop-up
   const panelAnswers = { ...base, listDevices: { ok: true, devices: [1] }, getSavedMatches: { ok: true, result } };
   await run('jira:issuePanel', panelAnswers, async (el, calls) => {

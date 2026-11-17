@@ -56,11 +56,13 @@ export default function WardPeople({ ward, suggestedIds = [] }) {
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={toggle}
-        style={{ width: '100%', minHeight: '32px', display: 'flex', alignItems: 'center', gap: sp(100), textAlign: 'left', background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', fontWeight: 600, color: 'inherit', cursor: 'pointer' }}
+        style={{ width: '100%', minHeight: '32px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: `0 ${sp(100)}`, textAlign: 'left', background: 'none', border: 0, padding: 0, margin: 0, font: 'inherit', fontWeight: 600, color: 'inherit', cursor: 'pointer' }}
       >
-        {open ? <ChevronDownIcon label="" size="small" /> : <ChevronRightIcon label="" size="small" />}
-        Who handles this ward
-        <span style={{ ...muted, fontWeight: 400 }}>from the Teamwork Graph</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(100), whiteSpace: 'nowrap' }}>
+          {open ? <ChevronDownIcon label="" size="small" /> : <ChevronRightIcon label="" size="small" />}
+          Who handles this ward
+        </span>
+        <span style={{ ...muted, fontWeight: 400, whiteSpace: 'nowrap' }}>from the Teamwork Graph</span>
       </button>
       {open && (
         <div id={bodyId} style={{ marginTop: sp(100) }}>
@@ -108,11 +110,13 @@ export default function WardPeople({ ward, suggestedIds = [] }) {
                         <span style={p.overdue > 0 ? { color: color.danger, fontWeight: 600 } : muted}>{workloadText(p)}</span>
                       </div>
                       {p.next && (
-                        <div style={{ ...muted, display: 'flex', gap: sp(100), minWidth: 0 }}>
-                          <span style={{ whiteSpace: 'nowrap' }}>Next:</span>{' '}
-                          <span style={{ whiteSpace: 'nowrap' }}><LinkLike onClick={() => openIssue(p.next.key)}>{p.next.key}</LinkLike></span>{' '}
-                          <span title={p.next.summary} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{p.next.summary}</span>{' '}
-                          {p.next.dueAt ? <span style={{ whiteSpace: 'nowrap' }}>{`· due ${formatDay(p.next.dueAt)}`}</span> : null}
+                        <div style={muted}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: `0 ${sp(100)}` }}>
+                            <span style={{ whiteSpace: 'nowrap' }}>Next:</span>{' '}
+                            <span style={{ whiteSpace: 'nowrap' }}><LinkLike onClick={() => openIssue(p.next.key)}>{p.next.key}</LinkLike></span>{' '}
+                            {p.next.dueAt ? <span style={{ whiteSpace: 'nowrap' }}>{`· due ${formatDay(p.next.dueAt)}`}</span> : null}
+                          </div>
+                          <div title={p.next.summary} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.next.summary}</div>
                         </div>
                       )}
                     </li>
