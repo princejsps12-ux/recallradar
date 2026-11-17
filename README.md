@@ -201,7 +201,7 @@ Step by step for Claude Desktop, Claude Code, Cursor and others: [`docs/MCP.md`]
 
 ## Develop
 
-Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), `npm run test:ui`, `npm run test:preview` (the real bundle in headless Chrome). The app is multi-app compatible (Jira required, Confluence optional): install it in Jira first, then connect Confluence. Everything else, including the project layout: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), `npm run typecheck` (the JSDoc types, checked by `tsc`: the core matching code strictly), `npm run test:ui`, `npm run test:preview` (the real bundle in headless Chrome). The app is multi-app compatible (Jira required, Confluence optional): install it in Jira first, then connect Confluence. Everything else, including the project layout: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
 ## Permissions
 

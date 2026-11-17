@@ -17,8 +17,16 @@
 //
 // No Forge imports, so this is unit tested with plain Node.
 
-export const LEVELS = Object.freeze(['exact', 'likely', 'possible', 'none']);
+/**
+ * @typedef {'exact' | 'likely' | 'possible' | 'none'} Level
+ * @typedef {{ id: string, truth: string, predicted: Level }} Row
+ * @typedef {{ tp: number, predicted: number, actual: number, precision: number | null, recall: number | null }} LevelScore
+ */
 
+/** @type {readonly Level[]} */
+export const LEVELS = Object.freeze(/** @type {Level[]} */ (['exact', 'likely', 'possible', 'none']));
+
+/** @type {Readonly<Record<string, Level>>} */
 export const TRUTH_LEVEL = Object.freeze({
   affected: 'exact',
   'product-covered': 'likely',
@@ -26,26 +34,30 @@ export const TRUTH_LEVEL = Object.freeze({
   unrelated: 'none',
 });
 
+/**
+ * @param {number} num
+ * @param {number} den
+ * @returns {number | null}
+ */
 const ratio = (num, den) => (den === 0 ? null : num / den);
 
 /**
- * @param rows  [{ id, truth, predicted }]  predicted is 'exact' | 'likely' | 'possible' | 'none'
+ * @param {Row[]} rows  predicted is 'exact' | 'likely' | 'possible' | 'none'
  * @returns per-level precision and recall, the same for "gets a task" (exact or likely), the confusion matrix, the number of
  *          dangerous over-claims (predicted exact, truth not affected) and the excluded cases kept apart.
  */
 export function scoreCases(rows) {
   const scored = rows.filter((row) => row.truth !== 'excluded');
   const excluded = rows.filter((row) => row.truth === 'excluded');
+  /** @param {Row} row */
   const expected = (row) => TRUTH_LEVEL[row.truth];
   for (const row of scored) if (!expected(row)) throw new Error(`Unknown truth "${row.truth}" in case ${row.id}`);
 
-  const confusion = {};
-  for (const e of LEVELS) {
-    confusion[e] = {};
-    for (const p of LEVELS) confusion[e][p] = 0;
-  }
+  /** @type {Record<Level, Record<Level, number>>} */
+  const confusion = { exact: { exact: 0, likely: 0, possible: 0, none: 0 }, likely: { exact: 0, likely: 0, possible: 0, none: 0 }, possible: { exact: 0, likely: 0, possible: 0, none: 0 }, none: { exact: 0, likely: 0, possible: 0, none: 0 } };
   for (const row of scored) confusion[expected(row)][row.predicted] += 1;
 
+  /** @type {Record<string, LevelScore>} */
   const perLevel = {};
   for (const level of LEVELS.filter((l) => l !== 'none')) {
     const tp = confusion[level][level];
@@ -55,6 +67,7 @@ export function scoreCases(rows) {
   }
 
   // "Gets a task": exact or likely. This is the line that decides whether a person is sent after a device.
+  /** @param {Level} level */
   const gets = (level) => level === 'exact' || level === 'likely';
   let taskTp = 0;
   let taskPredicted = 0;
@@ -82,6 +95,10 @@ export function scoreCases(rows) {
 }
 
 // 0.9333 -> "93.3%"; null (nothing to divide by) -> "n/a".
+/**
+ * @param {number | null | undefined} value
+ * @returns {string}
+ */
 export function percent(value) {
   return value === null || value === undefined ? 'n/a' : `${(value * 100).toFixed(1)}%`;
 }

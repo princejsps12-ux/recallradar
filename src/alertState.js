@@ -51,9 +51,27 @@ const LAST_SEEN = 1;
 const ALERTED = 2;
 const KIND = 3;
 
+/**
+ * One pair's record: [firstSeen (ms), lastSeen (ms), alerted (0 or 1), kind (0 baseline, 1 news)].
+ * @typedef {[number, number, number, number]} PairEntry
+ * @typedef {object} AlertRecord
+ * @property {1} v
+ * @property {number} baselineAt
+ * @property {number} updatedAt
+ * @property {boolean} baselineNext
+ * @property {Record<string, PairEntry>} pairs
+ * @property {Record<string, unknown> | null} last
+ */
+
+/**
+ * @param {import('./types.js').Kv} kv
+ * @param {() => number} [nowMs]
+ */
 export function createAlertState(kv, nowMs = () => Date.now()) {
   // The stored record if it is intact and not too old; otherwise null (and an old or damaged one is deleted).
+  /** @returns {Promise<AlertRecord | null>} */
   async function read() {
+    /** @type {any} */
     let state;
     try {
       state = await kv.get(ALERT_STATE_KEY);
@@ -70,26 +88,29 @@ export function createAlertState(kv, nowMs = () => Date.now()) {
     return null;
   }
 
+  /** @param {AlertRecord} state */
   async function write(state) {
     await kv.set(ALERT_STATE_KEY, state);
   }
 
   /**
    * Record the pairs that are affected right now (exact or likely match of a recall that is still open).
-   * @param pairs  ["recall|device", ...]
-   * @returns { baseline, added: [pair] }  `baseline` is true when this look only set the starting point; `added` are the news.
+   * @param {string[]} pairs  ["recall|device", ...]
+   * @returns {Promise<{ baseline: boolean, added: string[] }>}  `baseline` is true when this look only set the starting point; `added` are the news.
    */
   async function track(pairs) {
     const now = nowMs();
     const current = [...new Set(pairs)].slice(0, MAX_TRACKED_PAIRS);
     const state = await read();
     if (!state) {
+      /** @type {AlertRecord} */
       const fresh = { v: 1, baselineAt: now, updatedAt: now, baselineNext: false, pairs: {}, last: null };
       for (const pair of current) fresh.pairs[pair] = [now, now, 1, 0];
       await write(fresh);
       return { baseline: true, added: [] };
     }
     const baseline = state.baselineNext === true;
+    /** @type {string[]} */
     const added = [];
     // Forget first: a pair that was not seen for a whole week and is back is news again (a recall that was closed and reopened).
     for (const [pair, entry] of Object.entries(state.pairs)) {
@@ -121,8 +142,10 @@ export function createAlertState(kv, nowMs = () => Date.now()) {
   }
 
   // Alerts were just switched on: everything affected today is the starting point, so only later news is alerted.
+  /** @param {string[]} pairs */
   async function rebaseline(pairs) {
     const now = nowMs();
+    /** @type {AlertRecord} */
     const state = (await read()) || { v: 1, baselineAt: now, updatedAt: now, baselineNext: false, pairs: {}, last: null };
     for (const pair of new Set(pairs)) {
       const known = state.pairs[pair];
@@ -136,11 +159,17 @@ export function createAlertState(kv, nowMs = () => Date.now()) {
   // The pairs the daily alert should handle now, out of those affected at this moment:
   //   due      news (kind 1) not alerted yet and first seen within ALERT_WINDOW_MS
   //   expired  news not alerted yet but older than that: to be marked handled without a task
+  /**
+   * @param {Iterable<string>} currentPairs
+   * @returns {Promise<{ due: string[], expired: string[] }>}
+   */
   async function pendingAlerts(currentPairs) {
     const state = await read();
     if (!state) return { due: [], expired: [] };
     const now = nowMs();
+    /** @type {string[]} */
     const due = [];
+    /** @type {string[]} */
     const expired = [];
     for (const pair of currentPairs) {
       const entry = state.pairs[pair];
@@ -152,6 +181,7 @@ export function createAlertState(kv, nowMs = () => Date.now()) {
     return { due, expired };
   }
 
+  /** @param {string[]} pairs */
   async function markAlerted(pairs) {
     if (!pairs.length) return;
     const state = await read();
@@ -180,6 +210,7 @@ export function createAlertState(kv, nowMs = () => Date.now()) {
   }
 
   // The summary of the last alert run: counts and Jira issue keys, nothing about a person.
+  /** @param {Record<string, unknown>} summary */
   async function setLast(summary) {
     const state = await read();
     if (!state) return;

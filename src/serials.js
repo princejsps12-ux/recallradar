@@ -33,6 +33,16 @@ const INCLUSIVE_BELOW = /=|≤|equal|including|^up\s+to|^through|^thru/i;
 const INCLUSIVE_ABOVE = /=|≥|equal|from|starting/i;
 
 // "AB1500" -> { prefix: 'AB', digits: '1500', n: 1500n }; null when it is not letters-then-digits.
+/**
+ * @typedef {{ prefix: string, from: bigint, to: bigint, shortest: number, longest: number, text: string }} SerialRange
+ * @typedef {{ prefix: string, limit: bigint, digits: number, inclusive: boolean, text: string }} SerialLimit
+ * @typedef {{ ranges: SerialRange[], below: SerialLimit[], above: SerialLimit[] }} SerialConstraints
+ */
+
+/**
+ * @param {unknown} value
+ * @returns {{ prefix: string, digits: string, n: bigint } | null}
+ */
 export function splitSerial(value) {
   if (typeof value !== 'string') return null;
   const m = /^([A-Za-z]{0,4})[-\s]?(\d{3,})$/.exec(value.trim());
@@ -40,14 +50,22 @@ export function splitSerial(value) {
   return { prefix: m[1].toUpperCase(), digits: m[2], n: BigInt(m[2]) };
 }
 
+/** @param {string | undefined} p */
 const prefixOf = (p) => (p || '').toUpperCase();
-const stripSpans = (text, regex) => text.replace(regex, (m) => ' '.repeat(m.length));
+/**
+ * @param {string} text
+ * @param {RegExp} regex
+ */
+const stripSpans = (text, regex) => text.replace(regex, (/** @type {string} */ m) => ' '.repeat(m.length));
 
 /**
  * The serial ranges and limits a recall text states: { ranges, below, above } (empty arrays when there are none).
  * Each carries `text`, the words as the recall wrote them, to show in the reason.
+ * @param {unknown} text
+ * @returns {SerialConstraints}
  */
 export function parseSerialConstraints(text) {
+  /** @type {SerialConstraints} */
   const out = { ranges: [], below: [], above: [] };
   if (typeof text !== 'string' || text.length === 0) return out;
   for (const word of text.matchAll(SERIAL_WORD)) {
@@ -73,12 +91,21 @@ export function parseSerialConstraints(text) {
   return out;
 }
 
+/**
+ * @param {SerialConstraints | null | undefined} constraints
+ * @returns {constraints is SerialConstraints}
+ */
 export function hasSerialConstraints(constraints) {
-  return Boolean(constraints) && constraints.ranges.length + constraints.below.length + constraints.above.length > 0;
+  return Boolean(constraints) && /** @type {SerialConstraints} */ (constraints).ranges.length + /** @type {SerialConstraints} */ (constraints).below.length + /** @type {SerialConstraints} */ (constraints).above.length > 0;
 }
 
 /**
  * Is this serial inside one of the stated ranges or limits? Returns { text } (the recall's own words for it) or null.
+ */
+/**
+ * @param {unknown} serial
+ * @param {SerialConstraints | null | undefined} constraints
+ * @returns {{ text: string } | null}
  */
 export function serialInConstraints(serial, constraints) {
   const s = splitSerial(serial);

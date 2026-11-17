@@ -4,6 +4,10 @@
 // Lower-case a string and split it into alphanumeric "words". Every other character
 // (spaces, hyphens, slashes, commas, dots...) is a separator, so "MMT-1885CLW/0076" and
 // "mmt 1885clw 0076" produce the same words. Non-strings give an empty list.
+/**
+ * @param {unknown} text
+ * @returns {string[]}
+ */
 export function tokenize(text) {
   if (typeof text !== 'string') return [];
   return text
@@ -14,6 +18,10 @@ export function tokenize(text) {
 
 // The characters of `text` that are letters or digits, lower-cased, with separators removed.
 // Used to judge how "long" an identifier really is ("4-000-0080" -> "40000080").
+/**
+ * @param {unknown} text
+ * @returns {string}
+ */
 export function compact(text) {
   return tokenize(text).join('');
 }
@@ -21,6 +29,11 @@ export function compact(text) {
 // True if the words of `needle` appear next to each other, in order, as whole words inside
 // `haystack`. Whole-word matching stops "N15" matching inside "N150", and "4842" matching
 // inside "148421". Both inputs may be a string or an already tokenized list.
+/**
+ * @param {string | string[]} haystack
+ * @param {string | string[]} needle
+ * @returns {boolean}
+ */
 export function containsPhrase(haystack, needle) {
   const hay = Array.isArray(haystack) ? haystack : tokenize(haystack);
   const words = Array.isArray(needle) ? needle : tokenize(needle);

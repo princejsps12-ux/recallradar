@@ -12,6 +12,10 @@
 // No Forge imports, so this is unit tested with plain Node.
 
 // The GS1 check digit (the last digit): weights 3 and 1 from the right, the sum rounded up to a multiple of ten.
+/**
+ * @param {string} digits
+ * @returns {boolean}
+ */
 export function gs1CheckDigitValid(digits) {
   if (!/^\d{8}$|^\d{12,14}$/.test(digits)) return false;
   const body = digits.slice(0, -1);
@@ -26,6 +30,11 @@ export function gs1CheckDigitValid(digits) {
 // "(01)00884838085282", "0088 4838 0852 82", "884838085282" -> "00884838085282". Anything that is not a GTIN of 8, 12, 13
 // or 14 digits gives null. With `strict` the check digit must be right too (used for a person's own device list, where
 // a typo should be caught at import; recall texts are compared without it because they contain typos of their own).
+/**
+ * @param {unknown} value
+ * @param {{ strict?: boolean }} [options]
+ * @returns {string | null}
+ */
 export function normalizeDi(value, { strict = false } = {}) {
   if (typeof value !== 'string' && typeof value !== 'number') return null;
   let text = String(value).trim();
@@ -39,6 +48,10 @@ export function normalizeDi(value, { strict = false } = {}) {
 
 // The forms a GTIN is written in inside recall texts: 14 digits, or with one or two leading zeros dropped (13, 12).
 // Used to build the openFDA search, which compares text, not numbers.
+/**
+ * @param {unknown} di
+ * @returns {string[]}
+ */
 export function diVariants(di) {
   const full = normalizeDi(di);
   if (!full) return [];
@@ -69,10 +82,18 @@ const MODEL_SLASH_DI = /(?<![\w])([A-Za-z0-9][A-Za-z0-9-]{1,})\/(\d{12,14})(?![\
 /**
  * Every UDI-DI named in a recall's code text, as { di (14 digits), serials, lots }.
  * `serials` and `lots` are the numbers the text ties to that DI: (01)GTIN(21)serial, (01)GTIN(10)lot, or <DI>/<serial>.
+ * @param {unknown} text
+ * @returns {Array<{ di: string, serials: string[], lots: string[] }>}
  */
 export function extractUdis(text) {
   if (typeof text !== 'string' || text.length === 0) return [];
-  const found = new Map(); // di -> { di, serials: Set, lots: Set }
+  /** @type {Map<string, { di: string, serials: Set<string>, lots: Set<string> }>} */
+  const found = new Map();
+  /**
+   * @param {string} di
+   * @param {string} serial
+   * @param {string} lot
+   */
   const note = (di, serial, lot) => {
     const entry = found.get(di) || { di, serials: new Set(), lots: new Set() };
     if (serial) entry.serials.add(serial);

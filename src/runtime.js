@@ -161,7 +161,9 @@ export function taskKeyLookup(snapshot) {
 // the saved check result and the finished job (which holds a copy of it) after 24 hours. Run by the daily
 // trigger before it refreshes the check; reads and writes enforce the same limits on their own.
 export async function cleanupStorage() {
+  /** @type {Record<string, number>} */
   const counts = { previews: 0, guards: 0, cache: 0, job: 0, alerts: 0 };
+  /** @type {Array<[string, () => Promise<number>]>} */
   const steps = [
     ['previews', () => previewStore.purgeExpired()],
     ['guards', () => taskGuard.purgeExpired()],

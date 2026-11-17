@@ -128,7 +128,8 @@ export const MAX_PREVIEW_TEXT = 200 * 1000;
 const FIELD_LABELS = { name: 'Name', type: 'Type', manufacturer: 'Manufacturer', model: 'Model', lotOrSerial: 'Serial or lot', ward: 'Ward', udiDi: 'UDI-DI' };
 
 /**
- * @returns { valid, count, rows, columns, errors, withoutUdi }
+ * @param {unknown} text
+ * @returns {{ valid: boolean, count: number, rows: Array<Record<string, string>>, columns: Array<{ header: string, field: string | null, label: string }>, errors: string[], withoutUdi: number }}
  *   valid    true when the paste would import (no problems); the resolver's own `ok` means only that the question was answered
  *   rows     the first PREVIEW_ROWS devices as they would be imported: { name, manufacturer, model, lotOrSerial, ward, udiDi }
  *   columns  how each pasted header was read: { header, field, label }; label is '' for one that is ignored (a column RecallRadar

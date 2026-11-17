@@ -39,6 +39,7 @@ export async function createRecallPages(args) {
   }
 }
 
+/** @param {{ snapshot: any, inputs?: Record<string, any>, deps: Record<string, any> }} args */
 async function writeRecallPages({ snapshot, inputs = {}, deps }) {
   const { result } = snapshot;
   if (!result) return noData(snapshot);
@@ -66,11 +67,12 @@ async function writeRecallPages({ snapshot, inputs = {}, deps }) {
 
   // The open recalls, each with its exact/likely matches, in the saved check's order (most serious first).
   const details = result.recallDetails || {};
+  /** @type {Map<string, import('./types.js').Match[]>} */
   const byRecall = new Map();
   for (const match of result.matches.filter(isTaskWorthy)) {
     if (isClosed(details[match.recallNumber])) continue;
     if (!byRecall.has(match.recallNumber)) byRecall.set(match.recallNumber, []);
-    byRecall.get(match.recallNumber).push(match);
+    /** @type {import('./types.js').Match[]} */ (byRecall.get(match.recallNumber)).push(match);
   }
   let recalls = [...byRecall.entries()];
   const wanted = text(inputs.recallNumber);
@@ -94,6 +96,7 @@ async function writeRecallPages({ snapshot, inputs = {}, deps }) {
   const failed = [];
   for (const [recallNumber, matches] of batch) {
     try {
+      /** @type {Record<string, string>} */
       let taskKeys = {};
       if (deps.getTaskKeys) {
         try {

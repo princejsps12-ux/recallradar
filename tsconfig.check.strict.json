@@ -1,0 +1,18 @@
+{
+  // The core, pure modules are checked STRICTLY (every parameter typed, nulls handled): `npm run typecheck`. Everything else is checked
+  // by tsconfig.check.json, which reads the JSDoc that is there but does not demand more. Move a file in here when it is fully typed.
+  "extends": "./tsconfig.check.json",
+  "compilerOptions": { "strict": true, "noImplicitAny": true },
+  "include": [],
+  "files": [
+    "src/types.js",
+    "src/text.js",
+    "src/udi.js",
+    "src/serials.js",
+    "src/matching.js",
+    "src/progress.js",
+    "src/accuracy.js",
+    "src/alertState.js",
+    "src/alertSettings.js"
+  ]
+}

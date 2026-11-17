@@ -104,6 +104,10 @@ const GENERIC_SET = new Set(GENERIC_NAME_WORDS);
 // --- The three facts ------------------------------------------------------------------
 
 // The identifying words of a maker's name: lower-case words minus legal suffixes.
+/**
+ * @param {unknown} name
+ * @returns {string[]}
+ */
 export function makerWords(name) {
   return tokenize(name).filter((word) => !SUFFIX_SET.has(word));
 }
@@ -111,6 +115,11 @@ export function makerWords(name) {
 // Fact 1. Two makers match when ALL the words of the shorter name appear in the longer one
 // ("Philips" is inside "Philips North America Llc"), and at least one shared word is specific
 // (not in GENERIC_NAME_WORDS). Order does not matter; the rule is symmetric.
+/**
+ * @param {unknown} deviceMaker
+ * @param {unknown} recallFirm
+ * @returns {boolean}
+ */
 export function manufacturersMatch(deviceMaker, recallFirm) {
   const a = makerWords(deviceMaker);
   const b = makerWords(recallFirm);
@@ -124,6 +133,12 @@ export function manufacturersMatch(deviceMaker, recallFirm) {
 // Fact 2. The model's words must appear in order, as whole words, in the recall's product
 // text or code text. "MMT-1885CLW" matches "MMT-1885CLW/00763000" because both reduce to the
 // words "mmt 1885clw". Models shorter than `minLength` never match.
+/**
+ * @param {string} model
+ * @param {import('./types.js').Recall} recall
+ * @param {number} [minLength]
+ * @returns {boolean}
+ */
 export function modelInRecall(model, recall, minLength = MIN_MODEL_LENGTH) {
   if (compact(model).length < minLength) return false;
   const text = tokenize(`${recall.productText || ''} ${recall.codeText || ''}`);
@@ -132,6 +147,11 @@ export function modelInRecall(model, recall, minLength = MIN_MODEL_LENGTH) {
 
 // Fact 3a. This unit's lot/serial appears, as whole words, in the recall's code text.
 // Lots shorter than MIN_LOT_LENGTH never match.
+/**
+ * @param {string} lotOrSerial
+ * @param {import('./types.js').Recall} recall
+ * @returns {boolean}
+ */
 export function lotInRecall(lotOrSerial, recall) {
   if (compact(lotOrSerial).length < MIN_LOT_LENGTH) return false;
   return containsPhrase(recall.codeText || '', lotOrSerial);
@@ -148,6 +168,10 @@ const QUALIFIER_SET = new Set(ALL_UNITS_QUALIFIERS);
 const QUALIFIER_WINDOW = 4;
 
 // Fact 3b. The recall says every unit is affected ("all serial numbers"), without a condition on which ones.
+/**
+ * @param {import('./types.js').Recall} recall
+ * @returns {boolean}
+ */
 export function recallCoversAllUnits(recall) {
   const text = tokenize(recall.codeText || '');
   for (const phrase of ALL_UNITS_PHRASES) {
@@ -164,7 +188,9 @@ export function recallCoversAllUnits(recall) {
 
 // What a recall's code text says in a form a program can use, worked out once per recall: the UDI-DIs it names and the
 // serial ranges it states. (A WeakMap, so it goes away with the recall and never has to be stored or sent anywhere.)
+/** @type {WeakMap<object, { udis: ReturnType<typeof extractUdis>, constraints: ReturnType<typeof parseSerialConstraints> }>} */
 const parsedRecalls = new WeakMap();
+/** @param {import('./types.js').Recall} recall */
 function parsedRecall(recall) {
   let parsed = parsedRecalls.get(recall);
   if (!parsed) {
@@ -177,6 +203,11 @@ function parsedRecall(recall) {
 
 // Fact 4. The device's own UDI-DI (a GS1 GTIN) is named in the recall. Returns { di, serials, lots } or null; the serials and
 // lots are the ones the text ties to that DI ("(01)GTIN(21)serial"), which is why a short serial can be trusted there.
+/**
+ * @param {unknown} deviceUdi
+ * @param {import('./types.js').Recall} recall
+ * @returns {{ di: string, serials: string[], lots: string[] } | null}
+ */
 export function udiInRecall(deviceUdi, recall) {
   const di = normalizeDi(deviceUdi);
   if (!di) return null;
@@ -185,6 +216,11 @@ export function udiInRecall(deviceUdi, recall) {
 
 // Fact 3c. This unit's serial falls inside a range or limit the recall states ("serial numbers 1000 through 1500").
 // Returns the recall's own words for it ("1000 through 1500"), or null.
+/**
+ * @param {string} serial
+ * @param {import('./types.js').Recall} recall
+ * @returns {string | null}
+ */
 export function serialInRecallRange(serial, recall) {
   const hit = serialInConstraints(serial, parsedRecall(recall).constraints);
   return hit ? hit.text : null;
@@ -192,6 +228,11 @@ export function serialInRecallRange(serial, recall) {
 
 // Used only by the "same kind of device" rule: every word of the device's type
 // ("infusion pump") appears in the recall's product text.
+/**
+ * @param {string} deviceType
+ * @param {import('./types.js').Recall} recall
+ * @returns {boolean}
+ */
 export function typeInRecall(deviceType, recall) {
   const words = tokenize(deviceType);
   if (words.length === 0) return false;
@@ -201,12 +242,23 @@ export function typeInRecall(deviceType, recall) {
 
 // --- Rules ------------------------------------------------------------------------------
 
+/**
+ * @param {import('./types.js').Confidence} confidence
+ * @param {string} rule
+ * @param {string} reason
+ * @returns {import('./types.js').Verdict}
+ */
 function result(confidence, rule, reason) {
   return { confidence, rule, reason };
 }
 
 // Decide how (and whether) one device matches one recall. Returns
 // { confidence, rule, reason } for the strongest rule that applies, or null.
+/**
+ * @param {import('./types.js').Device} device
+ * @param {import('./types.js').Recall} recall
+ * @returns {import('./types.js').Verdict | null}
+ */
 export function evaluateMatch(device, recall) {
   const sameMaker = manufacturersMatch(device.manufacturer, recall.firm);
   const hasModel = modelInRecall(device.model, recall);
@@ -311,11 +363,17 @@ export function evaluateMatch(device, recall) {
 const CLASS_RANK = Object.freeze({ I: 1, II: 2, III: 3 });
 const UNKNOWN_CLASS_RANK = 4;
 
+/** @param {string} recallClass */
 function classRank(recallClass) {
-  return CLASS_RANK[recallClass] || UNKNOWN_CLASS_RANK;
+  return /** @type {Record<string, number>} */ (CLASS_RANK)[recallClass] || UNKNOWN_CLASS_RANK;
 }
 
 // A match, flattened for the UI: the verdict plus the facts needed to show it.
+/**
+ * @param {import('./types.js').Device} device
+ * @param {import('./types.js').Recall} recall
+ * @returns {import('./types.js').Match | null}
+ */
 export function matchDeviceToRecall(device, recall) {
   const verdict = evaluateMatch(device, recall);
   if (!verdict) return null;
@@ -338,6 +396,10 @@ export function matchDeviceToRecall(device, recall) {
 
 // Compare two matches: strongest confidence first, then the most serious recall class,
 // then the newest recall, then device id so the order is always the same.
+/**
+ * @param {import('./types.js').Match} a
+ * @param {import('./types.js').Match} b
+ */
 function compareMatches(a, b) {
   return (
     CONFIDENCE_ORDER.indexOf(a.confidence) - CONFIDENCE_ORDER.indexOf(b.confidence) ||
@@ -349,7 +411,13 @@ function compareMatches(a, b) {
 }
 
 // Match every device against every recall. Returns matches sorted as described above.
+/**
+ * @param {import('./types.js').Device[]} devices
+ * @param {import('./types.js').Recall[]} recalls
+ * @returns {import('./types.js').Match[]}
+ */
 export function matchDevicesToRecalls(devices, recalls) {
+  /** @type {import('./types.js').Match[]} */
   const matches = [];
   for (const device of devices) {
     for (const recall of recalls) {

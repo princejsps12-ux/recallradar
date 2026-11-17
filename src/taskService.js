@@ -165,6 +165,10 @@ async function findExisting(items, jira, guard) {
 // { "recall|device": { ... } }. `category` is Jira's status category ('new', 'indeterminate', 'done'); a task created a few
 // seconds ago (still in the local guard, maybe not searchable yet) is reported as 'new' with no status name.
 // `matches` must already be limited to the pairs of interest.
+/**
+ * @param {{ matches: import('./types.js').Match[], jira: any, guard: any }} args
+ * @returns {Promise<Record<string, import('./types.js').TaskInfo>>}
+ */
 export async function getTaskStatuses({ matches, jira, guard }) {
   const items = matches.filter(isTaskWorthy).map((match) => ({
     match,
@@ -173,6 +177,7 @@ export async function getTaskStatuses({ matches, jira, guard }) {
   const guarded = guard.readMany ? await guard.readMany(items.map((i) => i.label)) : new Map();
   const toSearch = items.map((i) => i.label).filter((label) => !(guarded.get(label) && guarded.get(label).key));
   const found = toSearch.length ? await jira.findTasks(toSearch) : new Map();
+  /** @type {Record<string, import('./types.js').TaskInfo>} */
   const states = {};
   for (const { match, label } of items) {
     const entry = guarded.get(label);

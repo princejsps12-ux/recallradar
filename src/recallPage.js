@@ -49,6 +49,9 @@ export function niceMoment(iso) {
 // `matches` are the exact/likely matches for this ONE recall (one row per device).
 // `taskKeys` maps "recall|device" to an existing Jira key. `info` is the saved per-recall detail
 // (status, initiated, reason). `checkedAt` is when the saved check ran.
+/**
+ * @param {{ matches: import('./types.js').Match[], info?: { status?: string, initiated?: string, reason?: string }, taskKeys?: Record<string, string>, checkedAt?: string }} args
+ */
 export function buildRecallPageBody({ matches, info = {}, taskKeys = {}, checkedAt }) {
   const first = matches[0];
   const recallClass = first.recallClass || '';

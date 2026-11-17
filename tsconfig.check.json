@@ -1,0 +1,21 @@
+{
+  // Type-checks the app code (src/*.js) from its JSDoc comments, without a build: `npm run typecheck`.
+  // NOT named tsconfig.json on purpose: Forge's own linter (run by `forge lint` and `forge deploy`) picks up a tsconfig.json at the app
+  // root and then insists that it includes every file it lints, tests included, which stops the deploy.
+  // The plain JavaScript stays plain JavaScript; the checker reads the comments and complains where a call does not fit them.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "strict": false,
+    "noImplicitAny": false
+  },
+  "include": ["src/**/*.js"],
+  "exclude": ["node_modules", "static"]
+}

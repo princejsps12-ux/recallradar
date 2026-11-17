@@ -181,6 +181,9 @@ function wardsOf(matches) {
 // Devices the saved check says are affected (exact or likely) by a recall that is still open.
 // inputs: ward, recallClass, confidence ("exact" | "likely"), limit.
 // deps (optional): getTaskKeys(pairs) -> { "recall|device": "MOBL-1" }, to show existing tasks.
+/**
+ * @param {{ snapshot: any, inputs?: Record<string, any>, deps?: Record<string, any> }} args
+ */
 export async function listOpenRecalls({ snapshot, inputs = {}, deps = {} }) {
   const { result } = snapshot;
   if (!result) return noData(snapshot);
@@ -241,6 +244,9 @@ function sameId(a, b) {
 // Look a device up in the hospital's list by id, serial/lot or model (all compared ignoring case and
 // punctuation), optionally narrowed by manufacturer.
 // inputs: deviceId, serial, model, manufacturer. At least one of the first three is required.
+/**
+ * @param {{ snapshot: any, inputs?: Record<string, any>, deps?: Record<string, any> }} args
+ */
 export function checkDevice({ snapshot, inputs = {} }) {
   const { result, devices } = snapshot;
   const deviceId = text(inputs.deviceId);
@@ -329,6 +335,9 @@ export function buildActionSteps(recallClass, anyLikely) {
 
 // Explain one recall that matched a hospital device.
 // inputs: recallNumber (required). deps (optional): getTaskKeys(pairs).
+/**
+ * @param {{ snapshot: any, inputs?: Record<string, any>, deps?: Record<string, any> }} args
+ */
 export async function recallDetails({ snapshot, inputs = {}, deps = {} }) {
   const { result } = snapshot;
   const wanted = text(inputs.recallNumber);
@@ -457,6 +466,9 @@ function parseProjectKey(value) {
 // time the people are looked up again from the ward's team with the same rule, so they are always current
 // members of the team, and the answer says who was assigned.
 // `team` is { store, graph, openCounts() } (see teamService.js); without it nobody is ever assigned.
+/**
+ * @param {{ snapshot: any, inputs?: Record<string, any>, deps?: Record<string, any> }} args
+ */
 export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
   const { result } = snapshot;
   if (!result) return noData(snapshot);
@@ -632,6 +644,9 @@ export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
 // is still open, and never twice for the same recall and device.
 // inputs: recallNumber, deviceId, projectKey (all required: an external client has no Jira issue to take the project from).
 // deps: { jira, guard, now(), defaultProjectKey }.
+/**
+ * @param {{ snapshot: any, inputs?: Record<string, any>, deps?: Record<string, any> }} args
+ */
 export async function createRemediationTask({ snapshot, inputs = {}, deps }) {
   const { result } = snapshot;
   if (!result) return noData(snapshot);

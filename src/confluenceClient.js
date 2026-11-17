@@ -25,6 +25,7 @@ export const NOT_CONNECTED_MESSAGE =
 // this instance"}). It is matched on the sentence, not on 403 alone: a 403 also means "you may not write in this space".
 const NOT_CONNECTED_ANSWER = /app is not installed on this instance/i;
 
+/** @param {any} error */
 export function isNotConnected(error) {
   return Boolean(error && error.notConnected);
 }
@@ -36,6 +37,7 @@ async function readError(response) {
   } catch (error) {
     // no body is fine
   }
+  /** @type {Error & { notConnected?: boolean }} */
   const failure = new Error(`Confluence answered ${response.status}${detail ? `: ${detail}` : ''}`);
   if (response.status === 403 && NOT_CONNECTED_ANSWER.test(detail)) failure.notConnected = true;
   return failure;

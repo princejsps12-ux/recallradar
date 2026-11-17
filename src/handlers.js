@@ -213,6 +213,7 @@ export function createHandlers(deps) {
         const devices = await deps.deviceStore.listDevices();
         const latest = await getLatestResult({ devices, cache: deps.matchCache, jobs: deps.checkJobs });
         const matches = openTaskMatches(latest);
+        /** @type {Record<string, import('./types.js').TaskInfo>} */
         const states = matches.length ? await getTaskStatuses({ matches, jira: deps.jira, guard: deps.taskGuard }) : {};
         return { ok: true, progress: summarizeProgress(matches, states) };
       } catch (error) {
@@ -391,7 +392,7 @@ export function createHandlers(deps) {
     saveAlertSettings: forAdministrators(async ({ payload }) => {
       try {
         const checked = validateSettings(payload);
-        if (!checked.ok) return { ok: false, error: checked.error };
+        if (checked.ok === false) return { ok: false, error: checked.error };
         const { settings } = checked;
         if (settings.enabled) {
           try {

@@ -68,7 +68,7 @@ export function normalizeDevice(input) {
     device.udiDi = '';
   }
   const source = asTrimmedString(input.source);
-  device.source = Object.values(DEVICE_SOURCES).includes(source) ? source : DEVICE_SOURCES.MANUAL;
+  device.source = /** @type {string[]} */ (Object.values(DEVICE_SOURCES)).includes(source) ? source : DEVICE_SOURCES.MANUAL;
   return device;
 }
 

@@ -11,12 +11,15 @@
     "test:preview": "node scripts/preview/check.cjs",
     "shots": "node scripts/preview/shots.cjs",
     "lint": "eslint . --max-warnings=0",
-    "eval": "node scripts/eval-matching.mjs --write"
+    "eval": "node scripts/eval-matching.mjs --write",
+    "typecheck": "tsc -p tsconfig.check.json && tsc -p tsconfig.check.strict.json"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^4.6.0"
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@forge/api": "8.5.0",

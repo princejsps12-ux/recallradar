@@ -29,11 +29,12 @@ const actions = createRovoHandlers({
   log: console,
 });
 
-// Explicit functions (not a destructuring export): the Forge linter looks for them by name.
-export const listOpenRecallsAction = (payload, context) => actions.listOpenRecallsAction(payload, context);
-export const checkDeviceAction = (payload, context) => actions.checkDeviceAction(payload, context);
-export const recallDetailsAction = (payload, context) => actions.recallDetailsAction(payload, context);
+// Explicit functions (not a destructuring export): the Forge linter looks for them by name. Only the actions that create tasks need the
+// Forge context (to know the project of the page the chat is on); the rest read the saved check and ignore it.
+export const listOpenRecallsAction = (payload) => actions.listOpenRecallsAction(payload);
+export const checkDeviceAction = (payload) => actions.checkDeviceAction(payload);
+export const recallDetailsAction = (payload) => actions.recallDetailsAction(payload);
 export const createRemediationTasksAction = (payload, context) => actions.createRemediationTasksAction(payload, context);
 export const createRemediationTaskAction = (payload, context) => actions.createRemediationTaskAction(payload, context);
-export const createRecallPageAction = (payload, context) => actions.createRecallPageAction(payload, context);
-export const whoHandlesWardAction = (payload, context) => actions.whoHandlesWardAction(payload, context);
+export const createRecallPageAction = (payload) => actions.createRecallPageAction(payload);
+export const whoHandlesWardAction = (payload) => actions.whoHandlesWardAction(payload);
