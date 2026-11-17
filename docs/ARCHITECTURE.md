@@ -11,7 +11,7 @@ A check makes about two dozen openFDA requests and a cold one takes 10 to 14 sec
 
 The rules that keep it correct (each has unit tests): a check with failed lookups is shown but **not** saved; only the running job with the right id may be updated, so late or duplicate queue deliveries are skipped; a job that stops reporting for 6 minutes counts as failed; a result too large for storage is reported as a failure, not lost; the search has its own 240-second deadline inside the 300-second limit. The pieces are [`src/checkJob.js`](../src/checkJob.js) (job record), [`src/matchService.js`](../src/matchService.js) (start / run / status) and [`src/matchCache.js`](../src/matchCache.js) (saved result).
 
-Searches are also kept small: each asks for the newest 25 recalls (`SEARCH_LIMIT_PER_QUERY`), not 100.
+Searches are also kept small: each asks for 25 recalls at a time (`SEARCH_LIMIT_PER_QUERY`) and continues to the next page, up to 100 per search (`MAX_PAGES_PER_QUERY`), over a three-year window.
 
 ## Measurements (demo hospital: 30 devices, 24 searches)
 

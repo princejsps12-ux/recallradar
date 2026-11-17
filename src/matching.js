@@ -33,7 +33,7 @@
 //
 // This file has no Forge imports so every rule can be unit tested with plain Node.
 import { tokenize, compact, containsPhrase } from './text.js';
-import { extractUdis, normalizeDi } from './udi.js';
+import { extractUdis, normalizeDi, diVariants } from './udi.js';
 import { parseSerialConstraints, serialInConstraints } from './serials.js';
 
 export const CONFIDENCE = Object.freeze({
@@ -240,6 +240,28 @@ export function typeInRecall(deviceType, recall) {
   return words.every((word) => text.has(word));
 }
 
+// --- One recall, several products --------------------------------------------------------
+// A recall often covers several models in one code text ("WX-200: all serial numbers. WX-300: serial numbers 12345-12400").
+// "All serial numbers", a listed lot or a range belongs to the product named beside it, not to every model of the recall, so
+// a device is judged only against the segments of the code text that name ITS model (or UDI-DI). Only when the text has two or
+// more segments that carry unit words AND one of them names this device; otherwise nothing can be told apart and the whole
+// text is used as before. Known limit: a model named only in the product description (not in the code text) cannot be scoped.
+const EXCLUSION = /\b(except|excepting|excluding|excluded|exclusive of|other than|not including|apart from)\b/i;
+const UNIT_CUE = /\b(serial|lots?|batch(?:es)?|all)\b|\((?:10|21)\)/i;
+
+/**
+ * @param {import('./types.js').Recall} recall
+ * @param {string[]} phrases  the device's model and the written forms of its UDI-DI
+ * @returns {import('./types.js').Recall}
+ */
+function scopedRecall(recall, phrases) {
+  const segments = (recall.codeText || '').split(/\n+|(?<=[.;])\s+/).map((s) => s.trim()).filter(Boolean);
+  const withCue = segments.filter((s) => UNIT_CUE.test(s));
+  if (withCue.length < 2) return recall;
+  const mine = withCue.filter((s) => phrases.some((p) => p && containsPhrase(s, p)));
+  return mine.length === 0 ? recall : { ...recall, codeText: mine.join(' ') };
+}
+
 // --- Rules ------------------------------------------------------------------------------
 
 /**
@@ -262,8 +284,12 @@ function result(confidence, rule, reason) {
 export function evaluateMatch(device, recall) {
   const sameMaker = manufacturersMatch(device.manufacturer, recall.firm);
   const hasModel = modelInRecall(device.model, recall);
-  const hasLot = lotInRecall(device.lotOrSerial, recall);
-  const range = hasLot ? null : serialInRecallRange(device.lotOrSerial, recall);
+  const scoped = scopedRecall(recall, [device.model, ...diVariants(device.udiDi)]);
+  // "All lot numbers except lot 123" and "1000-1500, excluding 1200" name units that are NOT affected: the text cannot be read as
+  // a plain list, range or "all units", so the unit-level rules are off and a person checks (the answer stays "likely").
+  const excluded = EXCLUSION.test(scoped.codeText || '');
+  const hasLot = !excluded && lotInRecall(device.lotOrSerial, scoped);
+  const range = hasLot || excluded ? null : serialInRecallRange(device.lotOrSerial, scoped);
   const unitListed = hasLot || Boolean(range);
   const unitHow = hasLot ? `serial/lot "${device.lotOrSerial}" is listed` : `serial "${device.lotOrSerial}" falls inside the range the recall gives ("${range}")`;
   const whyNotListed = device.lotOrSerial
@@ -280,7 +306,7 @@ export function evaluateMatch(device, recall) {
     if (unitListed || tied) {
       return result(CONFIDENCE.EXACT, RULES.EXACT_UDI_UNIT, `UDI-DI ${udi.di} is listed in this recall, and this unit's ${tied && !unitListed ? `serial/lot "${device.lotOrSerial}" is listed with it` : unitHow}.`);
     }
-    if (recallCoversAllUnits(recall)) {
+    if (!excluded && recallCoversAllUnits(scoped)) {
       return result(CONFIDENCE.EXACT, RULES.EXACT_UDI_ALL_UNITS, `UDI-DI ${udi.di} is listed in this recall, and the recall covers all serial/lot numbers.`);
     }
     return result(CONFIDENCE.LIKELY, RULES.LIKELY_UDI, `UDI-DI ${udi.di} is listed in this recall, but ${whyNotListed}.`);
@@ -304,7 +330,7 @@ export function evaluateMatch(device, recall) {
       );
     }
     // RULE exact-manufacturer-model-all: maker and model match and the recall covers every unit.
-    if (recallCoversAllUnits(recall)) {
+    if (!excluded && recallCoversAllUnits(scoped)) {
       return result(
         CONFIDENCE.EXACT,
         RULES.EXACT_MODEL_ALL_UNITS,

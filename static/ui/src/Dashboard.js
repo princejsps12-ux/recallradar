@@ -142,9 +142,10 @@ export default function Dashboard() {
     </div>
   );
   const messages = (
-    <div style={{ display: 'grid', gap: sp(150), marginBottom: d.error || (d.result && d.result.failedQueries > 0) ? sp(200) : 0 }}>
+    <div style={{ display: 'grid', gap: sp(150), marginBottom: d.error || (d.result && (d.result.failedQueries > 0 || d.result.cappedQueries > 0)) ? sp(200) : 0 }}>
       {d.error && <SectionMessage appearance="error" title="Something went wrong">{d.error}</SectionMessage>}
       {d.result && d.result.failedQueries > 0 && <SectionMessage appearance="warning" title="Result may be incomplete">{d.result.failedQueries} FDA lookups failed or timed out. Try Refresh.</SectionMessage>}
+      {d.result && d.result.cappedQueries > 0 && <SectionMessage appearance="information" title="Some older recalls may be missing">{d.result.cappedQueries} {d.result.cappedQueries === 1 ? 'search' : 'searches'} had more matching recalls than could be read (up to 100 each). "No match" is not proof that a device is unaffected.</SectionMessage>}
     </div>
   );
 

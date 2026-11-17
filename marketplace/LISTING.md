@@ -42,7 +42,7 @@ Hospitals track thousands of devices, and FDA publishes new device recalls every
 
 **Built to be trusted**
 - It reads the saved check, never guesses a space, team or recall number, and tasks and pages are written as the person who clicked, so Jira and Confluence permissions apply.
-- No patient data. It sends only manufacturer and model names to openFDA.
+- No patient data. It sends only manufacturer and model names and UDI-DIs to openFDA.
 
 Try it in about ten minutes (install, then): open the dashboard and click **Load demo hospital** (30 devices with real manufacturer and model names, so some really match recalls).
 
@@ -79,16 +79,16 @@ Then `16-create-all-confirm-light.jpg` (it asks before creating), `04-ward-teams
 ## Data and security notes (for the listing's security questionnaire)
 
 - **What is stored** (Forge storage, `storage:app`, inside Atlassian's infrastructure): the device list (name, type, manufacturer, model, serial/lot, ward), the latest saved check result (deleted after at most 24 hours), the ward-to-team mapping (team id and name), and short-lived task and preview guards (deleted when they expire). **No patient data and no Atlassian account ids, names or emails are stored.**
-- **What leaves Atlassian**: only searches to `api.fda.gov` containing manufacturer and model names from the device list. Nothing else is sent anywhere.
-- **Teamwork Graph**: read-only; two queries (a user's teams, a team's members), run as the signed-in person. Nothing is written to the graph.
+- **What leaves Atlassian**: only searches to `api.fda.gov` containing manufacturer and model names and UDI-DIs from the device list. Nothing else is sent anywhere.
+- **Teamwork Graph**: read-only; four queries (a user's teams, a team's members, the Jira projects a team works in with their lead, the work assigned to a person), run as the signed-in person. Nothing is written to the graph.
 - **Permissions and why**: see the "Permissions" table in the README. Jira work and Confluence page scopes act as the signed-in person. No unused scopes are declared (the Assets scopes were removed until an Assets import exists).
 - **No claim of HIPAA or other certification** is made here. Do not add one unless it is true for your organisation.
 - Output written to Jira and Confluence is built on the server from saved data, and every piece of FDA or hospital text is escaped before it goes into a Confluence page.
 
 ## Known limits to state honestly
 
-- Each search reads the newest 25 matching recalls; older ones in the last year may be missing (the panel says so).
+- Each search reads up to 100 matching recalls from the last three years, 25 at a time; a search that still has more is capped and older recalls may be missing.
 - openFDA allows about 1,000 anonymous requests a day per IP; a full check uses about 24, which is why results are saved for 6 hours.
 - External MCP clients were not tested end to end.
 
-**About the screenshots.** `01` to `19` are generated from the app with invented demo data (`npm run shots`), so their counts agree with each other (for example 21 devices need action, 27 tasks). `20` to `23` were taken live on a Forge demo site with its own data (for example one Cath Lab device with six Class I recalls), so their numbers differ from the generated ones. Both show the real app and its real behaviour.
+**About the screenshots.** `01` to `19` are generated from the app with invented demo data (`npm run shots`), so their counts agree with each other (for example 25 devices need action). `20` to `23` were taken live on a Forge demo site with its own data (for example one Cath Lab device with six Class I recalls), so their numbers differ from the generated ones. Both show the real app and its real behaviour.

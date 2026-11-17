@@ -488,3 +488,26 @@ test('a short serial tied to the device\'s own UDI-DI counts as listed ((21) ser
   const noUdi = evaluateMatch({ manufacturer: 'Philips Medical Systems', model: '722064', type: 'azurion', lotOrSerial: '209' }, recall);
   assert.equal(noUdi.rule, RULES.LIKELY_MODEL, 'without the DI, a 3-digit number in the text proves nothing');
 });
+
+test('"all serial numbers" or a range for one model of a multi-product recall does not make another model exact', () => {
+  const base = { recallNumber: 'Z-9', recallClass: 'II', date: '2026-11-01', firm: 'Acme Medical', product: 'WX family' };
+  const recall = { ...base, productText: 'WX-200 and WX-300 monitors', codeText: 'WX-200: all serial numbers. WX-300: serial numbers 12345 through 12400.' };
+  const dev = (model, lotOrSerial) => ({ id: 'd', name: 'Monitor', type: 'monitor', manufacturer: 'Acme Medical', model, lotOrSerial, ward: 'ICU' });
+  assert.equal(evaluateMatch(dev('WX-200', '55555'), recall).rule, RULES.EXACT_MODEL_ALL_UNITS, 'its own model: all units');
+  assert.equal(evaluateMatch(dev('WX-300', '99999'), recall).confidence, 'likely', 'outside WX-300 range; the all-units of WX-200 is not its');
+  assert.equal(evaluateMatch(dev('WX-300', '12350'), recall).rule, RULES.EXACT_MODEL_AND_RANGE);
+  const lots = { ...recall, codeText: 'WX-200: lots A1234, B5678. WX-300: lots C9999.' };
+  assert.equal(evaluateMatch(dev('WX-300', 'A1234'), lots).confidence, 'likely', "a lot listed for WX-200 is not WX-300's");
+  assert.equal(evaluateMatch(dev('WX-200', 'A1234'), lots).rule, RULES.EXACT_MODEL_AND_LOT);
+});
+
+test('exclusions in the code text switch the unit-level rules off: the answer stays "likely"', () => {
+  const recall = { recallNumber: 'Z-8', recallClass: 'II', date: '2026-11-01', firm: 'Acme Medical', product: 'WX', productText: 'WX-200 monitor', codeText: 'All lot numbers except lot 12345.' };
+  const dev = (lotOrSerial) => ({ id: 'd', name: 'M', type: 'monitor', manufacturer: 'Acme Medical', model: 'WX-200', lotOrSerial, ward: 'ICU' });
+  assert.equal(evaluateMatch(dev('77777'), recall).confidence, 'likely');
+  assert.equal(evaluateMatch(dev('12345'), recall).confidence, 'likely', 'the excluded lot is never exact');
+  const range = { ...recall, codeText: 'Serial numbers 1000 through 1500, excluding 1200.' };
+  assert.equal(evaluateMatch(dev('1200'), range).confidence, 'likely');
+  assert.equal(evaluateMatch(dev('1300'), range).confidence, 'likely', 'with an exclusion in the text a person decides');
+});
+

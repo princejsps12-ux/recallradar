@@ -29,7 +29,13 @@ export async function getLatestResult({ devices, cache, jobs }) {
   const saved = await getSavedMatches({ devices, cache });
   if (saved) return saved;
   const job = await jobs.current();
-  return job && job.status === 'done' && job.result ? job.result : null;
+  if (!(job && job.status === 'done' && job.result)) return null;
+  // The job's copy carries no device fingerprint, so check it against the devices there are NOW: after devices were removed or
+  // replaced it must not be used (it would still create tasks and progress for a device that is gone).
+  const ids = new Set(devices.map((device) => device.id));
+  const result = job.result;
+  if (result.deviceCount !== devices.length || !(result.matches || []).every((match) => ids.has(match.deviceId))) return null;
+  return result;
 }
 
 // Start a check, or say why not. Never waits for the check itself.

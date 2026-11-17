@@ -39,6 +39,12 @@ There are no unexplained constants. All are named exports in [`src/matching.js`]
 
 Results are sorted by confidence (exact, likely, possible), then recall class (I is the most serious), then newest recall first, then device id, so the order is always the same.
 
+## Several products in one recall, and exclusions
+
+- **Per product.** A recall often covers several models in one code text ("WX-200: all serial numbers. WX-300: serial numbers 12345 through 12400."). When the text has two or more segments that carry serial, lot or "all" words and one of them names the device's model (or UDI-DI), the lot list, the range and "all units" are judged against **those segments only** (`scopedRecall` in `src/matching.js`). A WX-300 with serial 99999 is therefore *likely*, not *exact* because of WX-200's "all serial numbers". If the model is named only in the product description and not in the code text, the text cannot be told apart and the whole of it is used: a known limit.
+- **Exclusions.** "All lot numbers except lot 12345" or "1000 through 1500, excluding 1200" name units that are *not* affected. When the code text holds such a word (except, excluding, other than, not including, apart from) the unit-level rules are off and the answer stays *likely*, so a person checks.
+- Both were found by independent review, fixed here and covered by tests; they are not in the accuracy set yet (`docs/ACCURACY.md` only covers one-product recalls), which is stated there.
+
 ## Known limits
 
 - **A unit outside a stated range is not ruled out.** When a recall says `serial numbers 2001-2500` and the device's serial is 3000, the product is still shown as **likely**: a wrongly read range would hide a real recall, so a person decides. The reason names the range.

@@ -364,3 +364,12 @@ test('a failing or throwing afterComplete never fails the check or loses its res
   assert.equal(second, 'done');
   assert.ok(await again.cache.read(devices), 'the result was saved');
 });
+
+test('getLatestResult does not use a finished job\'s copy for devices that were removed or replaced', async () => {
+  const s = setup({ result: found({ failedQueries: 1 }) }); // not saved, so only the job holds it
+  await performCheck({ devices, search: s.search, cache: s.cache, jobs: s.jobs, trigger: 'user', nowMs: () => s.clock.now });
+  assert.ok(await getLatestResult({ devices, cache: s.cache, jobs: s.jobs }), 'the same devices: the job copy is used');
+  assert.equal(await getLatestResult({ devices: [], cache: s.cache, jobs: s.jobs }), null, 'all devices removed');
+  assert.equal(await getLatestResult({ devices: [{ ...devices[0], id: 'b' }], cache: s.cache, jobs: s.jobs }), null, 'a replaced device');
+});
+

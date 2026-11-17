@@ -81,7 +81,7 @@ preview cannot quietly fall behind the app.
   dialog, both tabs, the pager, sorting, filters, selects) and fails on: a content security policy violation, a console
   error, an axe-core violation of impact serious or critical (WCAG 2.0 to 2.2 AA and best practice: contrast, names,
   roles, headings), issue-panel content taller than its 262 px frame, anything wider than the screen, or a phone run
-  whose frame is not really that wide. Targets under 24 x 24 px are warnings. Last run: 110 screens, all clean.
+  whose frame is not really that wide. Targets under 24 x 24 px are warnings. Last run: 148 screens, all clean.
   - One known, accepted violation: opening a dialog makes `@atlaskit/modal-dialog` (through `react-scrolllock`) write a
     `body { box-sizing ... }` style, which the policy blocks. The only effect is that the page behind a dialog can still
     scroll. Any other violation fails the run.

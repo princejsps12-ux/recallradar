@@ -19,7 +19,7 @@ In Atlassian Forge app storage, inside Atlassian's infrastructure, scoped to you
 
 ## What leaves Atlassian
 
-Searches to the public openFDA service (`api.fda.gov`) that contain **manufacturer and model names** from your device list. Nothing else is sent to any third party. We do not sell data, and we do not use it for advertising or to train models.
+Searches to the public openFDA service (`api.fda.gov`) that contain **manufacturer and model names and UDI-DIs (device identifiers)** from your device list. Nothing else is sent to any third party. We do not sell data, and we do not use it for advertising or to train models.
 
 ## Who acts, and with what rights
 

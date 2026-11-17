@@ -12,7 +12,7 @@ Check what the demo matches against the live API at any time:
 node scripts/check-demo-matches.mjs
 ```
 
-Results can drift as the FDA publishes new recalls, and recalls fall out of the one-year window.
+Results can drift as the FDA publishes new recalls, and recalls fall out of the three-year window.
 
 # Where devices live
 
@@ -42,7 +42,7 @@ src/recallPage.js         The Confluence page for one recall (pure, escaped)
 src/recallPageService.js  One page per open recall: choose space, create or update
 src/confluenceClient.js   The Confluence calls: spaces, find page by title, upsert
 src/rovoActions.js        Forge handlers for the agent's actions
-src/teamGraph.js          The two read-only Teamwork Graph calls (documents + parsing)
+src/teamGraph.js          The four read-only Teamwork Graph calls (documents + parsing)
 src/wardTeams.js          Ward-to-team mapping in Forge storage
 src/teamService.js        Assignee suggestion rule, ward lookups, checks before assigning
 skills/recall-triage/     The Rovo skill that groups the actions (SKILL.md)

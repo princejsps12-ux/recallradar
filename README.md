@@ -4,7 +4,7 @@ A Forge app for hospital teams. It compares **FDA medical device recalls** ([ope
 
 **Why it matters.** An FDA recall of a device model or lot can mean serious harm or death (Class I). New recalls are published every week, and a clinical engineering team has to find, by hand, which of its own devices they cover (the right maker, the right model, the right serial or lot) and then chase the follow-up. A missed match is a patient-safety risk and a slow one is a compliance problem. RecallRadar does the matching, says how sure it is, and turns each match into a Jira task due by the recall's class.
 
-![The RecallRadar dashboard: 21 devices need action, the most urgent first](marketplace/screenshots/01-dashboard-overview-light.jpg)
+![The RecallRadar dashboard: 25 devices need action, the most urgent first](marketplace/screenshots/01-dashboard-overview-light.jpg)
 
 *The dashboard, generated from the app with invented demo data (the issue panel, the device drawer, dark mode, phone width and live Rovo, Jira and Confluence shots are in [`marketplace/screenshots`](marketplace/screenshots)).*
 
@@ -23,7 +23,7 @@ Open it, pick your site and install it in **Jira**. That is all RecallRadar need
 - Optional, each unlocks one feature: **Rovo** (the chat agent; a free developer site has none, so if Jira shows no **Ask Rovo** button, skip step 5 and look at `marketplace/screenshots/21-rovo-chat-answer.png` and `22-rovo-chat-task-preview.png`), **Confluence** (recall pages, once connected as above), and membership of at least one **team** in your Atlassian directory (the ward-to-team feature lists the teams you belong to; with none, that dropdown is empty and everything else still works).
 
 **About ten minutes, in order**
-1. Jira, **Apps**, **RecallRadar**: the dashboard. On a fresh site it shows a first-run screen. Click **Load demo hospital** (30 sample devices with real manufacturer and model names), or **Import your own devices** and paste rows from a spreadsheet. It then checks them against the last year of FDA recalls in the background (about 15 seconds).
+1. Jira, **Apps**, **RecallRadar**: the dashboard. On a fresh site it shows a first-run screen. Click **Load demo hospital** (30 sample devices with real manufacturer and model names), or **Import your own devices** and paste rows from a spreadsheet. It then checks them against the last three years of FDA recalls in the background (about 15 seconds).
 2. Expect the headline "N devices need action" with the Class I count and one summary line (devices monitored, open recalls by class, task counts), a **Do this first** list and a table of affected devices. With the demo hospital you should see roughly 20 to 30 open exact or likely recalls across Class I, II and III; the exact numbers drift as the FDA publishes new recalls.
 3. Click a device name for its recalls, the reason each matched and what the FDA says is wrong, then **Create task** (or **Create and assign to ...** in the small menu beside it if you mapped a ward to a team).
 4. Open any Jira issue, click **Apps** (beside the **+** under its title) and choose **RecallRadar**: the panel is a compact summary with **Open dashboard** and **Create all N tasks...**.
@@ -227,7 +227,7 @@ Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), 
 - **Where it lives.** Forge app storage, inside Atlassian's infrastructure and scoped to the site. Uninstalling removes it.
 - **No personal data in storage.** The app never saves an Atlassian account id, name or email. Account ids and names are read from the Teamwork Graph only while you use the feature, and the Rovo task preview stores just ids of devices, recalls and the project, not people.
 - **Retention.** The saved check result and the finished-job copy of it are deleted after **24 hours**; task previews are deleted when used or after 10 minutes; task duplicate-guards after 2 minutes; the daily-alert record (which recall and device pairs have been seen, ids and times only, and the last run's counts and Jira issue keys) after **7 days** without an update, and when the devices are removed. A daily clean-up job deletes anything left over. The device list, the ward-to-team mapping and the administrator's alert choices (project key, issue key) stay until you remove them or uninstall. Jira tasks and Confluence pages are your content and stay.
-- **What leaves Atlassian.** Only searches to `api.fda.gov` that contain manufacturer and model names. For that reason the app is **not** eligible for "Runs on Atlassian".
+- **What leaves Atlassian.** Only searches to `api.fda.gov` that contain manufacturer and model names and the UDI-DIs (device identifiers) of your devices. For that reason the app is **not** eligible for "Runs on Atlassian".
 - **Acts as the person.** Tasks, pages and Teamwork Graph reads run as the signed-in user, so their permissions apply. The one exception is the **daily alert**, which has no signed-in person and acts as the app itself in the project an administrator chose (checked when the choice is saved). The Teamwork Graph is only read, never written.
 - **No certification claims.** This README does not claim HIPAA or any other certification.
 - Draft [privacy policy](https://github.com/princejsps12-ux/recallradar/blob/main/marketplace/PRIVACY.md) and [terms](https://github.com/princejsps12-ux/recallradar/blob/main/marketplace/TERMS.md).
@@ -247,7 +247,7 @@ Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), 
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The background check job, its rules and measurements |
 | [`docs/TASKS.md`](docs/TASKS.md) | The due-date rule, how duplicates are prevented, tracking tasks to closure, limits |
 | [`docs/ALERTS.md`](docs/ALERTS.md) | What "new" means, what the daily run does, who it acts as, what it stores, limits |
-| [`docs/TEAMWORK_GRAPH.md`](docs/TEAMWORK_GRAPH.md) | The two Teamwork Graph queries verbatim, what is stored, what was verified |
+| [`docs/TEAMWORK_GRAPH.md`](docs/TEAMWORK_GRAPH.md) | The four Teamwork Graph queries verbatim, what is stored, what was verified |
 | [`docs/MCP.md`](docs/MCP.md) | Connecting Claude Desktop, Claude Code, Cursor and others |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Demo hospital, project layout, build, deploy, tests |
 | [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | One installation for Jira, Confluence and Rovo Home, and connecting Confluence |

@@ -45,7 +45,7 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 | `src/matching.js` | The ten match rules (exact / likely / possible; UDI-DI rules first), every threshold a named constant with its reason |
 | `src/udi.js`, `src/serials.js` | UDI-DI (GS1 GTIN) extraction from recall text and device lists; serial ranges/limits read only inside a "serial" clause |
 | `src/accuracy.js`, `scripts/eval-matching.mjs`, `scripts/make-eval-set.mjs`, `eval/` | Accuracy evaluation: frozen real recalls (`eval/recalls.json`), labeled cases built from them, precision/recall per level, `docs/ACCURACY.md` |
-| `src/openfda.js`, `src/recallSearch.js`, `src/text.js` | openFDA URLs and parsing; which searches to run (per manufacturer + per model, 1-year window); tokenizing |
+| `src/openfda.js`, `src/recallSearch.js`, `src/text.js` | openFDA URLs and parsing; which searches to run (per manufacturer + per model + per UDI-DI, 3-year window, paged to 100); tokenizing |
 | `src/deviceStore.js` | Device list interface (Forge storage today; a read-only Assets import can plug in later) |
 | `src/matchCache.js` | Saved result, 6-hour freshness, fingerprint of the device list; `peek()` also returns expired entries as stale, but **never past 24 hours** (`MAX_RETENTION_MS`, deleted on read and by the daily cleanup) |
 | `src/checkJob.js` | The background job record (running / done / failed, progress, stale-job detection); a finished job holds a copy of the result, so it also obeys the 24-hour limit |
