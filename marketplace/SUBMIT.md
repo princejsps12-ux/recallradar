@@ -2,7 +2,7 @@
 
 These steps need your Atlassian account, vendor details or decisions, so they are listed for you to do. In order:
 
-1. **Fill the blanks.** Put your name and support email in `marketplace/PRIVACY.md`, `marketplace/TERMS.md` and the support row of `marketplace/LISTING.md`. Have the terms and privacy text reviewed if you can. The repository is public at https://github.com/princejsps12-ux/recallradar, so the privacy, terms and README files already have public URLs (listed in `LISTING.md`). Commit and push after you edit them.
+1. **Check the details.** The owner name and support email (Prince Pandey, princejsps12@gmail.com) are already in `marketplace/PRIVACY.md`, `marketplace/TERMS.md` and the support row of `marketplace/LISTING.md`; change them there if they are not what you want published. Have the terms and privacy text reviewed if you can. The repository is public at https://github.com/princejsps12-ux/recallradar, so the privacy, terms and README files already have public URLs (listed in `LISTING.md`). Commit and push after you edit them.
 2. **Screenshots**: all 28 are already in `marketplace/screenshots/`: 24 generated from the app (01 to 19 and 24 to 28) (`npm run shots` redoes them after any UI change) and four taken on the demo site (a Jira task, two Rovo chats, a Confluence page; `LISTING.md` lists them in order). Nothing to take; upload them.
 3. **Icon**: `marketplace/icon-144.png` is ready (144 x 144); nothing to do.
 4. **Scopes**: already trimmed to what the app uses; nothing to do.

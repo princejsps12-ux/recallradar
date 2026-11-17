@@ -14,64 +14,84 @@ Everything the listing form asks for, ready to paste. Nothing here is invented: 
 
 ## Tagline (max 80 characters)
 
-Match FDA device recalls to your hospital's devices, and say how sure and why.
+Match FDA device recalls to your devices by UDI, alert daily, track to closure.
 
 ## Short description (max 200 characters)
 
-RecallRadar compares FDA medical device recalls with your hospital's devices in Jira, shows how sure each match is and why, and creates the follow-up tasks.
+RecallRadar matches FDA device recalls to your hospital's devices by UDI-DI, serial range and model, says how sure each match is and why, alerts daily on new ones and tracks the Jira tasks to closure.
 
 ## Long description
 
-**Know which of your devices an FDA recall actually affects, and get the work started.**
+**Know which of your devices an FDA recall actually affects, hear about new ones the day they appear, and see the work through to closure.**
 
-Hospitals track thousands of devices, and FDA publishes new device recalls every week. RecallRadar compares the recalls with your device list and tells you, for each match, **how sure it is and why**:
+Hospitals track thousands of devices, and FDA publishes new device recalls every week. RecallRadar compares the recalls with your device list and tells you, for each match, **how sure it is and why**.
 
-- **Exact**: manufacturer, model and serial/lot are all listed in the recall.
-- **Likely**: the model matches, but the serial/lot is not listed or not recorded, so a person must check.
+**New in this version**
+- **Daily alerts.** Every day, after the check, RecallRadar finds the recalls that have **started to affect a device** since the last look, creates the Jira task for each (never twice) and posts **one comment** on an issue your team follows. A Jira administrator turns it on and chooses the project; saving tests that the app may create issues there. Nothing is created for what is affected today: alerts start from the moment they are switched on. A **New since yesterday** card on the dashboard lists what changed.
+- **Tracked to closure.** Jira's status of every task is shown next to it, and a **Progress** tab says how much is done: the overall share resolved, then each open recall (Class I first) and each ward, with tasks to do, in progress and done and the devices that still have no task.
+- **UDI-DI and serial-range matching.** The strongest match is by the device identifier printed on the label (a GS1 UDI-DI), read from the many shapes recalls use; recalls that describe affected units as a range ("serial numbers 1000 through 1500", "serial number < 2224") are understood too. The matching is **measured** on 3,423 labeled pairs from 48 real recalls, including recalls that name several products and recalls that leave units out (exact is right 100.0% of the time on that set; the numbers, every miss and the limits are published in the documentation, and the labels are the developer's, not a field measurement).
+- **Who owns the ward, and how busy they are.** In a device's details, **Who handles this ward** shows the team, the Jira project it works in and who leads it, and each person's open work, read from the Teamwork Graph (read-only, when you open it, never stored).
+- **Import with a preview.** Paste a spreadsheet of up to 1,000 devices and see how each of your columns was understood and the first rows, with line-numbered problems, before anything is imported. Re-pasting in another order keeps each device's tasks on the right device.
+
+**How sure, and why**
+- **Exact**: manufacturer, model and this unit's serial/lot are listed (or the UDI-DI and the unit, or a stated range or "all units"); nothing else is called exact.
+- **Likely**: the product matches, but this unit is not confirmed: a person must check. Only a UDI-DI, a listed unit or a stated range is trusted to say more.
 - **Possible**: weak signal, shown only for judgement and never turned into a task.
 
 **In Jira**
-- A **dashboard** with devices, open recalls by class, task progress, and a filterable table of affected devices by ward and class.
-- A **compact panel on every issue** (add it from the issue's Apps button): the headline, the three most urgent devices, **Open dashboard** and **Create all N tasks…**. On the dashboard, open a device to see each match with its reason and create a Jira task (one or all) with the ward, the reason, a link to the FDA recall and a due date from the recall's class (Class I sooner than II and III). Never a duplicate task for the same recall and device.
+- A **dashboard** with devices, open recalls by class, task progress and a filterable table of affected devices by ward and class; a **compact panel on every issue**: the headline, the three most urgent devices, **Open dashboard** and **Create all N tasks…**.
+- Open a device to see each match with its reason and create a Jira task (one or all) with the ward, the reason, a link to the FDA recall and a due date from the recall's class (Class I sooner than II and III). Never a duplicate task for the same recall and device.
 - **Ward teams from the Teamwork Graph** (read-only): map each ward to a team, see "Team: <name> (from Teamwork Graph)", and get a suggested assignee. Nobody is assigned unless you say yes.
 - **Confluence recall pages**: one page per recall (what is wrong, what to do, affected devices, live task cards).
 
 **With Rovo and other agents**
-- The **RecallRadar Assistant** answers "Which Cath Lab devices have open Class I recalls?" from the saved check, with the FDA recall numbers and device ids cited, never invented, and creates tasks only after you confirm a preview.
+- The **RecallRadar Assistant** answers "Which Cath Lab devices have open Class I recalls?" or "Who handles the Cath Lab?" from the saved check and the Teamwork Graph, with the FDA recall numbers and device ids cited, never invented, and creates tasks only after you confirm a preview.
 - The same tools are available over **MCP** to other agents (an admin must enable them).
 
 **Built to be trusted**
-- It reads the saved check, never guesses a space, team or recall number, and tasks and pages are written as the person who clicked, so Jira and Confluence permissions apply.
+- It reads the saved check, never guesses a space, team or recall number. Tasks and pages are written as the person who clicked, so Jira and Confluence permissions apply; the one exception is the daily alert, which an administrator switches on and which acts as the app in the project they chose.
 - No patient data. It sends only manufacturer and model names and UDI-DIs to openFDA.
 
 Try it in about ten minutes (install, then): open the dashboard and click **Load demo hospital** (30 devices with real manufacturer and model names, so some really match recalls).
 
 ## Screenshots
 
-**The app's own screenshots are generated** (`npm run shots`, see [`scripts/preview/README.md`](../scripts/preview/README.md)) from the real production bundle, with invented data, so they always match the current UI. They are in [`marketplace/screenshots/`](screenshots/) at 1440 x 900 CSS pixels (the issue panel at 680 x 262, phone at 390 x 844), captured at 2x. Upload them in this order, the first five are the ones a gallery shows first:
+All 28 are in [`marketplace/screenshots/`](screenshots/), in this order (the first five are the ones a gallery shows first). `01` to `19` and `24` to `28` are **generated** by `npm run shots` (see [`scripts/preview/README.md`](../scripts/preview/README.md)) from the real production bundle in Atlassian Sans with invented data, so they always match the current UI and agree with each other (for example 25 devices need action); they are 1440 x 900 CSS pixels (the issue panel 680 x 262, phone 390 x 844) at 2x. `20` to `23` were taken live on a Forge demo site on 2026-11-16 with its own data, cropped so no names or avatars show, so their numbers differ from the generated ones.
 
 1. `01-dashboard-overview-light.jpg`: "25 devices need action", the summary line and **Do this first**.
-2. `03-device-drawer-light.jpg`: one device's recalls, each with the reason it matched and what the FDA says is wrong.
-3. `15-assign-menu-light.jpg`: **Create task**, with the Teamwork Graph's suggested assignee in the menu (nobody is assigned unless you choose).
-4. `02-affected-devices-light.jpg`: the table you can filter, sort and page through.
-5. `09-issue-panel-light.jpg`: the compact panel on every Jira issue.
-
-The newer ones follow (`24` to `28`; `20` to `23` below are taken on the demo site, so the generated set resumes at 24): `24-progress-light.jpg` (how much of the work is done, per recall and per ward), `25-new-since-yesterday-light.jpg` (the devices a recall started to affect in the last day, and their tasks), `26-daily-alerts-dialog-light.jpg` (the daily alerts: where the tasks go, what the last run did), `27-who-handles-ward-light.jpg` (the ward's team, the Jira project it works in and who leads it, and each person's open work, from the Teamwork Graph) and `28-import-preview-light.jpg` (a pasted list read before it is imported: how each column was understood, the first rows).
-
-Then `16-create-all-confirm-light.jpg` (it asks before creating), `04-ward-teams-light.jpg`, `06-confluence-dialog-light.jpg`, `05-import-dialog-light.jpg`, `07-first-run-light.jpg`, the dark ones (`10`, `11`, `12`), the phone ones (`13`, `14`) and the states (`17-check-refreshing`, `18-all-tasks-created`, `19-no-devices-need-action`). `08-loading-state-light.jpg` is for the README, not the gallery.
-
-**Taken on the demo site** (other Atlassian products, so not generated; 2026-11-16, cropped to the content so no names or avatars show). They are `20` to `23` in the same folder; add them to the gallery after the generated ones:
-
-- `20-jira-task-created.png`: the task RecallRadar created (MOBL-129): ward, device, why it matched, the recall, the FDA links and a due date from the recall class.
-- `21-rovo-chat-answer.png`: Rovo chat, "Which Cath Lab devices have open Class I recalls?", answered from the saved check with the recall numbers and device ids, and the Jira task one of them already has. (The demo hospital's ICU devices have no Class I recall, so the Cath Lab is the example that shows an answer.)
-- `22-rovo-chat-task-preview.png`: Rovo chat, the preview that ends "Shall I create these 5 tasks?" (nothing is created until the person confirms).
-- `23-confluence-recall-page.png`: the Confluence recall page with the affected-devices table and the live Jira task card.
+2. `25-new-since-yesterday-light.jpg`: **New since yesterday**: the devices a recall started to affect in the last day, with their tasks and Jira status.
+3. `24-progress-light.jpg`: **Progress**: how much of the work is done, per recall (Class I first) and per ward.
+4. `27-who-handles-ward-light.jpg`: **Who handles this ward**: the team, the Jira project it works in and who leads it, and each person's open work, from the Teamwork Graph.
+5. `03-device-drawer-light.jpg`: One device's recalls, each with the reason it matched and what the FDA says is wrong.
+6. `26-daily-alerts-dialog-light.jpg`: **Daily alerts**: where the tasks go, the optional comment, what the last run did.
+7. `15-assign-menu-light.jpg`: **Create task**, with the suggested assignee in the menu (nobody is assigned unless you choose).
+8. `02-affected-devices-light.jpg`: The table you can filter by ward and class, sort and page through.
+9. `09-issue-panel-light.jpg`: The compact panel on every Jira issue.
+10. `28-import-preview-light.jpg`: **Import preview**: how each pasted column was understood, and the first rows, before anything is imported.
+11. `16-create-all-confirm-light.jpg`: **Create all** asks first: how many tasks, in which project, nobody assigned unless ticked.
+12. `04-ward-teams-light.jpg`: **Ward teams**: choose the Teamwork Graph team that handles each ward.
+13. `06-confluence-dialog-light.jpg`: **Create Confluence pages**: one page per recall, in the space you choose.
+14. `05-import-dialog-light.jpg`: Import your own devices by pasting from a spreadsheet.
+15. `07-first-run-light.jpg`: The first-run screen: load the demo hospital or import your own devices.
+16. `10-dashboard-overview-dark.jpg`: The dashboard in dark mode.
+17. `11-device-drawer-dark.jpg`: A device's details in dark mode.
+18. `12-issue-panel-dark.jpg`: The issue panel in dark mode.
+19. `13-narrow-overview-dark.jpg`: The dashboard on a phone-width screen.
+20. `14-narrow-devices-dark.jpg`: The affected devices on a phone-width screen.
+21. `17-check-refreshing-light.jpg`: A refresh in progress: the saved result stays on screen while a new check runs.
+22. `18-all-tasks-created-light.jpg`: Every device that needs action already has a task.
+23. `19-no-devices-need-action-light.jpg`: Nothing matches an open recall.
+24. `20-jira-task-created.png`: (demo site) The task RecallRadar created: ward, device, why it matched, the recall, the FDA links and a due date from the recall class.
+25. `21-rovo-chat-answer.png`: (demo site) Rovo chat: "Which Cath Lab devices have open Class I recalls?", answered from the saved check with the recall numbers and device ids cited.
+26. `22-rovo-chat-task-preview.png`: (demo site) Rovo chat: the preview that ends "Shall I create these 5 tasks?" (nothing is created until the person confirms).
+27. `23-confluence-recall-page.png`: (demo site) The Confluence recall page with the affected-devices table and the live Jira task card.
+28. `08-loading-state-light.jpg`: The loading skeleton (for the README, not the gallery).
 
 ## Support and links (fill in before submitting)
 
 | Field | Value |
 | --- | --- |
-| Support contact | **Your support email or issue tracker URL** (you must choose; not filled in on purpose) |
+| Support contact | Prince Pandey, princejsps12@gmail.com |
 | Privacy policy URL | https://github.com/princejsps12-ux/recallradar/blob/main/marketplace/PRIVACY.md |
 | Terms URL | https://github.com/princejsps12-ux/recallradar/blob/main/marketplace/TERMS.md |
 | Documentation | https://github.com/princejsps12-ux/recallradar/blob/main/README.md |

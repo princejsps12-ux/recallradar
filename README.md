@@ -81,7 +81,7 @@ Each check, every number and the reasons: [`docs/MATCHING.md`](docs/MATCHING.md)
 
 ### How accurate is it?
 
-Measured against **2,354 labeled pairs** of a device and a real FDA recall (40 recalls frozen from openFDA, 410 devices built from what each recall says, plus 1,946 unrelated pairs): **exact** is right **100.0%** of the time and finds **98.6%** of the affected units, **likely** 99.3% / 100%, **possible** 100% / 100%; it never says *exact* for a unit that is not confirmed (0 of 2,354), and no unit that needs a task is missed or invented. The one miss is a 3-character serial without a UDI-DI, which the matcher refuses to trust on its own. The labels were written by the developer from the recall text, so this is a regression set and a check of how the rules read real recall wording, **not** a measure of how often the app is right in a hospital. Every pair, every limit and how to re-run it (`npm run eval`): [`docs/ACCURACY.md`](docs/ACCURACY.md).
+Measured against **3,423 labeled pairs** of a device and a real FDA recall (48 recalls frozen from openFDA, 558 devices built from what each recall says, plus 2,874 unrelated pairs): **exact** is right **100.0%** of the time and finds **93.5%** of the affected units, **likely** 96.8% / 100%, **possible** 100% / 100%; it never says *exact* for a unit that is not confirmed (0 of 3,423), and no unit that needs a task is missed or invented. The set includes 6 recalls that name several products (a lot of one product never confirms another: 27 of 27 pairs) and 3 that leave units out (a unit the text excludes is never *exact*: 7 of 7). The 7 affected units that came out *likely* instead of *exact* are named in the report: one is a 3-character serial without a UDI-DI, which the matcher refuses to trust on its own, and six are in two recalls whose text says "excluding" or "before", where the matcher does not read lists and ranges and a person decides (each still gets a task). The labels were written by the developer from the recall text, so this is a regression set and a check of how the rules read real recall wording, **not** a measure of how often the app is right in a hospital. Every pair, every limit and how to re-run it (`npm run eval`): [`docs/ACCURACY.md`](docs/ACCURACY.md).
 
 ## The check runs in the background
 
@@ -226,7 +226,7 @@ Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), 
 - **No patient data.** The app stores equipment information only: device name, type, manufacturer, model, serial or lot, ward, the saved check, and the ward-to-team mapping. Do not enter patient data.
 - **Where it lives.** Forge app storage, inside Atlassian's infrastructure and scoped to the site. Uninstalling removes it.
 - **No personal data in storage.** The app never saves an Atlassian account id, name or email. Account ids and names are read from the Teamwork Graph only while you use the feature, and the Rovo task preview stores just ids of devices, recalls and the project, not people.
-- **Retention.** The saved check result and the finished-job copy of it are deleted after **24 hours**; task previews are deleted when used or after 10 minutes; task duplicate-guards after 2 minutes; the daily-alert record (which recall and device pairs have been seen, ids and times only, and the last run's counts and Jira issue keys) after **7 days** without an update, and when the devices are removed. A daily clean-up job deletes anything left over. The device list, the ward-to-team mapping and the administrator's alert choices (project key, issue key) stay until you remove them or uninstall. Jira tasks and Confluence pages are your content and stay.
+- **Retention.** The saved check result (stored in parts when it is large) and the finished-job copy of it are deleted after **24 hours**; task previews are deleted when used or after 10 minutes; task duplicate-guards after 2 minutes; the short locks that stop two writers overwriting each other (a record that holds only a random token) after 30 seconds; the daily-alert record (which recall and device pairs have been seen, ids and times only, and the last run's counts and Jira issue keys) after **7 days** without an update, and when the devices are removed. A daily clean-up job deletes anything left over. The device list, the ward-to-team mapping and the administrator's alert choices (project key, issue key) stay until you remove them or uninstall. Jira tasks and Confluence pages are your content and stay.
 - **What leaves Atlassian.** Only searches to `api.fda.gov` that contain manufacturer and model names and the UDI-DIs (device identifiers) of your devices. For that reason the app is **not** eligible for "Runs on Atlassian".
 - **Acts as the person.** Tasks, pages and Teamwork Graph reads run as the signed-in user, so their permissions apply. The one exception is the **daily alert**, which has no signed-in person and acts as the app itself in the project an administrator chose (checked when the choice is saved). The Teamwork Graph is only read, never written.
 - **No certification claims.** This README does not claim HIPAA or any other certification.
@@ -234,7 +234,7 @@ Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), 
 
 ## Support
 
-- Support contact: _to be filled in by the app owner before the Marketplace listing_ (see [`marketplace/SUBMIT.md`](marketplace/SUBMIT.md)).
+- Support contact: Prince Pandey, princejsps12@gmail.com (see [`marketplace/SUBMIT.md`](marketplace/SUBMIT.md)).
 - Tests: `npm test` runs the unit tests with no network or extra packages.
 - For Forge platform help see [Get help](https://developer.atlassian.com/platform/forge/get-help/).
 
@@ -243,7 +243,7 @@ Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), 
 | Page | What is in it |
 | --- | --- |
 | [`docs/MATCHING.md`](docs/MATCHING.md) | Each fact check, every threshold and why, ordering, known limits |
-| [`docs/ACCURACY.md`](docs/ACCURACY.md) | Precision and recall per match level on 2,354 labeled pairs from real recalls, every wrong pair, the limits of the measurement |
+| [`docs/ACCURACY.md`](docs/ACCURACY.md) | Precision and recall per match level on 3,423 labeled pairs from 48 real recalls (including recalls with several products and with exclusions), every wrong pair, the limits of the measurement |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The background check job, its rules and measurements |
 | [`docs/TASKS.md`](docs/TASKS.md) | The due-date rule, how duplicates are prevented, tracking tasks to closure, limits |
 | [`docs/ALERTS.md`](docs/ALERTS.md) | What "new" means, what the daily run does, who it acts as, what it stores, limits |

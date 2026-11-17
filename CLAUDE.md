@@ -14,7 +14,7 @@ npm run test:preview                       # the real bundle in headless Chrome,
 npm run preview                            # http://localhost:4173/ the app without Jira (see scripts/preview/README.md)
 npm run shots                              # regenerate marketplace/screenshots/01..19 from the preview
 node scripts/check-demo-matches.mjs        # live openFDA check of the demo hospital (needs network; --why prints the reasons)
-npm run eval                               # measure the matcher on eval/ (2,354 labeled pairs from 40 real recalls), rewrite docs/ACCURACY.md; npm test fails when that page is stale
+npm run eval                               # measure the matcher on eval/ (3,423 labeled pairs from 48 real recalls, incl. several products and exclusions), rewrite docs/ACCURACY.md; npm test fails when that page is stale. Adding a recall: put it in SPEC in scripts/make-eval-set.mjs, `node scripts/make-eval-set.mjs --pull` (fetches only the missing ones, the frozen records stay), rebuild, `npm run eval`, name any new miss in src/accuracy.test.mjs
 
 # after ANY change to static/ui/src, rebuild BEFORE deploying
 (cd static/ui && npm run build)   # first time: npm install --legacy-peer-deps (template pins React 16)
@@ -47,8 +47,9 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 | `src/accuracy.js`, `scripts/eval-matching.mjs`, `scripts/make-eval-set.mjs`, `eval/` | Accuracy evaluation: frozen real recalls (`eval/recalls.json`), labeled cases built from them, precision/recall per level, `docs/ACCURACY.md` |
 | `src/openfda.js`, `src/recallSearch.js`, `src/text.js` | openFDA URLs and parsing; which searches to run (per manufacturer + per model + per UDI-DI, 3-year window, paged to 100); tokenizing |
 | `src/deviceStore.js` | Device list interface (Forge storage today; a read-only Assets import can plug in later) |
-| `src/matchCache.js` | Saved result, 6-hour freshness, fingerprint of the device list; `peek()` also returns expired entries as stale, but **never past 24 hours** (`MAX_RETENTION_MS`, deleted on read and by the daily cleanup) |
-| `src/checkJob.js` | The background job record (running / done / failed, progress, stale-job detection); a finished job holds a copy of the result, so it also obeys the 24-hour limit |
+| `src/matchCache.js` | Saved result, 6-hour freshness, fingerprint of the device list; `peek()` also returns expired entries as stale, but **never past 24 hours** (`MAX_RETENTION_MS`, deleted on read and by the daily cleanup). **Stored in parts**: a head record `cache:matches` (`{v:2, checkedAt, fingerprint, chunks}`, written LAST) plus `cache:matches:part:<i>` strings of at most `CHUNK_CHARS` (one Forge value is 240 KiB), at most `MAX_CHUNKS` parts; old one-record entries still read. Delete a result with `deleteEntry` so no part is left behind |
+| `src/lock.js` | `createLock(kv).run(name, work)`: a lease lock for the read-modify-write records (`lock:<name>`, 30 s expiry, `kv.setIfAbsent` = Forge `kvs.set(..., {keyPolicy: 'FAIL_IF_EXISTS'})`). Used by `checkJob.start`, every `alertState` change and nothing else; it throws when the lock stays held (never writes unlocked while a lock exists) and runs unlocked only when `setIfAbsent` says the storage cannot lock (`null`). The task guard does not use it: each label is claimed with one atomic `setIfAbsent` |
+| `src/checkJob.js` | The background job record (running / done / failed, progress, stale-job detection); `start` runs under the `check-job` lock. A finished job holds a copy of the result, so it also obeys the 24-hour limit; a copy above `MAX_JOB_COPY_BYTES` is not kept (`resultInCache: true`) and the status call reads the result from the cache instead |
 | `src/matchService.js` | `requestCheck`, `performCheck`, `getCheckStatus`, `getSavedMatches` |
 | `src/taskRules.js`, `src/taskService.js`, `src/jiraClient.js` | Jira tasks for matches: due-date rule, title/labels/description; duplicate-free creation; the Jira calls (as the user); `getTaskStatuses` reads each task's key AND status category by label |
 | `src/alertState.js`, `src/alertSettings.js`, `src/alertService.js` | Daily alerts (docs/ALERTS.md): the seen-pairs record (`alerts:state`, ids and times, 7-day TTL, baseline on first look / after an import / on switching on), the admin's choices (`alerts:settings`), and `runAlerts` (tasks for NEW pairs + one comment, as the APP: the only `asApp` Jira call in the app). Hooked in `runtime.runCheck` via `performCheck`'s `afterComplete` (complete checks only) and `runDailyAlerts()` in `scheduled.js`; resolvers `getAlerts` (everyone), `saveAlertSettings` and `runAlertsNow` (Jira administrators; saving tests the project as the app) |
@@ -59,7 +60,7 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 | `src/handlers.js`, `src/rovoHandlers.js` | The resolver and Rovo action logic as factories with injected dependencies (unit tested with fakes: `handlers.test.mjs`, `rovoHandlers.test.mjs`); `rovoActions.js` wraps them in explicit exported arrow functions because the Forge linter needs visible exports |
 | `src/permissions.js` | Who may change the shared device list: Jira administrators only (`refuseUnlessAdministrator`, server-side; the dashboard shows it via resolver `getCapabilities`) |
 | `static/ui/src/App.js` | The panel |
-| `src/deviceCsv.js` | Paste-in import of the hospital's own devices (all-or-nothing, line-numbered errors); resolvers `previewImport` (read-only: how the columns were read, the first rows, the problems; the dialog calls it 400 ms after the last key) and `importDevices`, UI in `dash/Modals.js` (`ImportModal`) |
+| `src/deviceCsv.js` | Paste-in import of the hospital's own devices (all-or-nothing, line-numbered errors, up to `MAX_IMPORT_ROWS` = 1,000 rows). **Device ids are stable**: `own-<8 hex>` from the compacted maker + model + serial (no serial: + ward + name; identical rows get `-2`, `-3`), so re-pasting in another order keeps each device's tasks; an import writes only the devices that changed and deletes the ones that are gone (`stableDeviceIds`, `importDevices`); resolvers `previewImport` (read-only: how the columns were read, the first rows, the problems; the dialog calls it 400 ms after the last key) and `importDevices`, UI in `dash/Modals.js` (`ImportModal`) |
 
 ### The recall check is a background job
 
@@ -138,7 +139,7 @@ Only **exact** and **likely** matches get a task. Due date is calendar days from
 ### Privacy rules the code must keep
 
 - **No personal data in Forge storage**: no accountId, name or email anywhere (`ward-teams` holds team ARI and team name only).
-- **Retention**: the saved check and the finished job (it holds a copy) at most **24 hours**; previews 10 minutes and task guards 2 minutes, **deleted** (not just ignored) when they expire: on read, on the next write, and by `cleanupStorage()` in the daily trigger. If you add a new stored record, give it an expiry and add it to `cleanupStorage()`, the tests, README "Data and trust" and `marketplace/PRIVACY.md`.
+- **Retention**: the saved check (head AND every part: `deleteEntry` removes them together and, when the head is unreadable, by prefix) and the finished job (it may hold a copy) at most **24 hours**; `lock:*` records hold only a random token and expire after 30 s by themselves (Forge TTL, nothing to clean up); previews 10 minutes and task guards 2 minutes, **deleted** (not just ignored) when they expire: on read, on the next write, and by `cleanupStorage()` in the daily trigger. If you add a new stored record, give it an expiry and add it to `cleanupStorage()`, the tests, README "Data and trust" and `marketplace/PRIVACY.md`.
 
 ## Gotchas learned the hard way
 

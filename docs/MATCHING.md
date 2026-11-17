@@ -33,7 +33,9 @@ There are no unexplained constants. All are named exports in [`src/matching.js`]
 | `CACHE_TTL_HOURS` | 6 | How long a saved check stays fresh. FDA publishes about weekly, so a few hours old is fine, and it spares openFDA's request limit. |
 | `SEARCH_DEADLINE_MS` | 240 s | Gives up on slow searches 60 s before the 300 s limit of the background function. |
 | `STALE_JOB_MS` | 6 min | A background job with no progress update for this long counts as failed. |
-| `MAX_CACHE_BYTES` | 200 KiB | Forge storage rejects values over 240 KiB; larger results are skipped (recomputed) instead of failing. |
+| `CHUNK_CHARS`, `MAX_CHUNKS` | 50,000 characters, 60 parts | Forge storage rejects any single value over 240 KiB, so a saved result is cut into parts (at most 150 KB each) with a small head record written last: 1,000 matches are about 10 parts. A result needing more than 60 parts (about 3 MB) is shown but not saved. |
+| `MAX_JOB_COPY_BYTES` | 150 KiB | The job record keeps a copy of the finished result only while it fits in one value; a bigger one is read from the saved parts instead. |
+| `MAX_IMPORT_ROWS` | 1,000 | One paste may hold this many devices; only the rows that changed are written, four groups of 25 at a time. Not yet timed on a live site at this size. |
 
 ## Ordering
 
@@ -41,9 +43,9 @@ Results are sorted by confidence (exact, likely, possible), then recall class (I
 
 ## Several products in one recall, and exclusions
 
-- **Per product.** A recall often covers several models in one code text ("WX-200: all serial numbers. WX-300: serial numbers 12345 through 12400."). When the text has two or more segments that carry serial, lot or "all" words and one of them names the device's model (or UDI-DI), the lot list, the range and "all units" are judged against **those segments only** (`scopedRecall` in `src/matching.js`). A WX-300 with serial 99999 is therefore *likely*, not *exact* because of WX-200's "all serial numbers". If the model is named only in the product description and not in the code text, the text cannot be told apart and the whole of it is used: a known limit.
-- **Exclusions.** "All lot numbers except lot 12345" or "1000 through 1500, excluding 1200" name units that are *not* affected. When the code text holds such a word (except, excluding, other than, not including, apart from) the unit-level rules are off and the answer stays *likely*, so a person checks.
-- Both were found by independent review, fixed here and covered by tests; they are not in the accuracy set yet (`docs/ACCURACY.md` only covers one-product recalls), which is stated there.
+- **Per product.** A recall often covers several models in one code text. A device is judged only against the part of the code text that names **its** model (or UDI-DI), so a lot, a range or "all serial numbers" of one product never confirms another (`scopedRecall` in `src/matching.js`). Real recalls write one product as an *entry*, with its model, its UDI-DI and its lots in separate sentences ("1. Model Number: 44-0712. UDI-DI: (01)6088... Lot Code: 550031624. 2. Model Number: 44-0707. ..."), so the text is cut into entries first: at a label that carries a number (`Model No`, `Part No.`, `REF`, `Catalog Number`, `Product Code`) or at a list number (`2.`, `3)`), but only after the entry before it has said something about units, so `Model No 123, Catalog No 456, Lot A1234` stays one entry. Without such labels ("WX-200: all serial numbers. WX-300: lots C9999.") it falls back to the sentences that carry unit words. Either way the cut counts only when there are two or more parts with unit words and one of them names the device; otherwise the whole text is used. Known limits: a model named only in the product description (not in the code text) cannot be scoped, and an entry that starts with a bare number and a name and no label ("5855300 Slim-Cath ... Lot Number: REKY1364") cannot be cut.
+- **Exclusions.** "All lot numbers except lot 12345" or "1000 through 1500, excluding 1200" name units that are *not* affected. When the part of the code text that names the device holds such a word (except, excluding, other than, not including, apart from) the unit-level rules are off for that product and the answer stays *likely*, so a person checks. The exclusion belongs to its own entry: in the real Maquet recall Z-0420-2024 one part is "a range minus six named serials" and the other lists those six, so the second part's serial is still *exact*.
+- **Measured.** Both rules were found by independent review. The accuracy set now holds six real recalls with several products (27 pairs where a product's model or UDI-DI is paired with another product's lot: none is *exact*) and three that leave units out (7 units the text rules out: none is *exact*). Building it found two real defects, fixed: the first version of the per-product rule cut the text at every full stop and so judged real recalls (Cooper INCA, restor3d) against the wrong lots, and a UDI-DI written "UDI - 0403..." (with a dash) was not read at all.
 
 ## Known limits
 
@@ -57,4 +59,4 @@ Results are sorted by confidence (exact, likely, possible), then recall class (I
 
 ## How accurate is it?
 
-Measured against 2,354 labeled pairs built from 40 real recalls: [ACCURACY.md](ACCURACY.md) (generated by `npm run eval`; `npm test` fails when it is out of date).
+Measured against 3,423 labeled pairs built from 48 real recalls, six of them naming several products and three leaving units out: [ACCURACY.md](ACCURACY.md) (generated by `npm run eval`; `npm test` fails when it is out of date).
