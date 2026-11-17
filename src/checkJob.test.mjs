@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { JOB_KEY, JOB_STATUS, STALE_JOB_MS, createCheckJobs } from './checkJob.js';
-import { MAX_CACHE_BYTES, MAX_RETENTION_MS } from './matchCache.js';
+import { JOB_KEY, JOB_STATUS, STALE_JOB_MS, MAX_JOB_COPY_BYTES, createCheckJobs } from './checkJob.js';
+import { MAX_RETENTION_MS } from './matchCache.js';
 import { fakeKv } from './fakeKv.mjs';
 
 const T0 = Date.UTC(2026, 10, 14, 12, 0, 0);
@@ -148,11 +148,22 @@ test('the stale time is six minutes, one minute beyond the 300 s background limi
 test('a result too large to store is recorded as a failure, not lost silently', async () => {
   const { jobs } = setup();
   const { job } = await jobs.start('user');
-  const huge = { matches: ['x'.repeat(MAX_CACHE_BYTES)] };
+  const huge = { matches: ['x'.repeat(MAX_JOB_COPY_BYTES + 10)] };
   assert.equal(await jobs.complete(job.id, huge), 'failed');
   const now = await jobs.current();
   assert.equal(now.status, JOB_STATUS.FAILED);
   assert.match(now.error, /too large/);
+});
+
+test('a big result that is saved elsewhere ends the job as done, without a copy, and says where it is', async () => {
+  const { jobs } = setup();
+  const { job } = await jobs.start('user');
+  const huge = { matches: ['x'.repeat(MAX_JOB_COPY_BYTES + 10)] };
+  assert.equal(await jobs.complete(job.id, huge, { inCache: true }), 'done');
+  const now = await jobs.current();
+  assert.equal(now.status, JOB_STATUS.DONE);
+  assert.equal(now.result, null);
+  assert.equal(now.resultInCache, true);
 });
 
 test('damaged stored data is treated as no job', async () => {
@@ -213,3 +224,12 @@ test('purgeExpired deletes an old finished job and keeps a recent one', async ()
   assert.equal(await s.jobs.purgeExpired(), true);
   assert.equal(s.kv.data.has(JOB_KEY), false);
 });
+
+test('two starts at the same moment begin ONE job', async () => {
+  const kv = fakeKv();
+  const jobs = createCheckJobs(kv, () => 1_700_000_000_000);
+  const [a, b] = await Promise.all([jobs.start('user'), jobs.start('schedule')]);
+  assert.equal([a, b].filter((r) => r.started).length, 1);
+  assert.equal(a.job.id === b.job.id, true, 'the second one joins the first');
+});
+

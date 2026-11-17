@@ -8,8 +8,8 @@ test('a comma separated sheet becomes devices with ids, source and defaults', ()
   const { devices, errors } = parseDeviceCsv(csv);
   assert.deepEqual(errors, []);
   assert.equal(devices.length, 2);
-  assert.deepEqual(devices[0], { id: 'own-001', name: 'Sigma pump', type: 'medical device', manufacturer: 'Baxter Healthcare', model: '35700BAX2', lotOrSerial: 'SP-1', ward: 'Med-Surg 4E', udiDi: '', source: 'manual' });
-  assert.equal(devices[1].id, 'own-002');
+  assert.deepEqual(devices[0], { id: devices[0].id, name: 'Sigma pump', type: 'medical device', manufacturer: 'Baxter Healthcare', model: '35700BAX2', lotOrSerial: 'SP-1', ward: 'Med-Surg 4E', udiDi: '', source: 'manual' });
+  assert.match(devices[1].id, /^own-[0-9a-f]{8}$/);
 });
 
 test('a sheet pasted from a spreadsheet uses tabs', () => {
@@ -70,15 +70,41 @@ test('only the first few errors are listed', () => {
   assert.equal(errors[8], '...and 4 more.');
 });
 
-test('importDevices replaces earlier pasted devices, keeps demo devices, and saves nothing on error', async () => {
+test('importDevices replaces the earlier pasted devices, keeps the demo ones, writes only what changed, and saves nothing on error', async () => {
   const calls = [];
-  const store = { removeBySource: async (s) => calls.push(['remove', s]), saveDevices: async (d) => { calls.push(['save', d.length]); return d.length; } };
+  let stored = [
+    { id: 'demo-001', name: 'Demo pump', manufacturer: 'Demo', model: 'D1', source: 'demo' },
+    { id: 'own-old', name: 'Old pump', manufacturer: 'Old', model: 'O1', source: 'manual' },
+  ];
+  const store = {
+    listDevices: async () => stored,
+    removeDevices: async (ids) => { calls.push(['remove', ids]); stored = stored.filter((d) => !ids.includes(d.id)); },
+    saveDevices: async (d) => { calls.push(['save', d.length]); stored = [...stored, ...d]; return d.length; },
+  };
   assert.deepEqual(await importDevices(store, csv), { ok: true, count: 2 });
-  assert.deepEqual(calls, [['remove', 'manual'], ['save', 2]]);
+  assert.deepEqual(calls, [['remove', ['own-old']], ['save', 2]], 'the old pasted device is removed, the demo one stays, two are new');
+  calls.length = 0;
+  assert.deepEqual(await importDevices(store, csv), { ok: true, count: 2 });
+  assert.deepEqual(calls, [], 're-pasting the same list writes nothing');
+  const reordered = 'Device,Manufacturer,Model,Serial,Ward\nVentilator,Getinge,6487800,SI-7,ICU\nSigma pump,Baxter Healthcare,35700BAX2,SP-1,Med-Surg 4E';
+  await importDevices(store, reordered);
+  assert.deepEqual(calls, [], 'the same list in another order writes nothing either');
+  const edited = reordered.replace('Med-Surg 4E', 'ICU');
+  await importDevices(store, edited);
+  assert.deepEqual(calls, [['save', 1]], 'one edited ward is one write');
   calls.length = 0;
   const bad = await importDevices(store, 'Manufacturer,Model\n,1');
   assert.equal(bad.ok, false);
   assert.deepEqual(calls, []);
+});
+
+test('1,000 rows are accepted and 1,001 are not', () => {
+  const rows = (n) => `Manufacturer,Model,Serial\n${Array.from({ length: n }, (_, i) => `Acme,X${i},S${i}`).join('\n')}`;
+  assert.equal(MAX_IMPORT_ROWS, 1000);
+  const ok = parseDeviceCsv(rows(1000));
+  assert.equal(ok.errors.length, 0);
+  assert.equal(new Set(ok.devices.map((d) => d.id)).size, 1000, 'a thousand different ids');
+  assert.match(parseDeviceCsv(rows(1001)).errors[0], /Too many rows \(1001\)/);
 });
 
 test('a UDI-DI column is read, checked and stored as 14 digits (UDI, UDI-DI, DI and GTIN all work as its name)', () => {
@@ -156,5 +182,25 @@ test('previewDeviceCsv: nothing pasted, no header, and far too much text', () =>
 test('a column header is cut so a pasted paragraph cannot flood the preview', () => {
   const out = previewDeviceCsv(`${'h'.repeat(300)},Manufacturer,Model\nx,Acme,M1`);
   assert.equal(out.columns[0].header.length, 40);
+});
+
+test('a device keeps its id whatever order or company it is pasted in: ids come from maker, model and serial', () => {
+  const a = parseDeviceCsv('Manufacturer,Model,Serial,Ward\nBaxter,35700BAX2,SP-1,ICU\nGetinge,6487800,SI-7,ER').devices;
+  const b = parseDeviceCsv('Manufacturer,Model,Serial,Ward\nGetinge,6487800,SI-7,ER\nAcme,X1,Z9,OR\nBaxter,35700BAX2,SP-1,ICU').devices;
+  const idOf = (list, model) => list.find((d) => d.model === model).id;
+  assert.equal(idOf(a, '35700BAX2'), idOf(b, '35700BAX2'), 'reordered, with a row added in between');
+  assert.equal(idOf(a, '6487800'), idOf(b, '6487800'));
+  assert.equal(new Set(b.map((d) => d.id)).size, 3);
+  const spelled = parseDeviceCsv('Manufacturer,Model,Serial\nBAXTER,35700-bax2,sp 1').devices[0].id;
+  assert.equal(spelled, idOf(a, '35700BAX2'), 'case, spaces and punctuation do not change who a device is');
+});
+
+test('identical rows get -2, -3 in order, and a unit with no serial is told apart by its ward and name', () => {
+  const same = parseDeviceCsv('Manufacturer,Model,Serial\nAcme,X1,S1\nAcme,X1,S1\nAcme,X1,S1').devices.map((d) => d.id);
+  assert.equal(new Set(same).size, 3);
+  assert.deepEqual([same[1], same[2]], [`${same[0]}-2`, `${same[0]}-3`]);
+  const noSerial = parseDeviceCsv('Name,Manufacturer,Model,Ward\nPump,Acme,X1,ICU\nPump,Acme,X1,ER').devices.map((d) => d.id);
+  assert.notEqual(noSerial[0], noSerial[1], 'same model, no serial, different wards: two devices');
+  assert.equal(parseDeviceCsv('Name,Manufacturer,Model,Ward\nPump,Acme,X1,ER').devices[0].id, noSerial[1], 'and the same device is the same in another paste');
 });
 

@@ -4,6 +4,7 @@ import {
   DEVICE_KEY_PREFIX,
   DEVICE_SOURCES,
   WRITE_BATCH_SIZE,
+  WRITE_CONCURRENCY,
   deviceKey,
   normalizeDevice,
   normalizeDevices,
@@ -95,16 +96,25 @@ test('saveDevices validates everything before writing anything', async () => {
   assert.equal(kv.data.size, 0);
 });
 
-test('saveDevices limits parallel writes to the batch size', async () => {
+test('saveDevices limits parallel writes to a few batches at a time', async () => {
   const kv = fakeKv();
   const store = createDeviceStore(kv);
-  const many = Array.from({ length: WRITE_BATCH_SIZE * 2 + 5 }, (_, i) => ({
+  const many = Array.from({ length: WRITE_BATCH_SIZE * WRITE_CONCURRENCY * 2 + 5 }, (_, i) => ({
     ...pump,
     id: `dev-${String(i).padStart(3, '0')}`,
   }));
   await store.saveDevices(many);
   assert.equal(kv.data.size, many.length);
-  assert.ok(kv.maxInFlight <= WRITE_BATCH_SIZE, `max in flight was ${kv.maxInFlight}`);
+  assert.ok(kv.maxInFlight <= WRITE_BATCH_SIZE * WRITE_CONCURRENCY, `max in flight was ${kv.maxInFlight}`);
+  assert.ok(kv.maxInFlight > WRITE_BATCH_SIZE, 'and the groups really do run together');
+});
+
+test('removeDevices deletes just the devices with these ids', async () => {
+  const kv = fakeKv();
+  const store = createDeviceStore(kv);
+  await store.saveDevices([{ ...pump, id: 'a' }, { ...pump, id: 'b' }, { ...pump, id: 'c' }]);
+  assert.equal(await store.removeDevices(['a', 'c', 'nope']), 2);
+  assert.deepEqual((await store.listDevices()).map((d) => d.id), ['b']);
 });
 
 test('clear removes only devices and reports how many', async () => {

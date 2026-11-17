@@ -75,11 +75,14 @@ export async function requestCheck({ devices, cache, jobs, enqueue, refresh = fa
 }
 
 // The panel's polling call. `result` is set only for a finished job.
-export async function getCheckStatus({ jobs }) {
+export async function getCheckStatus({ jobs, cache = null, devices = [] }) {
   const job = await jobs.current();
   if (!job) return { job: null, result: null };
   const { result, ...summary } = job;
-  return { job: summary, result: job.status === 'done' ? result : null };
+  if (job.status !== 'done') return { job: summary, result: null };
+  // A result too big for the job record was left out of it and saved in the cache: read it from there.
+  const stored = result || (job.resultInCache && cache ? await getSavedMatches({ devices, cache }) : null);
+  return { job: summary, result: stored };
 }
 
 // The background work. `search(devices, onProgress)` resolves to
@@ -112,8 +115,9 @@ export async function performCheck({ devices, search, cache, jobs, trigger, jobI
     const result = await search(devices, onProgress);
     const elapsedMs = nowMs() - started;
     const checkedAt = new Date(nowMs()).toISOString();
+    let inCache = false;
     if (result.failedQueries === 0) {
-      await cache.write(devices, result, checkedAt);
+      inCache = await cache.write(devices, result, checkedAt);
       if (afterComplete) {
         try {
           await afterComplete(result, checkedAt);
@@ -123,7 +127,7 @@ export async function performCheck({ devices, search, cache, jobs, trigger, jobI
       }
     }
     await writes;
-    const outcome = await jobs.complete(id, { ...result, checkedAt, fromCache: false, stale: false, elapsedMs });
+    const outcome = await jobs.complete(id, { ...result, checkedAt, fromCache: false, stale: false, elapsedMs }, { inCache });
     return outcome || 'skipped';
   } catch (error) {
     await writes;

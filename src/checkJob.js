@@ -14,7 +14,8 @@
 // compare-and-set in Forge storage, so two clicks at the very same moment could both start a
 // job; that only costs a duplicate check, and every step is safe to repeat.
 // No Forge imports here, so everything is unit tested with plain Node.
-import { MAX_CACHE_BYTES, MAX_RETENTION_MS } from './matchCache.js';
+import { MAX_RETENTION_MS } from './matchCache.js';
+import { createLock } from './lock.js';
 
 export const JOB_KEY = 'job:check';
 
@@ -31,11 +32,17 @@ export const STALE_JOB_MS = 6 * 60 * 1000;
 const STALE_MESSAGE = 'The check stopped unexpectedly. Please try again.';
 const TOO_LARGE_MESSAGE = 'The result was too large to store.';
 
+// The job record keeps a copy of the finished result only while that fits in ONE storage value (240 KiB at most). A bigger result
+// is not copied when it is saved in the cache (the status call then reads it from there); only a big result that could not be saved
+// either (it also had failed searches) still ends the job as failed, because nothing could hold it.
+export const MAX_JOB_COPY_BYTES = 150 * 1024;
+
 function defaultId(nowMs) {
   return `${nowMs()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function createCheckJobs(kv, nowMs = () => Date.now(), makeId = defaultId) {
+  const lock = createLock(kv);
   async function load() {
     try {
       const job = await kv.get(JOB_KEY);
@@ -74,25 +81,28 @@ export function createCheckJobs(kv, nowMs = () => Date.now(), makeId = defaultId
   }
 
   // Begin a new job unless one is already running. Returns { started, job }.
+  // The check and the write run inside a short lock, so two starts at the same moment cannot both begin a job.
   async function start(trigger) {
-    const existing = await current();
-    if (existing && existing.status === JOB_STATUS.RUNNING) {
-      return { started: false, job: existing };
-    }
-    const now = nowMs();
-    const job = {
-      id: makeId(nowMs),
-      status: JOB_STATUS.RUNNING,
-      trigger,
-      startedAt: now,
-      updatedAt: now,
-      finishedAt: null,
-      progress: { done: 0, total: 0 },
-      result: null,
-      error: null,
-    };
-    await kv.set(JOB_KEY, job);
-    return { started: true, job };
+    return lock.run('check-job', async () => {
+      const existing = await current();
+      if (existing && existing.status === JOB_STATUS.RUNNING) {
+        return { started: false, job: existing };
+      }
+      const now = nowMs();
+      const job = {
+        id: makeId(nowMs),
+        status: JOB_STATUS.RUNNING,
+        trigger,
+        startedAt: now,
+        updatedAt: now,
+        finishedAt: null,
+        progress: { done: 0, total: 0 },
+        result: null,
+        error: null,
+      };
+      await kv.set(JOB_KEY, job);
+      return { started: true, job };
+    });
   }
 
   // Only the job that is stored AND still running may be changed. A late message from an old
@@ -110,15 +120,16 @@ export function createCheckJobs(kv, nowMs = () => Date.now(), makeId = defaultId
 
   // Store the finished result. Returns what was recorded: 'done', 'failed' (the result was too
   // large to store) or null (this job is no longer the running one, so nothing was changed).
-  async function complete(jobId, result) {
-    const tooLarge = new TextEncoder().encode(JSON.stringify(result)).length > MAX_CACHE_BYTES;
-    if (tooLarge) {
+  async function complete(jobId, result, { inCache = false } = {}) {
+    const tooLarge = new TextEncoder().encode(JSON.stringify(result)).length > MAX_JOB_COPY_BYTES;
+    if (tooLarge && !inCache) {
       const recorded = await fail(jobId, TOO_LARGE_MESSAGE);
       return recorded ? JOB_STATUS.FAILED : null;
     }
     const recorded = await updateRunning(jobId, (job) => ({
       status: JOB_STATUS.DONE,
-      result,
+      result: tooLarge ? null : result,
+      resultInCache: tooLarge,
       error: null,
       finishedAt: nowMs(),
       progress: { done: job.progress.total, total: job.progress.total },

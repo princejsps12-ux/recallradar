@@ -7,6 +7,7 @@ import {
   MAX_RETENTION_MS,
   MAX_RETENTION_HOURS,
   MAX_CACHE_BYTES,
+  splitText,
   fingerprintDevices,
   createMatchCache,
 } from './matchCache.js';
@@ -151,19 +152,79 @@ test('write uses the given checked-at time', async () => {
   assert.equal(kv.data.get(MATCH_CACHE_KEY).checkedAt, '2026-11-14T10:00:00.000Z');
 });
 
-test('a result that is too large is not saved', async () => {
+const manyMatches = (n) => Array.from({ length: n }, (_, i) => ({ deviceId: `d${i}`, recallNumber: `Z-${i}-2026`, reason: 'r'.repeat(400), device: '€ünïcode '.repeat(5) }));
+
+test('a result of 1,500 matches is saved in parts, every stored value is small, and it reads back whole', async () => {
   const kv = fakeKv();
   const cache = createMatchCache(kv, () => T0);
-  const big = { ...result, matches: ['x'.repeat(MAX_CACHE_BYTES)] };
-  assert.equal(await cache.write(devices, big), false);
-  assert.equal(kv.data.has(MATCH_CACHE_KEY), false);
+  const big = { ...result, matches: manyMatches(1500) };
+  assert.equal(await cache.write(devices, big), true);
+  const head = kv.data.get(MATCH_CACHE_KEY);
+  assert.equal(head.v, 2);
+  assert.ok(head.chunks > 5, `a big result is several parts (${head.chunks})`);
+  for (const [key, value] of kv.data) {
+    if (key.startsWith(`${MATCH_CACHE_KEY}:part:`)) assert.ok(Buffer.byteLength(value) <= 150 * 1024, 'each part fits one storage value');
+  }
+  const back = await cache.read(devices);
+  assert.deepEqual(back.result, big);
 });
 
-test('the size limit counts bytes, not characters', async () => {
-  const cache = createMatchCache(fakeKv(), () => T0);
-  // 3 bytes per character: fewer characters than the limit, more bytes than the limit.
-  const wide = { ...result, matches: ['€'.repeat(Math.ceil(MAX_CACHE_BYTES / 3) + 100)] };
-  assert.equal(await cache.write(devices, wide), false);
+test('parts are cut between characters, never inside a surrogate pair', () => {
+  const text = '😀'.repeat(7); // each is two UTF-16 units
+  for (const size of [3, 4, 5, 7]) {
+    const pieces = splitText(text, size);
+    assert.equal(pieces.join(''), text);
+    for (const piece of pieces) assert.ok(!/[\ud800-\udbff]$/.test(piece), `no piece ends on half a pair (size ${size})`);
+  }
+});
+
+test('a result needing more than MAX_CHUNKS parts is not saved, and nothing is left behind', async () => {
+  const kv = fakeKv();
+  const cache = createMatchCache(kv, () => T0);
+  const tooBig = { ...result, matches: ['x'.repeat(MAX_CACHE_BYTES + 10)] };
+  assert.equal(await cache.write(devices, tooBig), false);
+  assert.equal(kv.data.size, 0);
+});
+
+test('a shorter result replaces a longer one and the unused parts are deleted; clear and expiry delete every part', async () => {
+  const kv = fakeKv();
+  let now = T0;
+  const cache = createMatchCache(kv, () => now);
+  await cache.write(devices, { ...result, matches: manyMatches(1500) });
+  const long = kv.data.get(MATCH_CACHE_KEY).chunks;
+  await cache.write(devices, { ...result, matches: manyMatches(10) });
+  const short = kv.data.get(MATCH_CACHE_KEY).chunks;
+  assert.ok(short < long);
+  const parts = () => [...kv.data.keys()].filter((k) => k.includes(':part:'));
+  assert.equal(parts().length, short);
+  await cache.clear();
+  assert.equal(kv.data.size, 0, 'clear removes the head and every part');
+  await cache.write(devices, { ...result, matches: manyMatches(300) });
+  now += 25 * 60 * 60 * 1000;
+  assert.equal(await cache.purgeExpired(), true);
+  assert.equal(kv.data.size, 0, 'the 24-hour purge removes the parts too');
+});
+
+test('a missing or damaged part makes the saved result unusable instead of wrong, and a different device list does not read the parts at all', async () => {
+  const kv = fakeKv();
+  const cache = createMatchCache(kv, () => T0);
+  await cache.write(devices, { ...result, matches: manyMatches(400) });
+  const reads = [];
+  const get = kv.get;
+  kv.get = async (key) => { reads.push(key); return get(key); };
+  assert.equal(await cache.peek([{ ...devices[0], id: 'other' }]), null);
+  assert.deepEqual(reads, [MATCH_CACHE_KEY], 'only the head was read');
+  kv.get = get;
+  kv.data.set(`${MATCH_CACHE_KEY}:part:1`, '{ not json');
+  assert.equal(await cache.peek(devices), null);
+  kv.data.delete(`${MATCH_CACHE_KEY}:part:0`);
+  assert.equal(await cache.peek(devices), null);
+});
+
+test('an entry saved the old way (the whole result inline) is still read', async () => {
+  const kv = fakeKv({ [MATCH_CACHE_KEY]: { checkedAt: new Date(T0).toISOString(), fingerprint: fingerprintDevices(devices), result } });
+  const cache = createMatchCache(kv, () => T0);
+  assert.deepEqual((await cache.read(devices)).result, result);
 });
 
 test('a storage error while writing returns false instead of throwing', async () => {

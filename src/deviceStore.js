@@ -88,9 +88,17 @@ export function normalizeDevices(inputs) {
   return devices;
 }
 
+// How many groups of WRITE_BATCH_SIZE run at the same time. 1,000 devices are 40 groups: one after another that is slow enough to
+// come near the 25-second limit of a resolver, so a few run together (100 requests in flight at most).
+export const WRITE_CONCURRENCY = 4;
+
 async function inBatches(items, size, worker) {
-  for (let i = 0; i < items.length; i += size) {
-    await Promise.all(items.slice(i, i + size).map(worker));
+  const step = size * WRITE_CONCURRENCY;
+  for (let i = 0; i < items.length; i += step) {
+    const slice = items.slice(i, i + step);
+    const groups = [];
+    for (let j = 0; j < slice.length; j += size) groups.push(Promise.all(slice.slice(j, j + size).map(worker)));
+    await Promise.all(groups);
   }
 }
 
@@ -116,6 +124,14 @@ export function createDeviceStore(kv) {
     return items.length;
   }
 
+  // Delete the devices with these ids (the ones not in a new import). Returns how many were removed.
+  async function removeDevices(ids) {
+    const wanted = new Set(ids);
+    const items = (await kv.listByPrefix(DEVICE_KEY_PREFIX)).filter((item) => item.value && wanted.has(item.value.id));
+    await inBatches(items, WRITE_BATCH_SIZE, (item) => kv.delete(item.key));
+    return items.length;
+  }
+
   // Delete only the devices that came from one source (e.g. just the demo ones) and leave the
   // rest untouched. Returns how many were removed.
   async function removeBySource(source) {
@@ -134,5 +150,5 @@ export function createDeviceStore(kv) {
     return devices.length;
   }
 
-  return { listDevices, saveDevices, clear, removeBySource, replaceAll };
+  return { listDevices, saveDevices, clear, removeBySource, removeDevices, replaceAll };
 }

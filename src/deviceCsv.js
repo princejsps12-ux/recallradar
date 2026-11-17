@@ -6,10 +6,10 @@ import { compact } from './text.js';
 import { DEVICE_SOURCES } from './deviceStore.js';
 import { normalizeDi } from './udi.js';
 
-// An import is written in batches of 25 and a UI function is cut off at 25 s, so one paste stays small.
-// A larger hospital imports in several pastes (each import ADDS to the manual devices only when
-// `mode` is "add"; by default it replaces the earlier pasted list).
-export const MAX_IMPORT_ROWS = 200;
+// An import is written in batches of 25 (four batches at a time) and a UI function is cut off at 25 s, so one paste stays bounded:
+// 1,000 devices at most. Only what CHANGED is written (see importDevices), so re-pasting a list with a few edits is quick.
+// A paste replaces the earlier pasted list.
+export const MAX_IMPORT_ROWS = 1000;
 export const MAX_FIELD_LENGTH = 120;
 export const MAX_ERRORS_SHOWN = 8;
 
@@ -59,7 +59,52 @@ function fieldFor(header) {
   return Object.keys(COLUMN_ALIASES).find((field) => COLUMN_ALIASES[field].includes(key)) || null;
 }
 
-// Returns { devices, errors }. Ids are own-001, own-002...; source is "manual".
+// A device's id comes from WHAT IT IS (maker, model and serial; for a unit with no serial also its ward and name), not from its place
+// in the paste. Tasks are labelled with the device id, so a re-import in another order, or with rows added or removed, must give the
+// same device the same id or its tasks would attach to the wrong device (or to none). Two identical rows get -2, -3... in the order
+// they appear. The id is `own-` and 8 hex digits of a 32-bit FNV-1a hash.
+/** @param {string} text */
+function fnv1a(text) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * @param {Array<{ manufacturer: string, model: string, lotOrSerial: string, ward: string, name: string }>} rows
+ * @returns {string[]} one id per row, in the same order
+ */
+export function stableDeviceIds(rows) {
+  /** @type {Map<string, string>} id -> the identity text that owns it */
+  const owner = new Map();
+  /** @type {Map<string, number>} identity text -> how many rows had it so far */
+  const seen = new Map();
+  return rows.map((row) => {
+    const identity = [row.manufacturer, row.model, row.lotOrSerial, row.lotOrSerial ? '' : row.ward, row.lotOrSerial ? '' : row.name].map(compact).join('|');
+    const n = (seen.get(identity) || 0) + 1;
+    seen.set(identity, n);
+    const base = `own-${fnv1a(identity)}`;
+    // two different devices that happen to share a hash (about 1 in 4 billion) must not share an id either
+    let id = n === 1 ? base : `${base}-${n}`;
+    for (let clash = 2; owner.has(id) && owner.get(id) !== `${identity}#${n}`; clash += 1) id = `${base}-c${clash}`;
+    owner.set(id, `${identity}#${n}`);
+    return id;
+  });
+}
+
+const SAME_FIELDS = ['name', 'type', 'manufacturer', 'model', 'lotOrSerial', 'ward', 'udiDi', 'source'];
+/**
+ * @param {Record<string, any> | undefined} a
+ * @param {Record<string, any>} b
+ */
+function sameDevice(a, b) {
+  return Boolean(a) && SAME_FIELDS.every((field) => (a && a[field]) === b[field] || ((a && a[field]) || '') === (b[field] || ''));
+}
+
+// Returns { devices, errors }. Ids are stable (see stableDeviceIds); source is "manual".
 export function parseDeviceCsv(text) {
   const lines = String(text || '')
     .split(/\r?\n/)
@@ -98,7 +143,7 @@ export function parseDeviceCsv(text) {
       return;
     }
     devices.push({
-      id: `own-${String(index + 1).padStart(3, '0')}`,
+      id: '',
       name: row.name || `${row.manufacturer} ${row.model}`,
       type: row.type || 'medical device',
       manufacturer: row.manufacturer,
@@ -108,6 +153,10 @@ export function parseDeviceCsv(text) {
       udiDi: row.udiDi ? normalizeDi(row.udiDi, { strict: true }) : '',
       source: DEVICE_SOURCES.MANUAL,
     });
+  });
+  const ids = stableDeviceIds(devices);
+  devices.forEach((device, i) => {
+    device.id = ids[i];
   });
   if (errors.length > MAX_ERRORS_SHOWN) {
     const more = errors.length - MAX_ERRORS_SHOWN;
@@ -121,9 +170,9 @@ export function parseDeviceCsv(text) {
 // A paste is read before anything is imported, so the person sees what RecallRadar understood: which of their columns became
 // which field, and the first rows as devices. It changes nothing and stores nothing.
 export const PREVIEW_ROWS = 5;
-// The longest paste the preview reads. 200 rows of 120-character fields in 7 columns is about 170 KB; more than this is refused
-// without parsing it, so a huge paste cannot make the server work for nothing.
-export const MAX_PREVIEW_TEXT = 200 * 1000;
+// The longest paste the preview reads. 1,000 rows of about 100 characters is 100 KB (the worst case, every field at its 120-character
+// limit in 7 columns, is 840 KB); more than this is refused without parsing it, so a huge paste cannot make the server work for nothing.
+export const MAX_PREVIEW_TEXT = 600 * 1000;
 
 const FIELD_LABELS = { name: 'Name', type: 'Type', manufacturer: 'Manufacturer', model: 'Model', lotOrSerial: 'Serial or lot', ward: 'Ward', udiDi: 'UDI-DI' };
 
@@ -167,7 +216,14 @@ export function previewDeviceCsv(text) {
 export async function importDevices(store, text) {
   const { devices, errors } = parseDeviceCsv(text);
   if (errors.length) return { ok: false, errors };
-  await store.removeBySource(DEVICE_SOURCES.MANUAL);
-  const count = await store.saveDevices(devices);
-  return { ok: true, count };
+  // Replace the earlier pasted list, but touch only what differs: devices no longer in the paste are deleted, new or edited ones
+  // are written, identical ones are left alone. Ids are stable (stableDeviceIds), so a re-paste in another order changes nothing.
+  const existing = (await store.listDevices()).filter((device) => device.source === DEVICE_SOURCES.MANUAL);
+  const keep = new Set(devices.map((device) => device.id));
+  const byId = new Map(existing.map((device) => [device.id, device]));
+  const gone = existing.filter((device) => !keep.has(device.id)).map((device) => device.id);
+  const changed = devices.filter((device) => !byId.has(device.id) || !sameDevice(byId.get(device.id), device));
+  if (gone.length) await store.removeDevices(gone);
+  if (changed.length) await store.saveDevices(changed);
+  return { ok: true, count: devices.length };
 }

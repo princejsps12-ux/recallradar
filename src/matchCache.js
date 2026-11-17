@@ -24,9 +24,37 @@ export const CACHE_TTL_MS = CACHE_TTL_HOURS * 60 * 60 * 1000;
 export const MAX_RETENTION_HOURS = 24;
 export const MAX_RETENTION_MS = MAX_RETENTION_HOURS * 60 * 60 * 1000;
 
-// Forge storage rejects values above 240 KiB. Stay well under it so a larger hospital's result
-// is skipped (and simply recomputed next time) instead of failing the check.
-export const MAX_CACHE_BYTES = 200 * 1024;
+// Forge storage rejects any single value above 240 KiB, so a result is SAVED IN PARTS: its JSON text is cut into pieces of at most
+// CHUNK_CHARS characters (at most 150 KB even if every character takes three bytes), each stored under its own key, and a small
+// head record says how many there are. The head is written LAST, so a reader never sees a head that points at missing parts. A
+// result of 1,000 matches is about 10 parts. A result needing more than MAX_CHUNKS parts (about 3 MB, thousands of matches) is not
+// saved, and the check still shows it; only the 6-hour reuse is lost.
+export const CHUNK_CHARS = 50 * 1000;
+export const MAX_CHUNKS = 60;
+export const MAX_CACHE_BYTES = CHUNK_CHARS * MAX_CHUNKS;
+const PART_PREFIX = `${'cache:matches'}:part:`;
+
+/**
+ * Cut a string into pieces of at most `size` characters, never between the two halves of a surrogate pair.
+ * @param {string} text
+ * @param {number} size
+ * @returns {string[]}
+ */
+export function splitText(text, size) {
+  /** @type {string[]} */
+  const pieces = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(start + size, text.length);
+    if (end < text.length) {
+      const last = text.charCodeAt(end - 1);
+      if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+    }
+    pieces.push(text.slice(start, end));
+    start = end;
+  }
+  return pieces;
+}
 
 // Separators that cannot appear in normal device text, so fields cannot run together.
 const FIELD_SEPARATOR = '␟';
@@ -54,33 +82,65 @@ export function fingerprintDevices(devices) {
   return `${devices.length}:${fnv1a(rows.join(DEVICE_SEPARATOR))}`;
 }
 
-function byteLength(text) {
-  return new TextEncoder().encode(text).length;
-}
-
 export function createMatchCache(kv, nowMs = () => Date.now()) {
   // The saved entry for this device list plus whether it is still fresh, or null if there is
   // none or it cannot be used at all. An EXPIRED entry for the same devices is returned as
   // { fresh: false } so the panel can show it while a new check runs ("stale while revalidate").
   // Damaged data, a different device list, or a date in the future still give null.
-  async function peek(devices) {
-    let entry;
+  // The head record: an older entry kept the whole result inline (`result`), a newer one says how many parts hold it (`chunks`).
+  /** @param {any} head */
+  const isHead = (head) => Boolean(head) && typeof head === 'object' && typeof head.checkedAt === 'string' && (Boolean(head.result) || (head.v === 2 && Number.isInteger(head.chunks) && head.chunks >= 1 && head.chunks <= MAX_CHUNKS));
+
+  // Delete a saved result: its parts, then its head.
+  /** @param {any} head */
+  async function deleteEntry(head) {
+    if (head && head.v === 2 && Number.isInteger(head.chunks)) {
+      for (let i = 0; i < Math.min(head.chunks, MAX_CHUNKS); i += 1) await kv.delete(`${PART_PREFIX}${i}`).catch(() => {});
+    }
+    if (typeof kv.listByPrefix === 'function') {
+      // parts left behind by a write that died halfway
+      for (const { key } of await kv.listByPrefix(PART_PREFIX).catch(() => [])) await kv.delete(key).catch(() => {});
+    }
+    await kv.delete(MATCH_CACHE_KEY);
+  }
+
+  // The whole result of a head: inline, or put together from its parts. Null when a part is missing or damaged.
+  /** @param {any} head */
+  async function assemble(head) {
+    if (head.result) return head.result;
+    const parts = await Promise.all(Array.from({ length: head.chunks }, (_, i) => kv.get(`${PART_PREFIX}${i}`)));
+    if (parts.some((part) => typeof part !== 'string')) return null;
     try {
-      entry = await kv.get(MATCH_CACHE_KEY);
+      return JSON.parse(parts.join(''));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function peek(devices) {
+    let head;
+    try {
+      head = await kv.get(MATCH_CACHE_KEY);
     } catch (error) {
       return null; // storage trouble is never fatal: just recompute
     }
-    if (!entry || typeof entry !== 'object' || !entry.result || typeof entry.checkedAt !== 'string') {
-      return null;
-    }
-    if (entry.fingerprint !== fingerprintDevices(devices)) return null;
-    const age = nowMs() - Date.parse(entry.checkedAt);
+    if (!isHead(head)) return null;
+    if (head.fingerprint !== fingerprintDevices(devices)) return null;
+    const age = nowMs() - Date.parse(head.checkedAt);
     if (!Number.isFinite(age) || age < 0) return null;
     if (age >= MAX_RETENTION_MS) {
-      await kv.delete(MATCH_CACHE_KEY).catch(() => {}); // too old to keep, even as an old result
+      await deleteEntry(head).catch(() => {}); // too old to keep, even as an old result
       return null;
     }
-    return { entry, fresh: age < CACHE_TTL_MS };
+    // Only now, when the entry is usable, are its parts read.
+    let result;
+    try {
+      result = await assemble(head);
+    } catch (error) {
+      return null;
+    }
+    if (!result) return null;
+    return { entry: { checkedAt: head.checkedAt, fingerprint: head.fingerprint, result }, fresh: age < CACHE_TTL_MS };
   }
 
   // Delete the saved result if it is older than MAX_RETENTION_MS (or damaged). Returns true if deleted.
@@ -94,7 +154,7 @@ export function createMatchCache(kv, nowMs = () => Date.now()) {
     if (entry === undefined || entry === null) return false;
     const age = entry && typeof entry.checkedAt === 'string' ? nowMs() - Date.parse(entry.checkedAt) : NaN;
     if (Number.isFinite(age) && age >= 0 && age < MAX_RETENTION_MS) return false;
-    await kv.delete(MATCH_CACHE_KEY);
+    await deleteEntry(entry);
     return true;
   }
 
@@ -104,12 +164,23 @@ export function createMatchCache(kv, nowMs = () => Date.now()) {
     return found && found.fresh ? found.entry : null;
   }
 
-  // Save a result. Returns true if saved, false if it was too large or storage failed.
+  // Save a result, in parts (see CHUNK_CHARS). Returns true if saved, false if it needed more than MAX_CHUNKS parts or storage failed.
   async function write(devices, result, checkedAt = new Date(nowMs()).toISOString()) {
-    const entry = { checkedAt, fingerprint: fingerprintDevices(devices), result };
-    if (byteLength(JSON.stringify(entry)) > MAX_CACHE_BYTES) return false;
+    const pieces = splitText(JSON.stringify(result), CHUNK_CHARS);
+    if (pieces.length > MAX_CHUNKS) return false;
     try {
-      await kv.set(MATCH_CACHE_KEY, entry);
+      /** @type {any} */
+      let before = null;
+      try {
+        before = await kv.get(MATCH_CACHE_KEY);
+      } catch (error) {
+        before = null;
+      }
+      for (let i = 0; i < pieces.length; i += 1) await kv.set(`${PART_PREFIX}${i}`, pieces[i]);
+      await kv.set(MATCH_CACHE_KEY, { v: 2, checkedAt, fingerprint: fingerprintDevices(devices), chunks: pieces.length });
+      // an earlier, longer result leaves parts the new head does not use
+      const oldChunks = before && before.v === 2 && Number.isInteger(before.chunks) ? before.chunks : 0;
+      for (let i = pieces.length; i < Math.min(oldChunks, MAX_CHUNKS); i += 1) await kv.delete(`${PART_PREFIX}${i}`).catch(() => {});
       return true;
     } catch (error) {
       return false;
@@ -117,7 +188,13 @@ export function createMatchCache(kv, nowMs = () => Date.now()) {
   }
 
   async function clear() {
-    await kv.delete(MATCH_CACHE_KEY);
+    let head = null;
+    try {
+      head = await kv.get(MATCH_CACHE_KEY);
+    } catch (error) {
+      head = null;
+    }
+    await deleteEntry(head);
   }
 
   return { peek, read, write, clear, purgeExpired };

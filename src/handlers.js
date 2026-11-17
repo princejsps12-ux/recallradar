@@ -185,7 +185,7 @@ export function createHandlers(deps) {
     // The panel's polling call: progress, and the result once the background check has finished.
     async getCheckStatus() {
       try {
-        return { ok: true, ...(await getCheckStatus({ jobs: deps.checkJobs })) };
+        return { ok: true, ...(await getCheckStatus({ jobs: deps.checkJobs, cache: deps.matchCache, devices: await deps.deviceStore.listDevices() })) };
       } catch (error) {
         log.error('Failed to read the check status', error);
         return { ok: false, error: 'Could not read the check status.' };

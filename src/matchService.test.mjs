@@ -210,8 +210,22 @@ test('a failed check leaves the previous saved result in place', async () => {
   assert.equal((await s.cache.peek(devices)).entry.result.recallCount, 99);
 });
 
-test('a result too large for the job record is reported as a failure', async () => {
-  const s = setup({ result: found({ matches: ['x'.repeat(250 * 1024)] }) });
+test('a big COMPLETE result no longer fails the check: it is saved in parts and the status call reads it from there', async () => {
+  const big = found({ matches: Array.from({ length: 1500 }, (_, i) => ({ deviceId: 'a', recallNumber: `Z-${i}`, reason: 'r'.repeat(400) })) });
+  const s = setup({ result: big });
+  const { job } = await s.jobs.start('user');
+  const outcome = await performCheck({ devices, search: s.search, cache: s.cache, jobs: s.jobs, trigger: 'user', jobId: job.id, nowMs: s.nowMs });
+  assert.equal(outcome, 'done');
+  const record = await s.jobs.current();
+  assert.equal(record.status, 'done');
+  assert.equal(record.result, null, 'the job record does not hold the big copy');
+  const status = await getCheckStatus({ jobs: s.jobs, cache: s.cache, devices });
+  assert.equal(status.result.matches.length, 1500);
+  assert.equal((await getSavedMatches({ devices, cache: s.cache })).matches.length, 1500);
+});
+
+test('a big result that could NOT be saved either (it had failed searches) is still reported as a failure', async () => {
+  const s = setup({ result: found({ failedQueries: 2, matches: ['x'.repeat(250 * 1024)] }) });
   const { job } = await s.jobs.start('user');
   const outcome = await performCheck({ devices, search: s.search, cache: s.cache, jobs: s.jobs, trigger: 'user', jobId: job.id, nowMs: s.nowMs });
   assert.equal(outcome, 'failed');
