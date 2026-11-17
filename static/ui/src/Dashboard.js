@@ -193,10 +193,10 @@ export default function Dashboard() {
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300), width: '100%' }}>
             <Hero stats={stats} devicesCount={d.devicesCount} result={d.result} progressTasks={progressTasks} summaryState={d.summaryState} capped={Boolean(d.summary && d.summary.capped)} covered={d.tasksReady && missing.length === 0} />
-            <NewSince items={news} tasks={d.tasks} taskInfo={d.taskInfo} onOpen={setDrawerDevice} alertsOn={Boolean(d.alerts.data && d.alerts.data.settings.enabled)} />
             {/* Nothing matches an open recall: the hero says so. A "do this first" list and a table of zero rows with
                 filters would only repeat it (the table's empty state even asked to "clear filters" when none was set). */}
             {all.length > 0 && <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} loading={!d.tasksReady} />}
+            <NewSince items={news} tasks={d.tasks} taskInfo={d.taskInfo} onOpen={setDrawerDevice} alertsOn={Boolean(d.alerts.data && d.alerts.data.settings.enabled)} />
             {all.length > 0 && (
               <section style={card} aria-labelledby="rr-affected-h">
                 <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-affected-h">Affected devices</Heading></div>
@@ -214,7 +214,7 @@ export default function Dashboard() {
         </TabPanel>
       </Tabs>
       <DeviceDrawer deviceId={drawerDevice} result={d.result} tasks={d.tasks} taskInfo={d.taskInfo} suggestions={d.suggestions} teams={teams} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onCreateMany={(ms) => d.createTasks(ms, false)} onClose={() => setDrawerDevice(null)} />
-      <CreateAllModal isOpen={createAllOpen} onClose={() => setCreateAllOpen(false)} count={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} suggestedCount={suggestedCount} projectName={projectName} onConfirm={createAll} running={d.creating.active} />
+      <CreateAllModal isOpen={createAllOpen} onClose={() => setCreateAllOpen(false)} count={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} suggestedCount={suggestedCount} projectName={projectName} onConfirm={createAll} running={d.creating.active} progress={d.creating} />
       <FlagGroup onDismissed={() => d.setNote(null)}>
         {d.note ? (
           <AutoDismissFlag

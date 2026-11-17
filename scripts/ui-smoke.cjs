@@ -200,7 +200,7 @@ const pickOption = async (el, inputId, optionText) => {
   await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result }, getAlerts: { ...base.getAlerts, newSince: news }, saveAlertSettings: (payload) => { saveCalls.push(payload); return base.saveAlertSettings; } }, async (el, calls) => {
     const card = el.querySelector('ul[aria-label="New since yesterday"]');
     check('the "New since yesterday" card lists the device a recall started to affect in the last day, with its time and no task yet', Boolean(card) && /Pump d2/.test(text(card)) && /found 3 h ago/.test(text(card)) && /No task yet/.test(text(card)) && /Class II/.test(text(card)));
-    check('the card sits above "Do this first" and says how many', el.querySelector('#rr-new-h') && el.querySelector('#rr-urgent') && el.querySelector('#rr-new-h').compareDocumentPosition(el.querySelector('#rr-urgent')) & 4);
+    check('"Do this first" comes before "New since yesterday": the work to do is the first thing under the headline', el.querySelector('#rr-new-h') && el.querySelector('#rr-urgent') && Boolean(el.querySelector('#rr-urgent').compareDocumentPosition(el.querySelector('#rr-new-h')) & 4));
     await clickLabel(el, 'More actions');
     const item = [...document.querySelectorAll('[role="menuitem"], button, a')].find((n) => /^Daily alerts…/.test(n.textContent.trim()));
     check('the "..." menu offers "Daily alerts…" and says it is off', Boolean(item) && /Off/.test(item.textContent));
@@ -212,8 +212,8 @@ const pickOption = async (el, inputId, optionText) => {
     const saveButton = () => [...dialog.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save');
     check('Save is shut until something changes', saveButton().disabled);
     await act(async () => { toggle.click(); await wait(150); });
-    check('turning it on opens the fields, but Save needs a project', !dialog.querySelector('input#rr-alerts-issue').disabled && !saveButton().disabled);
-    check('the dialog explains who creates the tasks and that nobody is assigned', /RecallRadar app user/.test(text(dialog)) && /Nobody is assigned/.test(text(dialog)));
+    check('turning it on opens the fields, and Save stays shut until a project is chosen, and says so', !dialog.querySelector('input#rr-alerts-issue').disabled && saveButton().disabled && /Save: choose a project first/.test(text(dialog)));
+    check('the dialog says who creates the tasks, in one line, and why the buttons are shut', /The RecallRadar app creates them/.test(text(dialog)) && /Run now: turn the alerts on and save first/.test(text(dialog)));
     check('opening the dialog changed nothing on the server', !calls.includes('saveAlertSettings') && !calls.includes('runAlertsNow'));
   });
   // 2c3. who handles this ward: a collapsed card in the drawer that asks the graph only when it is opened
@@ -230,6 +230,18 @@ const pickOption = async (el, inputId, optionText) => {
     check('the person the "Create and assign" button would name is marked', /Suggested for new tasks/.test(t));
     await act(async () => { toggle.click(); await wait(100); toggle.click(); await wait(150); });
     check('closing and opening it again does not read the graph again', calls.filter((c) => c === 'getWardPeople').length === 1);
+  });
+  // 2c4. creating all tasks: the dialog counts "N of M", and cannot be closed while it runs
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result }, createTasks: async () => { await wait(900); return { ok: true, created: [{ pair: 'Z-2|d2', key: 'MOBL-6' }, { pair: 'Z-3|d3', key: 'MOBL-7' }], existing: [], inProgress: [], failed: [], notFound: [], assignedTo: {}, assignRefused: [] }; } }, async (el, calls) => {
+    await click(el, /^Create all/);
+    const confirm = [...document.querySelectorAll('[role="dialog"] button')].find((b) => /^Create \d+ tasks?$/.test(b.textContent.trim()));
+    check('the create-all dialog asks first', Boolean(confirm));
+    await act(async () => { confirm.click(); await wait(300); });
+    const dialog = document.querySelector('[role="dialog"][aria-label="Create all tasks"]');
+    check('while tasks are being created it says how many of how many, with a bar', Boolean(dialog) && /\d+ of 2 tasks created/.test(text(dialog)) && Boolean(dialog.querySelector('[role="progressbar"][aria-label="Tasks created"]')));
+    check('and it has no close button and ignores Escape until it is done', ![...dialog.querySelectorAll('button')].some((b) => /close/i.test(b.getAttribute('aria-label') || '')) && (await act(async () => { document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(150); }), Boolean(document.querySelector('[role="dialog"][aria-label="Create all tasks"]'))));
+    await act(async () => { await wait(1000); });
+    check('and the tasks were created through the server once, in one request', calls.filter((c) => c === 'createTasks').length === 1);
   });
   // 2d. the remove dialog uses Atlaskit radios and a danger button that names what it removes
   const someImported = [{ source: 'manual' }, { source: 'manual' }, { source: 'demo' }];

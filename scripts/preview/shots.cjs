@@ -93,7 +93,12 @@ const SHOTS = [
     await waitFor(frame, 'By recall');
     await sleep(400);
   }],
-  ['25', 'new-since-yesterday-light', { view: 'dashboard', state: 'alerts-on', theme: 'light' }, async () => {}],
+  // "Do this first" now comes before this card (the thing to do outranks the news), so the shot scrolls to it.
+  ['25', 'new-since-yesterday-light', { view: 'dashboard', state: 'alerts-on', theme: 'light' }, async ({ frame }) => {
+    await scrollToText(frame, 'New since yesterday');
+    await frame.evaluate(() => (document.scrollingElement || document.body).scrollBy(0, -56)); // keep the card's top edge in the picture
+    await sleep(200);
+  }],
   ['26', 'daily-alerts-dialog-light', { view: 'dashboard', state: 'alerts-on', theme: 'light' }, async (o) => {
     await menu(o, 'Daily alerts');
     await waitFor(o.frame, 'Last daily run');

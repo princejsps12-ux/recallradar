@@ -152,7 +152,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
           <ModalHeader hasCloseButton><ModalTitle appearance={removing ? 'danger' : undefined}>{removing ? 'Remove devices' : 'Import your own devices'}</ModalTitle></ModalHeader>
           <ModalBody>
             {!removing && (<>
-            <p style={{ marginTop: 0, marginBottom: sp(200) }}>Copy rows from a spreadsheet (or a .csv) and paste them here. The first row names the columns: <strong>Manufacturer</strong> and <strong>Model</strong> are required; Name, Type, Serial (or Lot) and Ward are optional. Up to 200 devices at a time. Importing replaces the devices you imported before and leaves the demo hospital alone. <strong>Do not include patient data.</strong></p>
+            <p style={{ marginTop: 0, marginBottom: sp(200) }}>Copy rows from a spreadsheet (or a .csv) and paste them here. The first row names the columns: <strong>Manufacturer</strong> and <strong>Model</strong> are required; Name, Type, Serial (or Lot) and Ward are optional. Up to 1,000 devices at a time. Importing replaces the devices you imported before and leaves the demo hospital alone. <strong>Do not include patient data.</strong></p>
             <Textarea isInvalid={problems.length > 0 || (preview.status === 'ready' && !preview.data.valid)} aria-label="Devices to import" placeholder={EXAMPLE} minimumRows={6} resize="vertical" value={text} onChange={(e) => setText(e.target.value)} />
             <ImportPreview state={preview} />
             </>)}
@@ -193,7 +193,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
 
 // "Create all": one confirmation for every device and recall that still has no task, with the optional
 // assignment (off by default). Tasks go in the project chosen on the dashboard.
-export function CreateAllBody({ count, deviceCount, suggestedCount, projectName, assign, onAssign, running }) {
+export function CreateAllBody({ count, deviceCount, suggestedCount, projectName, assign, onAssign, running, progress = null }) {
   const facts = [
     ['Devices without a task', deviceCount],
     ['Tasks', `${count} (one for each device and recall)`],
@@ -217,25 +217,36 @@ export function CreateAllBody({ count, deviceCount, suggestedCount, projectName,
         </div>
       )}
       <div role="status" aria-live="polite" style={{ marginTop: sp(150), minHeight: '24px' }}>
-        {running && <span style={muted}>Creating tasks… this takes a moment.</span>}
+        {running && progress && progress.total > 0 ? (
+          <div>
+            <span>{`${Math.min(progress.done, progress.total)} of ${progress.total} tasks created…`}</span>
+            <div role="progressbar" aria-label="Tasks created" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={Math.min(progress.done, progress.total)} style={{ marginTop: sp(75), height: '6px', borderRadius: '3px', background: color.track, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(100, Math.round((progress.done / progress.total) * 100))}%`, height: '100%', background: color.fillBrand }} />
+            </div>
+          </div>
+        ) : running ? (
+          <span style={muted}>Creating tasks… this takes a moment.</span>
+        ) : null}
       </div>
     </>
   );
 }
 
-export function CreateAllModal({ isOpen, onClose, count, deviceCount, suggestedCount, projectName, onConfirm, running }) {
+export function CreateAllModal({ isOpen, onClose, count, deviceCount, suggestedCount, projectName, onConfirm, running, progress = null }) {
   const [assign, setAssign] = useState(false);
   return (
     <ModalTransition>
       {isOpen && (
-        <Modal onClose={onClose} width="medium" label="Create all tasks">
-          <ModalHeader hasCloseButton><ModalTitle>{`Create ${count} task${count === 1 ? '' : 's'}?`}</ModalTitle></ModalHeader>
+        // While tasks are being created the dialog cannot be closed (Escape, the backdrop and the X do nothing): leaving halfway would
+        // hide a run that is still going on.
+        <Modal onClose={running ? () => {} : onClose} shouldCloseOnOverlayClick={!running} shouldCloseOnEscapePress={!running} width="medium" label="Create all tasks">
+          <ModalHeader hasCloseButton={!running}><ModalTitle>{running ? `Creating ${(progress && progress.total) || count} tasks` : `Create ${count} task${count === 1 ? '' : 's'}?`}</ModalTitle></ModalHeader>
           <ModalBody>
-            <CreateAllBody count={count} deviceCount={deviceCount} suggestedCount={suggestedCount} projectName={projectName} assign={assign} onAssign={setAssign} running={running} />
+            <CreateAllBody count={count} deviceCount={deviceCount} suggestedCount={suggestedCount} projectName={projectName} assign={assign} onAssign={setAssign} running={running} progress={progress} />
           </ModalBody>
           <ModalFooter>
             <Button appearance="subtle" isDisabled={running} onClick={onClose}>Cancel</Button>
-            <Button appearance="primary" isLoading={running} onClick={() => onConfirm(assign)}>{`Create ${count} ${count === 1 ? 'task' : 'tasks'}`}</Button>
+            <Button appearance="primary" isLoading={running} onClick={() => onConfirm(assign)}>{running ? 'Creating…' : `Create ${count} ${count === 1 ? 'task' : 'tasks'}`}</Button>
           </ModalFooter>
         </Modal>
       )}

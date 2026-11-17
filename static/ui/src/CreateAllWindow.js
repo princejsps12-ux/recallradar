@@ -91,7 +91,7 @@ export default function CreateAllWindow({ projectKey }) {
   return frame(
     <>
       <div style={{ marginBottom: sp(200) }}><Heading size="medium">{`Create ${missing.length} task${missing.length === 1 ? '' : 's'}?`}</Heading></div>
-      <CreateAllBody count={missing.length} deviceCount={deviceCount} suggestedCount={suggestedCount} projectName={projectKey || 'the project of this issue'} assign={assign} onAssign={setAssign} running={running} />
+      <CreateAllBody count={missing.length} deviceCount={deviceCount} suggestedCount={suggestedCount} projectName={projectKey || 'the project of this issue'} assign={assign} onAssign={setAssign} running={running} progress={d.creating} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: sp(100), marginTop: sp(100) }}>
         <Button appearance="subtle" isDisabled={running} onClick={() => close(false)}>Cancel</Button>
         <Button appearance="primary" isLoading={running} onClick={create}>{`Create ${missing.length}`}</Button>
