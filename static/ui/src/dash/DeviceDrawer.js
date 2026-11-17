@@ -16,6 +16,7 @@ import { sp, cap, color, muted, ClassLozenge, MatchLozenge, TaskStatusLozenge, L
 import { matchesForDevice } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 import { openIssue } from './DevicesTable';
+import WardPeople from './WardPeople';
 
 const recallUrl = (n) => `https://api.fda.gov/device/enforcement.json?search=recall_number:%22${encodeURIComponent(n)}%22`;
 // Long FDA text starts collapsed: a dense block of 600 characters is hard to scan.
@@ -203,6 +204,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, taskInfo = {}, s
                     <Field label="Serial or lot">{first.lotOrSerial}</Field>
                     {first.deviceUdiDi ? <Field label="UDI-DI">{first.deviceUdiDi}</Field> : null}
                   </div>
+                  <WardPeople ward={first.ward} suggestedIds={matches.map((m) => (suggestions[pairOf(m)] || {}).accountId).filter(Boolean)} />
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: sp(100) }}>
                     <Heading size="medium">Recalls that affect it ({matches.length})</Heading>
                     {missing.length > 1 && (

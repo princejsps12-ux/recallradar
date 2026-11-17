@@ -11,7 +11,7 @@ RecallRadar is an app for Atlassian Jira and Confluence that compares FDA medica
 - **Ward-to-team mapping**: a ward name and the name and id of a team in your Atlassian site.
 - **Daily alerts**: which recall and device pairs have been seen (ids and times only, to tell what is new) and what the last daily run did (counts and Jira issue keys); and the administrator's choices (project key, optional issue key). No name, account or message text.
 - **Jira and Confluence content it creates** at your request: tasks and recall pages.
-- **Atlassian account ids and names** of team members are read from the Teamwork Graph **only while you use the feature**, to show you a suggested assignee and to fill the assignee field when you ask. **They are never saved in app storage.** The Rovo agent's task preview stores only device, recall and project ids, and looks the person up again when you confirm.
+- **Atlassian account ids and names** of team members, the **Jira projects a team works in** (and their leads) and the **titles, due dates and statuses of the Jira work assigned to a team member** are read from the Teamwork Graph **only while you use the feature** (the suggested assignee, the assignee field when you ask, and the recall drawer's "Who handles this ward" card, read when you open it), as you, so you see only what you may see. **None of it is saved in app storage.** The Rovo agent's task preview stores only device, recall and project ids, and looks the person up again when you confirm.
 
 ## Where it is stored
 

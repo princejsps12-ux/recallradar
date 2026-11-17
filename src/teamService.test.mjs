@@ -8,6 +8,9 @@ import {
   assigneesForMatches,
   checkExplicitAssignees,
   whoHandlesWard,
+  wardOwnership,
+  summarizeWork,
+  MAX_PEOPLE_SHOWN,
 } from './teamService.js';
 import { createWardTeamStore } from './wardTeams.js';
 import { pairKey } from './taskRules.js';
@@ -243,4 +246,101 @@ test('who handles an unmapped ward: says so, never guesses, and lists the wards 
   assert.match(out.message, /Do not guess a team/);
   assert.deepEqual(out.mappedWards, ['ER', 'ICU']);
   assert.equal(out.team, undefined);
+});
+
+// --- who owns the ward: projects, leads and workload from the graph ---------------------------------------------------
+
+const NOW = Date.UTC(2026, 10, 17, 12, 0, 0);
+const item = (key, extra = {}) => ({ key, summary: `Work ${key}`, dueAt: '', status: 'To Do', category: 'new', ...extra });
+
+// The fake graph plus the two new reads: each person's assigned work, and a team's projects.
+function ownershipGraph({ work = {}, spaces = [{ key: 'BIOMED', name: 'Biomedical Engineering', lead: 'Hana Sato' }], spacesError = null, workErrors = [] } = {}) {
+  const graph = fakeGraph();
+  graph.calls.work = [];
+  graph.listTeamSpaces = async () => { if (spacesError) throw spacesError; return spaces; };
+  graph.listAssignedWork = async (accountId) => {
+    graph.calls.work.push(accountId);
+    if (workErrors.includes(accountId)) throw new Error('Teamwork Graph: User is not permitted to query this organization');
+    return work[accountId] || { items: [], capped: false };
+  };
+  return graph;
+}
+
+test('summarizeWork counts what is not done, what is overdue, and picks the item to look at next', () => {
+  const out = summarizeWork({ capped: false, items: [
+    item('A-1', { category: 'done', dueAt: '2026-11-01T00:00:00.000Z' }),
+    item('A-2', { dueAt: '2026-11-25T00:00:00.000Z' }),
+    item('A-3', { dueAt: '2026-11-10T00:00:00.000Z', category: 'indeterminate', status: 'In Progress' }),
+    item('A-4'),
+  ] }, NOW);
+  assert.deepEqual(out, { openWork: 3, overdue: 1, capped: false, next: { key: 'A-3', summary: 'Work A-3', dueAt: '2026-11-10T00:00:00.000Z', status: 'In Progress' } });
+  assert.equal(summarizeWork({ items: [item('A-5'), item('A-6')], capped: true }, NOW).next.key, 'A-5', 'with no due dates the first open item');
+  assert.deepEqual(summarizeWork({ items: [], capped: false }, NOW), { openWork: 0, overdue: 0, capped: false, next: null });
+  assert.equal(summarizeWork({ items: [item('A-7', { category: 'done' })], capped: false }, NOW).next, null, 'done work is never "next"');
+});
+
+test('wardOwnership: the team, its projects with their lead, and each person\'s open work', async () => {
+  const { store } = await setup();
+  const graph = ownershipGraph({ work: { aaa111: { items: [item('A-1'), item('A-2', { category: 'done' })], capped: false }, bbb222: { items: [item('B-1', { dueAt: '2026-11-01T00:00:00.000Z' })], capped: true } } });
+  const out = await wardOwnership({ ward: 'ICU', store, graph, now: () => new Date(NOW) });
+  assert.equal(out.mapped, true);
+  assert.deepEqual(out.team, { ari: T_ICU, name: 'ICU Team' });
+  assert.deepEqual(out.spaces, [{ key: 'BIOMED', name: 'Biomedical Engineering', lead: 'Hana Sato' }]);
+  assert.deepEqual(out.people.map((p) => [p.name, p.openWork, p.overdue, p.capped]), [['Alex Rivera', 1, 0, false], ['Priya Shah', 1, 1, true], ['Sam Lee', 0, 0, false]]);
+  assert.deepEqual(out.partial, { spaces: false, work: false });
+  assert.equal(out.moreMembers, 0);
+});
+
+test('wardOwnership: a ward with no team says so, and nothing is read from the graph', async () => {
+  const { store } = await setup();
+  const graph = ownershipGraph();
+  assert.deepEqual(await wardOwnership({ ward: 'Cath Lab', store, graph }), { ward: 'Cath Lab', mapped: false });
+  assert.deepEqual(graph.calls.listMembers, []);
+  assert.deepEqual(graph.calls.work, []);
+});
+
+test('wardOwnership shows what it can: no projects (scope or hiccup) and one person whose work cannot be read are named in "partial"', async () => {
+  const { store } = await setup();
+  const graph = ownershipGraph({ spacesError: new Error('boom'), workErrors: ['bbb222'], work: { aaa111: { items: [item('A-1')], capped: false } } });
+  const out = await wardOwnership({ ward: 'ICU', store, graph, now: () => new Date(NOW) });
+  assert.equal(out.spaces, null);
+  assert.deepEqual(out.partial, { spaces: true, work: true });
+  assert.deepEqual(out.people.map((p) => [p.name, p.openWork]), [['Alex Rivera', 1], ['Priya Shah', null], ['Sam Lee', 0]]);
+  assert.equal(out.mapped, true);
+});
+
+test('wardOwnership: an old graph without the new reads still answers with the people (no projects, no work)', async () => {
+  const { store, graph } = await setup(); // the fake graph of the other tests has only listTeams and listMembers
+  const out = await wardOwnership({ ward: 'ICU', store, graph });
+  assert.equal(out.spaces, null);
+  assert.ok(out.people.every((p) => p.openWork === null));
+});
+
+test('wardOwnership reads at most MAX_PEOPLE_SHOWN people, a few at a time, and counts the rest', async () => {
+  const store = createWardTeamStore(fakeKv());
+  await store.set('ICU', { ari: T_ICU, name: 'ICU Team' });
+  const many = Array.from({ length: MAX_PEOPLE_SHOWN + 5 }, (_, i) => ({ accountId: `acc${String(i).padStart(3, '0')}`, name: `Person ${String(i).padStart(2, '0')}` }));
+  const graph = ownershipGraph();
+  graph.listMembers = async () => many;
+  let inFlight = 0;
+  let peak = 0;
+  const original = graph.listAssignedWork;
+  graph.listAssignedWork = async (id) => { inFlight += 1; peak = Math.max(peak, inFlight); await new Promise((r) => setTimeout(r, 5)); inFlight -= 1; return original(id); };
+  const out = await wardOwnership({ ward: 'ICU', store, graph });
+  assert.equal(out.people.length, MAX_PEOPLE_SHOWN);
+  assert.equal(out.moreMembers, 5);
+  assert.ok(peak <= 4 && peak > 1, `at most four graph calls at a time, saw ${peak}`);
+});
+
+test('whoHandlesWard adds where the team works and each person\'s open work when the graph can say, and is unchanged when it cannot', async () => {
+  const { store } = await setup();
+  const rich = await whoHandlesWard({ ward: 'ICU', store, graph: ownershipGraph({ work: { aaa111: { items: [item('A-1'), item('A-2')], capped: false } } }) });
+  assert.deepEqual(rich.worksIn, [{ project: 'Biomedical Engineering', key: 'BIOMED', projectLead: 'Hana Sato' }]);
+  assert.deepEqual(rich.openWorkPerPerson[0], { name: 'Alex Rivera', openJiraWorkItems: 2, overdue: 0, atLeast: false });
+  assert.match(rich.note, /Name only the team, projects and people returned here/);
+  const plain = await whoHandlesWard({ ward: 'ICU', store, graph: fakeGraph() });
+  assert.equal(plain.ok, true);
+  assert.equal(plain.worksIn, undefined);
+  assert.equal(plain.openWorkPerPerson, undefined);
+  assert.equal(plain.team.name, 'ICU Team');
 });

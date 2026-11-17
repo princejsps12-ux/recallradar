@@ -3,13 +3,10 @@ import Heading from '@atlaskit/heading';
 import Button from '@atlaskit/button/new';
 import Badge from '@atlaskit/badge';
 import { sp, cap, color, card, muted, noBreak, ClassLozenge, TaskStatusLozenge, NameLink, LinkLike, ago } from '../ui/kit';
-import { router } from '@forge/bridge';
 import { pairOf } from '../data/tasks';
+import { openIssue } from './DevicesTable';
 
 const ROWS_SHOWN = 5;
-
-// Opens a Jira issue in the same tab (the same helper the table uses).
-const openIssue = (key) => router.navigate(`/browse/${key}`);
 
 // "New since yesterday": the devices a recall started to affect in the last 24 hours, newest first. It is the first thing under
 // the headline because it is the part that changed. A device that already has a task (the daily alert made it, or somebody

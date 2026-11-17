@@ -301,3 +301,26 @@ test('daily alerts in the preview: the news of the scenarios, the settings, Run 
   assert.equal((await stranger.invoke('getAlerts')).ok, true, 'everyone may read');
 });
 
+test('ward people in the preview: the real shape, an unmapped ward, a partial answer, and a graph that refuses', async () => {
+  const { wardOwnership } = await import('./teamService.js');
+  const backend = make('ready');
+  const icu = await backend.invoke('getWardPeople', { ward: 'ICU' });
+  assert.equal(icu.ok, true);
+  assert.equal(icu.mapped, true);
+  assert.deepEqual(icu.spaces, [{ key: 'BIOMED', name: 'Biomedical Engineering', lead: 'Hana Sato' }]);
+  assert.ok(icu.people.length >= 2 && icu.people.every((p) => p.accountId && p.name && 'openWork' in p && 'overdue' in p && 'capped' in p && 'next' in p));
+  // the same keys the real service answers with
+  const store = { get: async (ward) => ({ ward, teamAri: icu.team.ari, teamName: icu.team.name }) };
+  const graph = { listMembers: async () => icu.people.map((p) => ({ accountId: p.accountId, name: p.name })), listTeamSpaces: async () => icu.spaces, listAssignedWork: async () => ({ items: [], capped: false }) };
+  const real = await wardOwnership({ ward: 'ICU', store, graph });
+  assert.deepEqual(Object.keys(icu).sort(), Object.keys({ ok: true, ...real }).sort());
+  assert.deepEqual(Object.keys(icu.people[0]).sort(), Object.keys(real.people[0]).sort());
+  assert.deepEqual(await backend.invoke('getWardPeople', { ward: 'ER' }), { ok: true, ward: 'ER', mapped: false });
+  const cardiology = await backend.invoke('getWardPeople', { ward: 'Cardiology' });
+  assert.deepEqual(cardiology.spaces, []);
+  assert.equal(cardiology.partial.work, true);
+  assert.deepEqual(await backend.invoke('getWardPeople', { payload: {} }), { ok: false, error: 'Which ward?' });
+  const down = await make('no-graph').invoke('getWardPeople', { ward: 'ICU' });
+  assert.equal(down.ok, false);
+});
+

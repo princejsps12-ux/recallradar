@@ -23,6 +23,7 @@ import {
   lastRunText,
   alertsSummary,
   NOT_RUN_REASONS,
+  workloadText,
 } from '../static/ui/src/dashboardData.mjs';
 
 const m = (deviceId, recallNumber, extra = {}) => ({ deviceId, recallNumber, confidence: 'exact', recallClass: 'I', ward: 'ICU', ...extra });
@@ -173,5 +174,15 @@ test('alertsSummary and the reasons "Run now" gives when it does nothing', () =>
   assert.equal(alertsSummary({ enabled: false, projectKey: 'AL' }), 'Off');
   assert.equal(alertsSummary({ enabled: true, projectKey: 'AL' }), 'On: tasks go to AL');
   assert.deepEqual(Object.keys(NOT_RUN_REASONS).sort(), ['incomplete', 'no-project', 'off'], 'one sentence for every reason runAlerts can give');
+});
+
+test('workloadText: how busy a person is, in one phrase, and never a made-up zero when the graph would not say', () => {
+  assert.equal(workloadText({ openWork: 3, overdue: 1, capped: false }), '3 open, 1 overdue');
+  assert.equal(workloadText({ openWork: 5, overdue: 0, capped: false }), '5 open');
+  assert.equal(workloadText({ openWork: 12, overdue: 2, capped: true }), '12+ open, 2 overdue');
+  assert.equal(workloadText({ openWork: 0, overdue: 0, capped: false }), 'No open work');
+  assert.equal(workloadText({ openWork: 0, overdue: 0, capped: true }), '0+ open', 'nothing open in what was read, but there was more to read');
+  assert.equal(workloadText({ openWork: null }), 'Work could not be read');
+  assert.equal(workloadText(undefined), 'Work could not be read');
 });
 

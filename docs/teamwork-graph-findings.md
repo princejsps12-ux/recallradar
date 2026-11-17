@@ -58,3 +58,14 @@ query recallradar_members {
 3. **Or skip graph writes.** Step D (a Confluence page per recall, linking devices, tasks and teams in plain text) gives most of the same visibility without the consent or the data-sharing.
 
 A throwaway probe is easy to repeat: it needs the connector module and the five scopes added back, and a connection created by an admin.
+
+## Addendum, 17 Nov 2026: what the Preview API offers now
+
+Re-checked after the API moved from the Early Access Program to **Preview** (Forge changelog, 11 Nov 2026), against the docs and the live GraphQL schema of the demo site (`GET <site>/gateway/api/graphql/twg/schema`, 172 KB of SDL). Nothing above was redone; this only records what is new and what the app now uses.
+
+- **Raw Cypher (`cypherQuery`) is closed to new apps**: they use the curated fields, or persisted queries registered against the app (`customQuery`). There is still no curated team-to-work field.
+- **Curated fields that matter here**: `atlassianUserAssignedJiraWorkItems(userId)` (work assigned to a person), `spacesByAtlassianTeam(teamAri)` (the Jira projects and Confluence spaces linked to a team; a union of `JiraSpace` and `ConfluenceSpace`), `atlassianTeamsBySpace`, `jiraSpaceWorkItems`, `atlassianUserContent` (what a person created, watches or is mentioned in). Each returns at most 25 per page.
+- **A team still has no owner field, but a Jira project has a lead**: `JiraSpace` carries `lead { name }`. A team linked to a project therefore gives a real "who is responsible" signal that was missing in the first probe. The app reads it (call 3).
+- **`JiraWorkItem` exposes** `key`, `summary`, `dueAt`, `webUrl`, `assignee`, `reporter` and `status { name statusCategory { key name } }`, so "open" can be told from "done" by Jira's own category.
+- **Scopes are per object type** (`read:graph:<object>:<product>`): `JiraWorkItem` needs `read:graph:issue:jira`, `JiraSpace` needs `read:graph:project:jira`, plus the scope of the object the query starts from (`read:graph:user:atlassian`, `read:graph:team:atlassian`). The product-wide `read:graph:jira` and `read:graph:confluence` are being retired. A missing scope returns **no error**, the rows are left out.
+- **Not done, on purpose**: the graph is still read-only here. The write path (connector, consent dialog) stays closed, as decided.

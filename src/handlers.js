@@ -15,7 +15,7 @@ import { openTaskMatches, pairKey } from './taskRules.js';
 import { summarizeProgress } from './progress.js';
 import { validateSettings } from './alertSettings.js';
 import { runAlerts, friendlyJiraError, friendlyIssueError } from './alertService.js';
-import { assigneesForMatches, checkExplicitAssignees, setWardTeam } from './teamService.js';
+import { assigneesForMatches, checkExplicitAssignees, setWardTeam, wardOwnership } from './teamService.js';
 import { createRecallPages } from './recallPageService.js';
 import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient.js';
 import { importDevices } from './deviceCsv.js';
@@ -343,6 +343,19 @@ export function createHandlers(deps) {
       } catch (error) {
         log.error('Failed to count tasks', error);
         return { ok: false, error: 'Could not count the RecallRadar tasks.' };
+      }
+    },
+
+    // The ward's team, the Jira projects it works in and how busy each person is, for the recall drawer. Read from the Teamwork
+    // Graph as the signed-in person, when the drawer's card is opened; nothing is saved.
+    async getWardPeople({ payload }) {
+      try {
+        const ward = payload && typeof payload.ward === 'string' ? payload.ward.trim() : '';
+        if (!ward) return { ok: false, error: 'Which ward?' };
+        return { ok: true, ...(await wardOwnership({ ward, store: deps.wardTeams, graph: deps.teamGraph, now })) };
+      } catch (error) {
+        log.error('Failed to read the ward people', error);
+        return { ok: false, error: 'The Teamwork Graph could not be read. Try again in a moment.' };
       }
     },
 

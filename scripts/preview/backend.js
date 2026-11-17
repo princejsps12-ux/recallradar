@@ -37,7 +37,7 @@
   const RESOLVERS = [
     'listDevices', 'loadDemoHospital', 'importDevices', 'removeImportedDevices', 'clearDevices', 'getSavedMatches', 'startCheck', 'getCheckStatus',
     'getTaskStates', 'getProgress', 'getTaskSummary', 'createTasks', 'getWardTeams', 'listTeams', 'setWardTeam', 'suggestAssignees', 'listProjects', 'fetchRecalls',
-    'listSpaces', 'createRecallPage', 'getCapabilities', 'getAlerts', 'saveAlertSettings', 'runAlertsNow',
+    'listSpaces', 'createRecallPage', 'getCapabilities', 'getAlerts', 'saveAlertSettings', 'runAlertsNow', 'getWardPeople',
   ];
 
   const HOUR = 3600000;
@@ -331,6 +331,30 @@
       },
       getProgress() {
         return { ok: true, progress: rollUp() };
+      },
+      // The ward's team, the Jira projects it works in and each person's open work (src/teamService.js wardOwnership). The numbers
+      // are invented but vary from person to person; Cardiology has no linked project and one person whose work cannot be read.
+      getWardPeople({ payload }) {
+        const ward = String((payload && payload.ward) || '').trim();
+        if (!ward) return { ok: false, error: 'Which ward?' };
+        if (flags.suggestFails) return { ok: false, error: 'The Teamwork Graph could not be read. Try again in a moment.' };
+        const mapping = st.mappings.find((m) => m.ward === ward);
+        if (!mapping) return { ok: true, ward, mapped: false };
+        const spacesByWard = {
+          ICU: [{ key: 'BIOMED', name: 'Biomedical Engineering', lead: 'Hana Sato' }],
+          'Cath Lab': [{ key: 'BIOMED', name: 'Biomedical Engineering', lead: 'Hana Sato' }, { key: 'CATH', name: 'Cath Lab Operations', lead: 'Ayesha Khan' }],
+          Cardiology: [],
+        };
+        const titles = ['Replace the battery pack on bay 3', 'Annual safety test: infusion pumps', 'Calibrate the monitor in room 12', 'Update the pump library'];
+        const members = MEMBERS[mapping.teamAri] || [];
+        const people = members.map((p, i) => {
+          const unreadable = ward === 'Cardiology' && i === 1;
+          const open = (i * 3 + 2) % 7;
+          return unreadable
+            ? { accountId: p.accountId, name: p.name, openWork: null, overdue: 0, capped: false, next: null }
+            : { accountId: p.accountId, name: p.name, openWork: open, overdue: i % 2, capped: false, next: open ? { key: `BIOMED-${40 + i}`, summary: titles[i % titles.length], dueAt: new Date(now() + (i + 1) * 24 * HOUR).toISOString(), status: i % 2 ? 'In Progress' : 'To Do' } : null };
+        });
+        return { ok: true, ward, mapped: true, team: { ari: mapping.teamAri, name: mapping.teamName }, spaces: spacesByWard[ward] || [], people, moreMembers: 0, partial: { spaces: false, work: people.some((p) => p.openWork === null) } };
       },
       getAlerts() {
         const watching = Boolean(st.result);

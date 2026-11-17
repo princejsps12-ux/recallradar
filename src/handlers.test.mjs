@@ -73,6 +73,7 @@ function setup({ roles = { administrator: true, projectAdministrator: false }, d
       return [{ ari: 'ari:cloud:identity::team/00000000-0000-4000-8000-000000000001', name: 'ICU Nursing' }];
     },
     async listMembers() {
+      if (state.membersError) throw new Error('Teamwork Graph: User is not permitted to query this organization');
       return [];
     },
   };
@@ -394,3 +395,21 @@ test('importing devices or loading the demo is not news; removing devices clears
   assert.equal((await h.alertState.overview()).watching, false);
 });
 
+// --- the ward people (recall drawer) ---------------------------------------------------------------------------------
+
+test('getWardPeople: the ward\'s team, projects and people from the graph; an unmapped ward is said so; a graph failure is a plain message', async () => {
+  const h = setup();
+  const t = 'ari:cloud:identity::team/00000000-0000-4000-8000-000000000001';
+  await h.wardTeams.set('ICU', { ari: t, name: 'ICU Nursing' });
+  const out = await ask(h, 'getWardPeople', { payload: { ward: ' ICU ' } });
+  assert.equal(out.ok, true);
+  assert.equal(out.mapped, true);
+  assert.deepEqual(out.team, { ari: t, name: 'ICU Nursing' });
+  assert.equal(out.people.length, 0, 'the fake team has no members');
+  assert.deepEqual(await ask(h, 'getWardPeople', { payload: { ward: 'Cath Lab' } }), { ok: true, ward: 'Cath Lab', mapped: false });
+  assert.deepEqual(await ask(h, 'getWardPeople', { payload: {} }), { ok: false, error: 'Which ward?' });
+  h.state.membersError = true;
+  const failed = await ask(h, 'getWardPeople', { payload: { ward: 'ICU' } });
+  assert.deepEqual(failed, { ok: false, error: 'The Teamwork Graph could not be read. Try again in a moment.' });
+  assert.equal(h.calls.logged.length, 1, 'the real reason is logged, not shown');
+});

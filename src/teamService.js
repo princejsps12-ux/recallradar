@@ -3,6 +3,8 @@
 //   setWardTeam          save "this ward is handled by this team"; the team is checked against the graph
 //   wardTeamInfo         for a ward: its team, the team's members, and a suggested assignee
 //   whoHandlesWard       the same, shaped as an answer for the Rovo agent / MCP tool
+//   wardOwnership        for a ward: its team, the Jira projects the team works in (and their leads), and how much open
+//                        Jira work each person has, all read from the graph for the recall drawer
 //   assigneesForMatches  suggested assignees for a list of recall matches (balanced across the team)
 //   checkExplicitAssignees  keep only assignees the ward's team really contains
 //
@@ -24,6 +26,73 @@ export function suggestAssignee(members, openCounts = new Map(), planned = new M
   if (!members || members.length === 0) return null;
   const load = (m) => (openCounts.get(m.accountId) || 0) + (planned.get(m.accountId) || 0);
   return [...members].sort((a, b) => load(a) - load(b) || a.name.localeCompare(b.name))[0];
+}
+
+// How many people of a team are shown with their workload, and how many graph calls run at the same time. A ward's team is
+// a handful of people; a bigger one is cut here and says how many more there are.
+export const MAX_PEOPLE_SHOWN = 8;
+const WORKLOAD_CONCURRENCY = 4;
+
+// map with at most `limit` calls in flight, results in order.
+async function mapLimit(list, limit, fn) {
+  const results = new Array(list.length);
+  let next = 0;
+  async function worker() {
+    while (next < list.length) {
+      const index = next;
+      next += 1;
+      results[index] = await fn(list[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
+  return results;
+}
+
+// One person's assigned work (from the graph) as the numbers the drawer shows: how many items are not done, how many of those
+// are overdue, and the one to look at next (the earliest due date among those with one, else the first). `capped` means the
+// person has more work than was read, so the numbers are "at least".
+export function summarizeWork(work, nowMs) {
+  const open = work.items.filter((item) => item.category !== 'done');
+  const dated = open.filter((item) => item.dueAt).sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
+  const next = dated[0] || open[0] || null;
+  return {
+    openWork: open.length,
+    overdue: open.filter((item) => item.dueAt && Date.parse(item.dueAt) < nowMs).length,
+    capped: Boolean(work.capped),
+    next: next ? { key: next.key, summary: next.summary, dueAt: next.dueAt, status: next.status } : null,
+  };
+}
+
+// A ward's team, the Jira projects it works in and how busy each person is, read from the graph right now (nothing of it is
+// saved). Whatever the graph cannot say is left out and named in `partial`, so the drawer can show the rest:
+//   { ward, mapped: false }
+//   { ward, mapped: true, team, spaces | null, people: [{ accountId, name, openWork | null, overdue, capped, next }],
+//     moreMembers, partial: { spaces, work } }
+export async function wardOwnership({ ward, store, graph, now = () => new Date() }) {
+  const mapping = await store.get(ward);
+  if (!mapping) return { ward, mapped: false };
+  const [members, spaces] = await Promise.all([
+    graph.listMembers(mapping.teamAri),
+    Promise.resolve().then(() => graph.listTeamSpaces(mapping.teamAri)).catch(() => null),
+  ]);
+  const shown = members.slice(0, MAX_PEOPLE_SHOWN);
+  const nowMs = now().getTime();
+  const people = await mapLimit(shown, WORKLOAD_CONCURRENCY, async (member) => {
+    try {
+      return { accountId: member.accountId, name: member.name, ...summarizeWork(await graph.listAssignedWork(member.accountId), nowMs) };
+    } catch (error) {
+      return { accountId: member.accountId, name: member.name, openWork: null, overdue: 0, capped: false, next: null };
+    }
+  });
+  return {
+    ward: mapping.ward,
+    mapped: true,
+    team: { ari: mapping.teamAri, name: mapping.teamName },
+    spaces,
+    people,
+    moreMembers: members.length - shown.length,
+    partial: { spaces: spaces === null, work: people.some((p) => p.openWork === null) },
+  };
 }
 
 // A ward's team and people, read fresh from the graph.
@@ -118,7 +187,7 @@ export async function whoHandlesWard({ ward, store, graph, openCounts = new Map(
   const mappings = await store.list();
   const mappedWards = mappings.map((m) => m.ward);
   const info = await wardTeamInfo({ ward: wanted, store, graph, openCounts });
-  const source = 'Teamwork Graph (read-only): team and members read live; the ward-to-team mapping is saved in RecallRadar';
+  const source = 'Teamwork Graph (read-only): team, members, linked Jira projects and open work read live; the ward-to-team mapping is saved in RecallRadar';
   if (!info.mapped) {
     return {
       ok: true,
@@ -129,6 +198,20 @@ export async function whoHandlesWard({ ward, store, graph, openCounts = new Map(
       source,
     };
   }
+  // The richer picture (where the team works, who leads that project, how busy each person is). It is extra: when the graph
+  // cannot give it (a scope not granted, a hiccup) the answer is the same as before, without it.
+  let ownership = null;
+  try {
+    ownership = await wardOwnership({ ward: wanted, store, graph });
+  } catch (error) {
+    ownership = null;
+  }
+  const extra = {};
+  if (ownership && ownership.mapped) {
+    if (ownership.spaces && ownership.spaces.length) extra.worksIn = ownership.spaces.map((s) => ({ project: s.name, key: s.key, projectLead: s.lead || null }));
+    const busy = ownership.people.filter((p) => p.openWork !== null);
+    if (busy.length) extra.openWorkPerPerson = busy.map((p) => ({ name: p.name, openJiraWorkItems: p.openWork, overdue: p.overdue, atLeast: p.capped }));
+  }
   return {
     ok: true,
     ward: info.ward,
@@ -137,8 +220,9 @@ export async function whoHandlesWard({ ward, store, graph, openCounts = new Map(
     members: info.members,
     suggestedAssignee: info.suggested,
     suggestionRule: info.rule,
+    ...extra,
     source,
-    note: 'Name only the team and people returned here. Assigning anyone requires the user to say yes.',
+    note: 'Name only the team, projects and people returned here. Assigning anyone requires the user to say yes.',
   };
 }
 

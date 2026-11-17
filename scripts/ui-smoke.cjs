@@ -216,6 +216,21 @@ const pickOption = async (el, inputId, optionText) => {
     check('the dialog explains who creates the tasks and that nobody is assigned', /RecallRadar app user/.test(text(dialog)) && /Nobody is assigned/.test(text(dialog)));
     check('opening the dialog changed nothing on the server', !calls.includes('saveAlertSettings') && !calls.includes('runAlertsNow'));
   });
+  // 2c3. who handles this ward: a collapsed card in the drawer that asks the graph only when it is opened
+  const wardPeople = { ok: true, ward: 'ICU', mapped: true, team: { ari: 'ari:cloud:identity::team/11111111-aaaa-4bbb-8ccc-111111111111', name: 'Team Atlas' }, spaces: [{ key: 'MOBL', name: 'Mobile', lead: 'Casey Morgan' }], people: [{ accountId: 'acc-1', name: 'Casey Morgan', openWork: 2, overdue: 1, capped: false, next: { key: 'MOBL-7', summary: 'Replace the battery pack', dueAt: '2026-11-20T00:00:00.000Z', status: 'To Do' } }, { accountId: 'acc-2', name: 'Jo Lee', openWork: null, overdue: 0, capped: false, next: null }], moreMembers: 0, partial: { spaces: false, work: true } };
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result }, getWardPeople: wardPeople, suggestAssignees: { ok: true, suggestions: { 'Z-1|d1': { accountId: 'acc-1', name: 'Casey Morgan', teamName: 'Team Atlas' } }, skipped: [] } }, async (el, calls) => {
+    await clickLabel(el, 'Details for Pump d1, recall Z-1');
+    const drawer = el.querySelector('[role="dialog"]');
+    const toggle = drawer && [...drawer.querySelectorAll('button[aria-expanded]')].find((b) => /Who handles this ward/.test(b.textContent));
+    check('the drawer has a collapsed "Who handles this ward" card that has not asked the graph yet', Boolean(toggle) && toggle.getAttribute('aria-expanded') === 'false' && !calls.includes('getWardPeople'));
+    await act(async () => { toggle.click(); await wait(400); });
+    const t = text(drawer);
+    check('opening it reads the graph once and shows the team, the project with its lead and each person\'s open work', calls.filter((c) => c === 'getWardPeople').length === 1 && /Team: Team Atlas/.test(t) && /Mobile \(MOBL\)/.test(t) && /led by Casey Morgan/.test(t) && /2 open, 1 overdue/.test(t) && /Next: MOBL-7/.test(t));
+    check('a person whose work the graph would not give says so instead of showing zero', /Jo Lee/.test(t) && /Work could not be read/.test(t) && /for some people it could not be read/.test(t));
+    check('the person the "Create and assign" button would name is marked', /Suggested for new tasks/.test(t));
+    await act(async () => { toggle.click(); await wait(100); toggle.click(); await wait(150); });
+    check('closing and opening it again does not read the graph again', calls.filter((c) => c === 'getWardPeople').length === 1);
+  });
   // 2d. the remove dialog uses Atlaskit radios and a danger button that names what it removes
   const someImported = [{ source: 'manual' }, { source: 'manual' }, { source: 'demo' }];
   await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: someImported }, getSavedMatches: { ok: true, result } }, async (el) => {
@@ -272,7 +287,7 @@ const pickOption = async (el, inputId, optionText) => {
     const t = text(el);
     check('issue panel shows the headline, the urgent devices and the dashboard link', /devices? need(s)? action/.test(t) && /Open dashboard/.test(t) && /Pump d2/.test(t) && /Checked/.test(t));
     check('issue panel rows have no per-device buttons', ![...el.querySelectorAll('button')].some((b) => /^(Create task|Details)$/.test(b.textContent.trim())));
-    check('the light panel does not call the Teamwork Graph, the recent FDA list or the task counts', !calls.includes('suggestAssignees') && !calls.includes('fetchRecalls') && !calls.includes('getTaskSummary') && !calls.includes('getWardTeams') && !calls.includes('getAlerts'));
+    check('the light panel does not call the Teamwork Graph, the recent FDA list or the task counts', !calls.includes('suggestAssignees') && !calls.includes('fetchRecalls') && !calls.includes('getTaskSummary') && !calls.includes('getWardTeams') && !calls.includes('getAlerts') && !calls.includes('getWardPeople'));
     await click(el, /^Create all/);
     check('"Create all" opens the pop-up with the create-all context', global.__modalOpened === true && global.__modalOpts.context.view === 'create-all');
   });

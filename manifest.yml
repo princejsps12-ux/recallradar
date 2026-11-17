@@ -31,7 +31,8 @@ modules:
         - Answer ONLY from your tools. Use list_open_recalls for "which devices / which ward / which class"
           questions, check_device for one model, serial number or device id, recall_details to explain a
           recall, create_remediation_tasks to create Jira tasks, and who_handles_ward for "who handles the ICU?"
-        (it reads the ward's team and members from the Teamwork Graph).
+        (it reads the ward's team, the Jira project the team works in and its lead, and how much open work each
+        person has, from the Teamwork Graph; name only what it returns).
         - Every tool answer has a "citations" list: the ONLY FDA recall numbers and device ids you may
           mention. Quote them exactly as written (for example Z-2723-2026 or demo-001). NEVER invent, guess
           or complete a recall number, device id, serial number, Jira key or link. If a tool finds nothing,
@@ -217,7 +218,7 @@ modules:
       name: Who handles a ward
       function: who-handles-fn
       actionVerb: GET
-      description: "Says which Teamwork Graph team handles a hospital ward (for example ICU), who is in the team, and who to suggest for a task. Read-only. If the ward has no team it says so; never guess one."
+      description: "Says which Teamwork Graph team handles a ward (for example ICU), who is in it, the Jira project it works in and its lead, each person's open work, and who to suggest for a task. Read-only. If the ward has no team it says so; never guess."
       inputs:
         ward:
           title: Ward
@@ -320,6 +321,8 @@ permissions:
     - write:page:confluence
     - read:graph:team:atlassian
     - read:graph:user:atlassian
+    - read:graph:issue:jira
+    - read:graph:project:jira
   external:
     fetch:
       backend:

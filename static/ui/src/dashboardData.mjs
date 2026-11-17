@@ -200,3 +200,15 @@ export const NOT_RUN_REASONS = {
   incomplete: 'The last check did not finish all its FDA searches, so nothing was created. Refresh and try again.',
 };
 
+// --- Who handles a ward (the drawer card) ----------------------------------------------------------------------------
+
+// A person's workload from the graph as one phrase: "3 open, 1 overdue", "No open work", "12+ open" (more than was read), or
+// "Work could not be read" when the graph would not say.
+export function workloadText(person) {
+  if (!person || person.openWork === null || person.openWork === undefined) return 'Work could not be read';
+  if (person.openWork === 0 && !person.capped) return 'No open work';
+  const parts = [`${person.openWork}${person.capped ? '+' : ''} open`];
+  if (person.overdue > 0) parts.push(`${person.overdue} overdue`);
+  return parts.join(', ');
+}
+

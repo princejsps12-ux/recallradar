@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One screenshot of one view in one state, for looking at it (or for a bug report):
 //
-//   node scripts/preview/shot.cjs <view> <state> <theme> [width height] [--out=path.png] [--scale=2] [--full] [--tab=Progress] [--menu="Daily alerts"] [--run="Run now"]
+//   node scripts/preview/shot.cjs <view> <state> <theme> [width height] [--out=path.png] [--scale=2] [--full] [--tab=Progress] [--menu="Daily alerts"] [--run="Run now"] [--drawer="Impella Controller" [--people]]
 //   node scripts/preview/shot.cjs dashboard none-affected light
 //   node scripts/preview/shot.cjs panel first-run dark 360 262 --out=/tmp/panel.png
 //
@@ -39,6 +39,19 @@ const [view = 'dashboard', state = 'ready', theme = 'light', width, height] = po
         item.click();
       }, flag('menu'));
       await new Promise((resolve) => setTimeout(resolve, 700));
+    }
+    if (flag('drawer')) {
+      // Opens the details drawer of a device by its name, and with --people also expands "Who handles this ward".
+      await opened.frame.evaluate((name) => {
+        const button = [...document.querySelectorAll('button')].find((b) => (b.getAttribute('aria-label') || '').startsWith(`Details for ${name}`));
+        if (!button) throw new Error(`No device "${name}"`);
+        button.click();
+      }, flag('drawer'));
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      if (args.includes('--people')) {
+        await opened.frame.evaluate(() => [...document.querySelectorAll('[role="dialog"] button')].find((b) => /Who handles this ward/.test(b.textContent)).click());
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }
     }
     if (flag('run')) {
       await opened.frame.evaluate((name) => {

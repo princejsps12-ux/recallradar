@@ -95,7 +95,11 @@ async function tour(s, theme) {
     await waitFor(frame, 'Z-');
   });
   await step('device drawer', () => click(frame, 'Details for', { exact: false, selector: 'button' }));
-  await step('drawer card open', () => frame.evaluate(() => document.querySelector('[role="dialog"] button[aria-expanded="false"]').click()));
+  await step('drawer card open', () => frame.evaluate(() => document.querySelector('[role="dialog"] section[aria-label^="Recall"] button[aria-expanded="false"]').click()));
+  await step('drawer: who handles this ward', async () => {
+    await click(frame, 'Who handles this ward', { exact: false, selector: 'button' });
+    await frame.waitForFunction(() => /Team: |No team is set/.test(document.body.innerText), { timeout: 8000 });
+  });
   await step('drawer split button menu', () => click(frame, 'More ways to create the task', { exact: false, selector: 'button' }));
   await step('drawer closed', async () => { await escape(); await escape(); });
   await step('more actions menu', () => click(frame, 'More actions', { selector: 'button' }));
@@ -167,6 +171,29 @@ async function alertsTour(s, theme) {
   }
 }
 
+// The "Who handles this ward" card for a ward with two projects, one with no project and a person whose work cannot be read, and
+// for a graph that refuses: every state must be readable, keyboard reachable and inside the drawer.
+async function peopleTour(s, theme) {
+  const cases = [['in-progress', 'Details for Impella Controller', 'Cath Lab, two projects'], ['in-progress', 'Details for Digital ECG', 'Cardiology, no project and one person unread'], ['no-graph', 'Details for Impella Controller', 'the graph refuses']];
+  for (const [state, label, what] of cases) {
+    const name = `tour/${theme}/who handles this ward, ${what}`;
+    try {
+      const opened = await open(s, { view: 'dashboard', state, theme, axe: true });
+      const { frame } = opened;
+      await click(frame, label, { exact: false, selector: 'button' });
+      await sleep(400);
+      await click(frame, 'Who handles this ward', { exact: false, selector: 'button' });
+      await frame.waitForFunction(() => /Team: |No team is set|Could not read the Teamwork Graph/.test(document.body.innerText), { timeout: 8000 });
+      await sleep(350);
+      await inspect(opened, name);
+      await opened.page.close();
+    } catch (error) {
+      results.push({ name, problems: [`step failed: ${error.message}`], warnings: [] });
+      console.log(`FAIL ${name}\n       step failed: ${error.message}`);
+    }
+  }
+}
+
 // The Progress tab on a phone: long product text must be cut with an ellipsis, never push the page wider than the screen.
 async function progressPhone(s, theme) {
   const spec = { view: 'dashboard', state: 'in-progress', theme, width: 390, height: 844, axe: true };
@@ -225,6 +252,7 @@ async function notConnectedTour(s, theme) {
     for (const theme of quick ? ['light'] : ['light', 'dark']) {
       await tour(s, theme);
       await progressPhone(s, theme);
+      await peopleTour(s, theme);
       await alertsTour(s, theme);
       await notConnectedTour(s, theme);
     }

@@ -21,7 +21,7 @@ data the RecallRadar dashboard shows.
 | "Is this model / serial / device affected?" | `check_device` | Needs a model, serial/lot or device id. Only devices in the hospital list can be checked. |
 | "What is recall Z-...?" / "Explain this recall" | `recall_details` | Needs the FDA recall number. Gives what is wrong, how serious, affected devices, what to do, links. |
 | "Create tasks for ..." | `create_remediation_tasks` | **Two steps, see below.** |
-| "Who handles the ICU?" / "Who should get this task?" | `who_handles_ward` | Needs a `ward`. Reads the ward's team and members from the Teamwork Graph (read-only) and suggests one person. If the ward has no team it says so: tell the user to map it in the RecallRadar panel (Ward teams) and never guess. |
+| "Who handles the ICU?" / "Who should get this task?" | `who_handles_ward` | Needs a `ward`. Reads the ward's team and members, the Jira project the team works in (and its lead) and how many open work items each person has, all from the Teamwork Graph (read-only), and suggests one person. Quote the project, lead and counts only as returned (`worksIn`, `openWorkPerPerson`); either may be missing when the graph cannot say. If the ward has no team it says so: tell the user to map it in the RecallRadar panel (Ward teams) and never guess. |
 | "Make a Confluence page for this recall" | `create_recall_page` | Needs a `spaceKey`: call without it to list spaces and ask. Say which recalls and which space, and get a yes first. Updates an existing page instead of duplicating it. |
 
 ## Rules that always apply

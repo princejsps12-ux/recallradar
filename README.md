@@ -106,7 +106,7 @@ The due-date rule, how duplicates are prevented and the limits: [`docs/TASKS.md`
 
 ## Teamwork Graph (read-only)
 
-RecallRadar reads **teams and their members** from the Teamwork Graph as the signed-in person, and never writes to it. Two queries (a person's teams, a team's members) map each hospital ward to a team and suggest, never impose, an assignee: the team member with the fewest open RecallRadar tasks. Nothing is assigned unless you choose **Create and assign to …**, and nothing about a person is stored. The exact queries, what is stored and what was verified live: [`docs/TEAMWORK_GRAPH.md`](docs/TEAMWORK_GRAPH.md).
+RecallRadar reads from the Teamwork Graph as the signed-in person, and never writes to it. Four read-only queries: a person's **teams** and a team's **members** map each hospital ward to a team and suggest, never impose, an assignee (the team member with the fewest open RecallRadar tasks); the **Jira projects a team works in, with each project's lead**, and the **open Jira work assigned to each member** answer "who owns this ward, and how busy are they?" in the recall drawer's **Who handles this ward** card (read when you open it, shown to you, never saved). The Rovo agent's `who_handles_ward` gives the same picture. Nothing is assigned unless you choose **Create and assign to …**, and nothing about a person is stored. The exact queries, what is stored and what was verified live: [`docs/TEAMWORK_GRAPH.md`](docs/TEAMWORK_GRAPH.md).
 
 ## The Rovo agent
 
@@ -210,7 +210,8 @@ Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), 
 | `read:jira-work` | Jira issue panel; finding existing RecallRadar tasks. |
 | `write:jira-work` | Creating tasks (as the clicking user). |
 | `read:space:confluence`, `read:page:confluence`, `write:page:confluence` | The Confluence recall pages: list spaces, find a page by title, create or update it (as the person chatting). |
-| `read:graph:team:atlassian`, `read:graph:user:atlassian` | The two read-only Teamwork Graph queries (a user's teams, a team's members), run as the signed-in person. |
+| `read:graph:team:atlassian`, `read:graph:user:atlassian` | Teams a person is in, the members of a team, and (for the project lead) a person's name: read-only Teamwork Graph queries, run as the signed-in person. |
+| `read:graph:project:jira`, `read:graph:issue:jira` | The Jira projects a team is linked to (and each project's lead) and the Jira work assigned to a person, for the recall drawer's "Who handles this ward" card. Read-only, as the signed-in person; the graph returns only what that person may see. |
 | `storage:app` | The device list, the saved check, and the ward-to-team mapping in Forge storage. |
 | External fetch: `api.fda.gov` | Recall data from openFDA. |
 
