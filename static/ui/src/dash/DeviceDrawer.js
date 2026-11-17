@@ -12,7 +12,7 @@ import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
 import VisuallyHidden from '@atlaskit/visually-hidden';
 import LinkExternalIcon from '@atlaskit/icon/core/link-external';
 import { router } from '@forge/bridge';
-import { sp, cap, color, muted, ClassLozenge, MatchLozenge, LinkLike, formatDay } from '../ui/kit';
+import { sp, cap, color, muted, ClassLozenge, MatchLozenge, TaskStatusLozenge, LinkLike, formatDay } from '../ui/kit';
 import { matchesForDevice } from '../dashboardData.mjs';
 import { pairOf } from '../data/tasks';
 import { openIssue } from './DevicesTable';
@@ -47,7 +47,7 @@ function Field({ label, children }) {
 // One recall for this device. The WHOLE header row is the toggle (recall number, class and match included), so the
 // click target is the full width of the card; the task link or the Create button sits beside it, not inside it
 // (a button cannot hold another button). Expanded, it shows the facts and the reasons.
-function RecallCard({ m, result, tasks, suggestion, canCreate, busy, isOpen, onToggle, onCreate }) {
+function RecallCard({ m, result, tasks, taskInfo, suggestion, canCreate, busy, isOpen, onToggle, onCreate }) {
   const [hover, setHover] = useState(false);
   const key = tasks[pairOf(m)];
   const details = (result.recallDetails || {})[m.recallNumber] || {};
@@ -76,6 +76,7 @@ function RecallCard({ m, result, tasks, suggestion, canCreate, busy, isOpen, onT
             <>
               <span>Task:</span>
               <LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>
+              <TaskStatusLozenge info={taskInfo[pairOf(m)]} />
             </>
           ) : suggestion ? (
             // "Create task" is the main action and assigns nobody. The menu offers the one suggested person: people are
@@ -128,7 +129,7 @@ function RecallCard({ m, result, tasks, suggestion, canCreate, busy, isOpen, onT
 // FDA says is wrong, and the Jira task (or the buttons to create one). It slides in from the right (Atlaskit's own
 // Drawer is always left-anchored). Keyboard: focus moves in when it opens, Tab stays inside, Escape closes it,
 // and focus returns to what opened it.
-export default function DeviceDrawer({ deviceId, result, tasks, suggestions, teams, canCreate, busy, onCreate, onCreateMany, onClose }) {
+export default function DeviceDrawer({ deviceId, result, tasks, taskInfo = {}, suggestions, teams, canCreate, busy, onCreate, onCreateMany, onClose }) {
   const matches = deviceId ? matchesForDevice(result, deviceId) : [];
   const first = matches[0];
   const panel = useRef(null);
@@ -214,6 +215,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                       m={m}
                       result={result}
                       tasks={tasks}
+                      taskInfo={taskInfo}
                       suggestion={suggestions[pairOf(m)]}
                       canCreate={canCreate}
                       busy={busy}

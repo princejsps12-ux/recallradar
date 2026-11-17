@@ -1,6 +1,7 @@
 // The three Jira calls task creation needs, behind a small interface (see taskService.js).
 //
 //   findByLabels(labels)        -> Map(label -> issueKey) for tasks that already exist
+//   findTasks(labels)           -> Map(label -> { key, status, category }): the same, with Jira's status of each task
 //   taskIssueTypeId(projectKey) -> id of the project's "Task" issue type (or null)
 //   bulkCreate(fieldsList)      -> { created: [{ index, key }], errors: [{ index, message }] }
 //
@@ -30,6 +31,17 @@ export function buildLabelsJql(labels) {
 // Every RecallRadar task carries the label "recallradar" (APP_LABEL); "not done" is Jira's own status category.
 export const ALL_TASKS_JQL = 'labels = "recallradar"';
 export const OPEN_TASKS_JQL = 'labels = "recallradar" AND statusCategory != Done';
+
+// How a task's status is reported to the rest of the app: { key, status, category }. `status` is the name the project gave it
+// ("In review"), `category` is Jira's own grouping of statuses: 'new' (to do), 'indeterminate' (in progress) or 'done'. The
+// category is what counts, because every project names its statuses differently. A status without a known category counts as
+// 'new' (not resolved): never call a task done on a guess.
+export const STATUS_CATEGORIES = Object.freeze(['new', 'indeterminate', 'done']);
+export function taskFromIssue(issue) {
+  const status = issue && issue.fields && issue.fields.status;
+  const category = status && status.statusCategory && status.statusCategory.key;
+  return { key: issue.key, status: (status && status.name) || '', category: STATUS_CATEGORIES.includes(category) ? category : 'new' };
+}
 
 // Issues from a search -> Map(accountId -> how many are assigned to that person).
 export function countByAssignee(issues) {
@@ -105,24 +117,34 @@ async function readError(response) {
 }
 
 export function createJiraClient({ request, route }) {
-  async function findByLabels(labels) {
+  // One JQL search as the signed-in person; Jira's answer, or an Error carrying the status.
+  async function search(body) {
+    const response = await request(route`/rest/api/3/search/jql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw await readError(response);
+    return response.json();
+  }
+
+  async function findTasks(labels) {
     const found = new Map();
     const wanted = new Set(labels);
     for (const group of chunk(labels, JQL_LABELS_PER_QUERY)) {
-      const response = await request(route`/rest/api/3/search/jql`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ jql: buildLabelsJql(group), fields: ['labels'], maxResults: SEARCH_RESULT_LIMIT }),
-      });
-      if (!response.ok) throw await readError(response);
-      const body = await response.json();
+      const body = await search({ jql: buildLabelsJql(group), fields: ['labels', 'status'], maxResults: SEARCH_RESULT_LIMIT });
       for (const issue of body.issues || []) {
         for (const label of (issue.fields && issue.fields.labels) || []) {
-          if (wanted.has(label) && !found.has(label)) found.set(label, issue.key);
+          if (wanted.has(label) && !found.has(label)) found.set(label, taskFromIssue(issue));
         }
       }
     }
     return found;
+  }
+
+  async function findByLabels(labels) {
+    const tasks = await findTasks(labels);
+    return new Map([...tasks].map(([label, task]) => [label, task.key]));
   }
 
   async function taskIssueTypeId(projectKey) {
@@ -149,25 +171,14 @@ export function createJiraClient({ request, route }) {
   // "fewest open tasks" assignee suggestion. Unassigned tasks are not counted. One search of at most
   // SEARCH_RESULT_LIMIT issues is enough for a suggestion, and a failure only means "no load data".
   async function openTaskCounts() {
-    const response = await request(route`/rest/api/3/search/jql`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ jql: OPEN_TASKS_JQL, fields: ['assignee'], maxResults: SEARCH_RESULT_LIMIT }),
-    });
-    if (!response.ok) throw await readError(response);
-    return countByAssignee((await response.json()).issues);
+    const body = await search({ jql: OPEN_TASKS_JQL, fields: ['assignee'], maxResults: SEARCH_RESULT_LIMIT });
+    return countByAssignee(body.issues);
   }
 
   // How many RecallRadar tasks are open and how many are done, for the dashboard. One search of at most
   // SEARCH_RESULT_LIMIT issues; `capped` says there may be more than were counted.
   async function taskStatusCounts() {
-    const response = await request(route`/rest/api/3/search/jql`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ jql: ALL_TASKS_JQL, fields: ['status'], maxResults: SEARCH_RESULT_LIMIT }),
-    });
-    if (!response.ok) throw await readError(response);
-    const issues = (await response.json()).issues || [];
+    const issues = (await search({ jql: ALL_TASKS_JQL, fields: ['status'], maxResults: SEARCH_RESULT_LIMIT })).issues || [];
     return { ...countByStatusCategory(issues), capped: issues.length >= SEARCH_RESULT_LIMIT };
   }
 
@@ -203,5 +214,5 @@ export function createJiraClient({ request, route }) {
     return { administrator: has('ADMINISTER'), projectAdministrator: has('ADMINISTER_PROJECTS') };
   }
 
-  return { findByLabels, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, adminRoles };
+  return { findByLabels, findTasks, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, adminRoles };
 }

@@ -7,6 +7,10 @@ import {
   wardsOf,
   filterMatches,
   taskProgress,
+  taskStatusLabel,
+  taskStatusAppearance,
+  progressParts,
+  progressText,
   taskSummaryParts,
   screenFor,
   NO_WARD,
@@ -114,3 +118,25 @@ test('the tasks part of the summary line says what the counts are, or why there 
   assert.deepEqual(taskSummaryParts(taskProgress({ open: 1, done: 0 }), 'ok'), { lead: '1', rest: 'task open, 0 done' }, 'one task is singular');
   assert.deepEqual(taskSummaryParts(taskProgress({ open: 100, done: 20 }), 'ok', true), { lead: '100+', rest: 'tasks open, 20+ done' }, 'a capped count is "at least"');
 });
+
+test('taskStatusLabel: the project\'s own word, else the plain name of Jira\'s category; the appearance follows the category', () => {
+  assert.equal(taskStatusLabel({ status: 'In review', category: 'indeterminate' }), 'In review');
+  assert.equal(taskStatusLabel({ status: '', category: 'done' }), 'Done');
+  assert.equal(taskStatusLabel({ category: 'indeterminate' }), 'In progress');
+  assert.equal(taskStatusLabel({ category: 'new' }), 'To do');
+  assert.equal(taskStatusLabel(undefined), 'To do', 'no information is "to do", never "done"');
+  assert.equal(taskStatusAppearance({ category: 'done' }), 'success');
+  assert.equal(taskStatusAppearance({ category: 'indeterminate' }), 'inprogress');
+  assert.equal(taskStatusAppearance({ category: 'new' }), 'default');
+  assert.equal(taskStatusAppearance(undefined), 'default');
+});
+
+test('progressParts: four parts in drawing order with their share of the bar; progressText leaves out the zeros', () => {
+  const group = { pairs: 10, done: 5, inProgress: 2, open: 1, noTask: 2 };
+  assert.deepEqual(progressParts(group).map((p) => [p.key, p.count, p.share]), [['done', 5, 50], ['inProgress', 2, 20], ['open', 1, 10], ['noTask', 2, 20]]);
+  assert.equal(progressText(group), '5 done, 2 in progress, 1 to do, 2 no task yet');
+  assert.equal(progressText({ pairs: 3, done: 3, inProgress: 0, open: 0, noTask: 0 }), '3 done');
+  assert.equal(progressText({ pairs: 0, done: 0, inProgress: 0, open: 0, noTask: 0 }), '');
+  assert.deepEqual(progressParts(null).map((p) => p.share), [0, 0, 0, 0], 'no group is an empty bar, not NaN');
+});
+

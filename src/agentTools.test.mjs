@@ -417,6 +417,11 @@ function setupTasks({ existing = {}, bulkError = null } = {}) {
       for (const label of labels) if (existingMap.has(label)) found.set(label, existingMap.get(label));
       return found;
     },
+    // The same lookup with Jira's status of each task (every fake task is "To Do", i.e. category new).
+    async findTasks(labels) {
+      const keys = await this.findByLabels(labels);
+      return new Map([...keys].map(([label, key]) => [label, { key, status: 'To Do', category: 'new' }]));
+    },
     async taskIssueTypeId() {
       return '10002';
     },

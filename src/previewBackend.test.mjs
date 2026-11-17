@@ -225,3 +225,38 @@ test('the ward team mapping is refused for a person who is neither a Jira admini
   assert.equal((await projectAdmin.invoke('getCapabilities', {})).canManageTeams, true);
   assert.notEqual((await projectAdmin.invoke('setWardTeam', { ward: 'ICU', teamAri: '' })).notAllowed, true);
 });
+
+test('task status and progress: the preview gives Jira-like statuses and the same roll-up as the real code', async () => {
+  const { summarizeProgress } = await import('./progress.js');
+  const { openTaskMatches } = await import('./taskRules.js');
+  for (const scenario of ['ready', 'in-progress', 'all-done']) {
+    const backend = make(scenario);
+    const saved = await backend.invoke('getSavedMatches');
+    const pairs = affected(saved.result).map(pairOf);
+    const { tasks, states } = await backend.invoke('getTaskStates', { pairs });
+    assert.deepEqual(Object.keys(states).sort(), Object.keys(tasks).sort(), `${scenario}: a status for every task`);
+    for (const state of Object.values(states)) assert.ok(['new', 'indeterminate', 'done'].includes(state.category) && state.status && state.key, scenario);
+    const preview = (await backend.invoke('getProgress')).progress;
+    assert.deepEqual(preview, JSON.parse(JSON.stringify(summarizeProgress(openTaskMatches(saved.result), states))), `${scenario}: the preview rolls up like src/progress.js`);
+  }
+  const inProgress = (await make('in-progress').invoke('getProgress')).progress;
+  assert.equal(inProgress.overall.done, 3, 'the scenario says three of the eight tasks are done');
+  assert.equal(inProgress.overall.withTask, 8);
+  assert.ok(inProgress.overall.noTask > 0 && inProgress.overall.inProgress > 0 && inProgress.overall.open > 0);
+  const allDone = (await make('all-done').invoke('getProgress')).progress;
+  assert.equal(allDone.overall.noTask, 0);
+  const ready = (await make('ready').invoke('getProgress')).progress;
+  assert.equal(ready.overall.withTask, 0, 'no tasks yet');
+  assert.equal(ready.overall.resolvedPercent, 0);
+});
+
+test('creating a task in the preview shows up in the progress as a task to do', async () => {
+  const backend = make('ready');
+  const saved = await backend.invoke('getSavedMatches');
+  const first = affected(saved.result)[0];
+  await backend.invoke('createTasks', { pairs: [pairOf(first)], projectKey: 'BIOMED' });
+  const after = (await backend.invoke('getProgress')).progress;
+  assert.equal(after.overall.withTask, 1);
+  assert.equal(after.overall.open, 1, 'a new task is not done');
+});
+

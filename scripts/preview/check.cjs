@@ -116,6 +116,11 @@ async function tour(s, theme) {
   await step('remove dialog closed', escape);
   await step('create all dialog', () => click(frame, 'Create all', { exact: false, selector: 'button' }));
   await step('create all dialog closed', escape);
+  await step('progress tab', async () => {
+    await click(frame, 'Progress', { selector: '[role="tab"]' });
+    await waitFor(frame, 'By recall');
+  });
+  await step('progress: all recalls', () => click(frame, 'Show all', { exact: false, selector: 'button' }));
   await step('ward teams tab', async () => {
     await click(frame, 'Ward teams', { exact: false, selector: '[role="tab"]' });
     await waitFor(frame, 'Choose the team for each ward');
@@ -126,6 +131,23 @@ async function tour(s, theme) {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
   }));
   await opened.page.close();
+}
+
+// The Progress tab on a phone: long product text must be cut with an ellipsis, never push the page wider than the screen.
+async function progressPhone(s, theme) {
+  const spec = { view: 'dashboard', state: 'in-progress', theme, width: 390, height: 844, axe: true };
+  const name = `progress tab/${theme}/390px`;
+  try {
+    const opened = await open(s, spec);
+    await click(opened.frame, 'Progress', { selector: '[role="tab"]' });
+    await waitFor(opened.frame, 'By recall');
+    await sleep(350);
+    await inspect(opened, name);
+    await opened.page.close();
+  } catch (error) {
+    results.push({ name, problems: [`step failed: ${error.message}`], warnings: [] });
+    console.log(`FAIL ${name}\n       step failed: ${error.message}`);
+  }
 }
 
 // The Confluence dialog on a site where the app is installed in Jira only (Confluence is an optional connection): it must say
@@ -168,6 +190,7 @@ async function notConnectedTour(s, theme) {
     }
     for (const theme of quick ? ['light'] : ['light', 'dark']) {
       await tour(s, theme);
+      await progressPhone(s, theme);
       await notConnectedTour(s, theme);
     }
   } finally {

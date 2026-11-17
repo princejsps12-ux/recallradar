@@ -32,6 +32,8 @@ export default function useRecallData({ withProjects = false, light = false, wit
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(null); // null = no check running
   const [tasks, setTasks] = useState({});
+  const [taskInfo, setTaskInfo] = useState({}); // { "recall|device": { status, category } }: Jira's status of each task
+  const [taskProgress, setTaskProgress] = useState({ state: 'idle', data: null }); // 'idle' | 'loading' | 'ready' | 'error'
   const [summary, setSummary] = useState(null);
   const [summaryState, setSummaryState] = useState('loading'); // 'loading' | 'ok' | 'error'
   const [tasksReady, setTasksReady] = useState(false); // task links known (so rows do not change after they appear)
@@ -191,7 +193,10 @@ export default function useRecallData({ withProjects = false, light = false, wit
     const states = pairs.length
       ? invoke('getTaskStates', { pairs })
           .then((r) => {
-            if (!cancelled && r && r.ok) setTasks(r.tasks);
+            if (!cancelled && r && r.ok) {
+              setTasks(r.tasks);
+              setTaskInfo(r.states || {});
+            }
           })
           .catch(() => {})
       : Promise.resolve();
@@ -232,6 +237,15 @@ export default function useRecallData({ withProjects = false, light = false, wit
     };
   }, [checkedAt, mappingSignature]); // eslint-disable-line
 
+  // How far along the work is, for the Progress tab: read when the tab is opened and again when the result or the tasks change.
+  // The numbers already on screen stay until the new ones arrive.
+  const loadProgress = useCallback(() => {
+    setTaskProgress((previous) => ({ state: previous.data ? 'refreshing' : 'loading', data: previous.data }));
+    invoke('getProgress')
+      .then((r) => setTaskProgress((previous) => (r && r.ok ? { state: 'ready', data: r.progress } : { state: 'error', data: previous.data })))
+      .catch(() => setTaskProgress((previous) => ({ state: 'error', data: previous.data })));
+  }, []);
+
   const setProjectKey = (key) => {
     setProjectKeyState(key);
     try {
@@ -251,7 +265,11 @@ export default function useRecallData({ withProjects = false, light = false, wit
       suggestions,
       projectKey: withProjects || fixedProjectKey ? projectKey : undefined,
       onProgress: (done, total) => setCreating({ active: true, done, total }),
-      onTasks: (known) => setTasks((previous) => ({ ...previous, ...known })),
+      onTasks: (known) => {
+        setTasks((previous) => ({ ...previous, ...known }));
+        // A task made a moment ago is in its first status ("to do"); Jira's own word for it comes with the next reading.
+        setTaskInfo((previous) => ({ ...previous, ...Object.fromEntries(Object.keys(known).map((pair) => [pair, { status: '', category: 'new' }])) }));
+      },
     });
     setCreating({ active: false, done: 0, total: 0 });
     const text = summarize(totals);
@@ -306,7 +324,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
   };
 
   return {
-    devicesCount, importedCount, canManage, canManageTeams, result, error, progress, tasks, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, loadRecent, projects, projectKey, creating, note,
+    devicesCount, importedCount, canManage, canManageTeams, result, error, progress, tasks, taskInfo, taskProgress, loadProgress, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, loadRecent, projects, projectKey, creating, note,
     setProjectKey, setNote, load, begin, createTasks, loadDemo, loadWardInfo, afterDevicesChanged,
   };
 }

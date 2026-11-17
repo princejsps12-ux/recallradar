@@ -36,7 +36,7 @@
   // that is not in this list, so the preview cannot quietly fall behind the app.
   const RESOLVERS = [
     'listDevices', 'loadDemoHospital', 'importDevices', 'removeImportedDevices', 'clearDevices', 'getSavedMatches', 'startCheck', 'getCheckStatus',
-    'getTaskStates', 'getTaskSummary', 'createTasks', 'getWardTeams', 'listTeams', 'setWardTeam', 'suggestAssignees', 'listProjects', 'fetchRecalls',
+    'getTaskStates', 'getProgress', 'getTaskSummary', 'createTasks', 'getWardTeams', 'listTeams', 'setWardTeam', 'suggestAssignees', 'listProjects', 'fetchRecalls',
     'listSpaces', 'createRecallPage', 'getCapabilities',
   ];
 
@@ -138,6 +138,52 @@
 
     const findMatch = (recallNumber, deviceId) => (st.result ? st.result.matches.find((m) => m.recallNumber === recallNumber && m.deviceId === deviceId) : null);
     const wards = () => [...new Set(st.devices.map((d) => d.ward).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    // Jira's status of a task: the first `done` tasks are done, the rest alternate between to do and in progress.
+    const statusOf = (pair) => {
+      const index = Object.keys(st.tasks).indexOf(pair);
+      if (index < Math.min(st.done, Object.keys(st.tasks).length)) return { status: 'Done', category: 'done' };
+      return (index - st.done) % 2 === 0 ? { status: 'To Do', category: 'new' } : { status: 'In Progress', category: 'indeterminate' };
+    };
+    const isClosedRecall = (recallNumber) => {
+      const details = (st.result && st.result.recallDetails && st.result.recallDetails[recallNumber]) || null;
+      return Boolean(details && ['terminated', 'completed'].includes(String(details.status).toLowerCase()));
+    };
+    // One line of a long product description, cut at a whole word (the same as shorten() in src/progress.js).
+    const shorten = (text, length = 140) => {
+      const clean = String(text || '').replace(/\s+/g, ' ').trim();
+      return clean.length <= length ? clean : `${clean.slice(0, length).replace(/\s+\S*$/, '')}…`;
+    };
+    // The same roll-up as src/progress.js (src/previewBackend.test.mjs fails when the two give different answers).
+    const rollUp = () => {
+      const matches = st.result ? st.result.matches.filter((m) => isAffected(m) && !isClosedRecall(m.recallNumber)) : [];
+      const group = (extra) => Object.assign({}, extra, { pairs: 0, noTask: 0, open: 0, inProgress: 0, done: 0, ids: new Set() });
+      const add = (g, bucket, m) => { g.pairs += 1; g[bucket] += 1; g.ids.add(m.deviceId); };
+      const finish = (g) => {
+        const { ids, ...rest } = g;
+        const percent = !rest.pairs ? 0 : rest.done >= rest.pairs ? 100 : Math.min(99, Math.round((rest.done / rest.pairs) * 100));
+        return Object.assign({}, rest, { devices: ids.size, withTask: rest.pairs - rest.noTask, resolvedPercent: percent });
+      };
+      const overall = group({});
+      const recalls = new Map();
+      const wardMap = new Map();
+      matches.forEach((m) => {
+        const pair = matchPair(m);
+        const info = st.tasks[pair] ? statusOf(pair) : null;
+        const bucket = !info ? 'noTask' : info.category === 'done' ? 'done' : info.category === 'indeterminate' ? 'inProgress' : 'open';
+        add(overall, bucket, m);
+        if (!recalls.has(m.recallNumber)) recalls.set(m.recallNumber, group({ recallNumber: m.recallNumber, recallClass: m.recallClass || '', firm: m.firm || '', product: shorten(m.product) }));
+        add(recalls.get(m.recallNumber), bucket, m);
+        const ward = m.ward || 'No ward';
+        if (!wardMap.has(ward)) wardMap.set(ward, group({ ward }));
+        add(wardMap.get(ward), bucket, m);
+      });
+      const rank = (c) => ({ I: 0, II: 1, III: 2 }[c] ?? 0);
+      return {
+        overall: finish(overall),
+        byRecall: [...recalls.values()].map(finish).sort((a, b) => rank(a.recallClass) - rank(b.recallClass) || a.resolvedPercent - b.resolvedPercent || a.recallNumber.localeCompare(b.recallNumber)),
+        byWard: [...wardMap.values()].map(finish).sort((a, b) => a.resolvedPercent - b.resolvedPercent || a.ward.localeCompare(b.ward)),
+      };
+    };
     const summary = () => {
       const total = Object.keys(st.tasks).length;
       const done = Math.min(st.done, total);
@@ -238,11 +284,19 @@
       },
       getTaskStates({ payload }) {
         const tasks = {};
+        const states = {};
         ((payload && payload.pairs) || []).forEach((p) => {
-          const key = st.tasks[pairKey(p.recallNumber, p.deviceId)];
-          if (key) tasks[pairKey(p.recallNumber, p.deviceId)] = key;
+          const pair = pairKey(p.recallNumber, p.deviceId);
+          const key = st.tasks[pair];
+          if (key) {
+            tasks[pair] = key;
+            states[pair] = Object.assign({ key }, statusOf(pair));
+          }
         });
-        return { ok: true, tasks };
+        return { ok: true, tasks, states };
+      },
+      getProgress() {
+        return { ok: true, progress: rollUp() };
       },
       getTaskSummary() {
         return { ok: true, summary: summary() };

@@ -8,6 +8,7 @@ import {
   createJiraClient,
   countByAssignee,
   countByStatusCategory,
+  taskFromIssue,
   ALL_TASKS_JQL,
   OPEN_TASKS_JQL,
 } from './jiraClient.js';
@@ -261,4 +262,28 @@ test('listProjects still works when the recent list cannot be read', async () =>
 test('listProjects throws when Jira refuses the project list', async () => {
   const { request } = fakeRequest([{ status: 401, json: {} }]);
   await assert.rejects(createJiraClient({ request, route }).listProjects(), /401/);
+});
+
+// --- task status (closure tracking) ---------------------------------------------------------------------------------
+
+test('taskFromIssue reads the status name and Jira\'s own category, and never calls an unknown task done', () => {
+  const issue = (status) => ({ key: 'MOBL-1', fields: { status } });
+  assert.deepEqual(taskFromIssue(issue({ name: 'Closed', statusCategory: { key: 'done' } })), { key: 'MOBL-1', status: 'Closed', category: 'done' });
+  assert.deepEqual(taskFromIssue(issue({ name: 'In review', statusCategory: { key: 'indeterminate' } })), { key: 'MOBL-1', status: 'In review', category: 'indeterminate' });
+  assert.deepEqual(taskFromIssue(issue({ name: 'Backlog', statusCategory: { key: 'new' } })), { key: 'MOBL-1', status: 'Backlog', category: 'new' });
+  assert.equal(taskFromIssue(issue({ name: 'Odd', statusCategory: { key: 'undefined' } })).category, 'new');
+  assert.deepEqual(taskFromIssue({ key: 'MOBL-2', fields: {} }), { key: 'MOBL-2', status: '', category: 'new' });
+});
+
+test('findTasks asks Jira for the labels and the status, and maps each label to its task with its status', async () => {
+  const issues = [
+    { key: 'MOBL-1', fields: { labels: ['recallradar', 'recallradar-Z-1-a'], status: { name: 'Done', statusCategory: { key: 'done' } } } },
+    { key: 'MOBL-2', fields: { labels: ['recallradar', 'recallradar-Z-2-a', 'other'], status: { name: 'In progress', statusCategory: { key: 'indeterminate' } } } },
+  ];
+  const { request, calls } = fakeRequest([{ status: 200, json: { issues } }, { status: 200, json: { issues } }]);
+  const found = await createJiraClient({ request, route }).findTasks(['recallradar-Z-1-a', 'recallradar-Z-2-a']);
+  assert.deepEqual(calls[0].body.fields, ['labels', 'status']);
+  assert.deepEqual([...found], [['recallradar-Z-1-a', { key: 'MOBL-1', status: 'Done', category: 'done' }], ['recallradar-Z-2-a', { key: 'MOBL-2', status: 'In progress', category: 'indeterminate' }]]);
+  const keys = await createJiraClient({ request, route }).findByLabels(['recallradar-Z-1-a']);
+  assert.deepEqual([...keys], [['recallradar-Z-1-a', 'MOBL-1']], 'findByLabels still answers with keys only');
 });

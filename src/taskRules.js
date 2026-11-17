@@ -12,6 +12,21 @@ export function isTaskWorthy(match) {
   return TASK_CONFIDENCES.includes(match.confidence);
 }
 
+// openFDA recall statuses that mean the recall is over. Anything else (including "Ongoing", or no status in an older saved
+// check) counts as open. static/ui/src/dashboardData.mjs keeps its own copy (the UI bundle cannot import from src/).
+export const CLOSED_STATUSES = Object.freeze(['terminated', 'completed']);
+
+export function isRecallClosed(details) {
+  return Boolean(details && CLOSED_STATUSES.includes(String(details.status).toLowerCase()));
+}
+
+// The matches a person has to act on: exact or likely, and the recall is still open.
+export function openTaskMatches(result) {
+  if (!result || !Array.isArray(result.matches)) return [];
+  const details = result.recallDetails || {};
+  return result.matches.filter((m) => isTaskWorthy(m) && !isRecallClosed(details[m.recallNumber]));
+}
+
 // --- Due date (the rule, and the reason for every number) --------------------------------------------
 //
 // FDA classes recalls by how dangerous the problem is (21 CFR 7.3):

@@ -55,7 +55,15 @@ const base = {
   fetchRecalls: { ok: true, recalls: [{ recallNumber: 'Z-77', recallClass: 'II', firm: 'ACME', product: 'Widget', date: '2026-11-01' }] },
   getWardTeams: { ok: true, mappings: [{ ward: 'ICU', teamAri: 'ari:cloud:identity::team/11111111-aaaa-4bbb-8ccc-111111111111', teamName: 'Team Atlas' }], wards: ['ER', 'ICU'] },
   getCheckStatus: { ok: true, job: null },
-  getTaskStates: { ok: true, tasks: { 'Z-1|d1': 'MOBL-5' } },
+  getTaskStates: { ok: true, tasks: { 'Z-1|d1': 'MOBL-5' }, states: { 'Z-1|d1': { key: 'MOBL-5', status: 'In review', category: 'indeterminate' } } },
+  getProgress: { ok: true, progress: {
+    overall: { pairs: 3, devices: 3, noTask: 2, open: 0, inProgress: 1, done: 0, withTask: 1, resolvedPercent: 0 },
+    byRecall: [
+      { recallNumber: 'Z-1', recallClass: 'I', firm: 'Firm', product: 'p', pairs: 1, devices: 1, noTask: 0, open: 0, inProgress: 1, done: 0, withTask: 1, resolvedPercent: 0 },
+      { recallNumber: 'Z-2', recallClass: 'II', firm: 'Firm', product: 'p', pairs: 1, devices: 1, noTask: 1, open: 0, inProgress: 0, done: 0, withTask: 0, resolvedPercent: 0 },
+    ],
+    byWard: [{ ward: 'ER', pairs: 1, devices: 1, noTask: 1, open: 0, inProgress: 0, done: 0, withTask: 0, resolvedPercent: 0 }, { ward: 'ICU', pairs: 2, devices: 2, noTask: 1, open: 0, inProgress: 1, done: 0, withTask: 1, resolvedPercent: 0 }],
+  } },
   getTaskSummary: { ok: true, summary: { open: 3, done: 1, capped: false } },
   listProjects: { ok: true, projects: [{ key: 'MOBL', name: 'Mobile' }], recent: ['MOBL'] },
   suggestAssignees: { ok: true, suggestions: {}, skipped: [] },
@@ -112,6 +120,8 @@ const pickOption = async (el, inputId, optionText) => {
     check('there are no separate stat cards any more', !el.querySelector('[role="group"][aria-label="Open recalls"]') && !el.querySelector('[role="group"][aria-label="Tasks open"]'));
     check('table has a row per affected device and, with 3 rows, no pager', el.querySelectorAll('tbody tr').length === 3 && !el.querySelector('nav[aria-label="Pages of affected devices"]'));
     check('team name from the graph is shown', /Team Atlas/.test(text(el)));
+    const taskRow = [...el.querySelectorAll('tbody tr')].find((r) => /MOBL-5/.test(r.textContent));
+    check('a task shows Jira\'s own status next to its key', Boolean(taskRow) && /In review/.test(taskRow.textContent) && !calls.includes('getProgress'));
     check('every row has one way in: no "Details" buttons, the device name opens the details', ![...el.querySelectorAll('button')].some((b) => /^Details$/.test(b.textContent.trim())) && el.querySelectorAll('button[aria-label="Details for Pump d2, recall Z-2"]').length >= 1);
     check('the ward filter lists the wards', await pickOption(el, 'rr-ward-filter', 'ICU'));
     check('ward filter narrows the table', /Showing 2 of 3/.test(text(el)));
@@ -133,6 +143,14 @@ const pickOption = async (el, inputId, optionText) => {
       check('opening it shows why the device matches', toggle.getAttribute('aria-expanded') === 'true' && /Why we think it matches/.test(text(drawer)));
       check('without a suggested person the drawer offers a plain "Create task" and no menu', [...drawer.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Create task') && ![...drawer.querySelectorAll('button')].some((b) => /More ways to create/.test(b.textContent)));
     }
+    // the Progress tab: read from Jira only when it is opened
+    const progressTab = [...el.querySelectorAll('[role="tab"]')].find((t) => /^Progress$/.test(t.textContent.trim()));
+    check('there is a Progress tab', Boolean(progressTab));
+    await act(async () => { progressTab.click(); await wait(400); });
+    check('opening it reads the progress once', calls.filter((c) => c === 'getProgress').length === 1);
+    const lists = [...el.querySelectorAll('ul[aria-label^="Progress by"]')];
+    check('it shows the overall share and a list per recall and per ward', /0% resolved/.test(text(el)) && lists.length === 2 && /Z-1/.test(text(lists[0])) && /ICU/.test(text(lists[1])) && /2 no task yet/.test(text(el)));
+    check('every bar has a text label and the legend names the four parts', el.querySelectorAll('[role="img"][aria-label]').length >= 3 && ['done', 'in progress', 'to do', 'no task yet'].every((w) => new RegExp(w).test(text(el.querySelector('ul[aria-label="Legend"]')))));
   });
   // 2b. a long list: ten per page with the standalone pager, sorting covers ALL rows, filters go back to page 1
   const many = { ...result, matches: Array.from({ length: 23 }, (_, i) => mk('d' + (i + 1), 'Z-' + (i + 1), i < 2 ? 'I' : 'II', i % 2 ? 'ER' : 'ICU')) };

@@ -115,3 +115,40 @@ export function heroStats(result) {
 export function matchesForDevice(result, deviceId) {
   return sortByUrgency(affectedMatches(result).filter((m) => m.deviceId === deviceId));
 }
+
+// --- Task status and progress ---------------------------------------------------------------------------------------
+
+// How a task's status is shown: the project's own word when Jira gave one ("In review"), else the plain name of Jira's
+// status category. `category` is Jira's grouping: 'new' (to do), 'indeterminate' (in progress), 'done'.
+export const CATEGORY_NAMES = { new: 'To do', indeterminate: 'In progress', done: 'Done' };
+export function taskStatusLabel(info) {
+  if (info && info.status) return info.status;
+  return CATEGORY_NAMES[info && info.category] || CATEGORY_NAMES.new;
+}
+// Atlaskit lozenge appearance for a category: grey to do, blue in progress, green done.
+export function taskStatusAppearance(info) {
+  return { indeterminate: 'inprogress', done: 'success' }[info && info.category] || 'default';
+}
+
+// The four parts of a progress bar in the order they are drawn, with the words used for each.
+export const PROGRESS_PARTS = [
+  { key: 'done', label: 'done' },
+  { key: 'inProgress', label: 'in progress' },
+  { key: 'open', label: 'to do' },
+  { key: 'noTask', label: 'no task yet' },
+];
+
+// A progress group ({ pairs, done, inProgress, open, noTask }) as bar parts: { key, label, count, share } where share is the
+// part of the bar in percent. Parts with a zero count are kept (the legend lists all four), the bar draws only the others.
+export function progressParts(group) {
+  const pairs = (group && group.pairs) || 0;
+  return PROGRESS_PARTS.map((part) => {
+    const count = (group && group[part.key]) || 0;
+    return { ...part, count, share: pairs ? (count / pairs) * 100 : 0 };
+  });
+}
+
+// "3 done, 2 in progress, 1 to do, 4 no task yet": zero counts left out. '' when there is nothing.
+export function progressText(group) {
+  return progressParts(group).filter((part) => part.count > 0).map((part) => `${part.count} ${part.label}`).join(', ');
+}

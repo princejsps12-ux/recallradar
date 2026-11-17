@@ -8,6 +8,7 @@ import {
   createTaskGuard,
   createTasks,
   getTaskStates,
+  getTaskStatuses,
   validatePairs,
   selectMatches,
 } from './taskService.js';
@@ -44,6 +45,11 @@ function fakeJira({ existing = {}, issueTypeId = '10002', failIndexes = [], bulk
       const found = new Map();
       for (const label of labels) if (state.existing.has(label)) found.set(label, state.existing.get(label));
       return found;
+    },
+    // The same lookup with Jira's status of each task (every fake task is "To Do", i.e. category new).
+    async findTasks(labels) {
+      const keys = await this.findByLabels(labels);
+      return new Map([...keys].map(([label, key]) => [label, { key, status: 'To Do', category: 'new' }]));
     },
     async taskIssueTypeId() {
       return issueTypeId;
@@ -295,6 +301,75 @@ test('getTaskStates does not count a claim that is still in progress as a finish
   const s = setup();
   await s.guard.reserve(taskLabel('Z-1-2026', 'demo-001'));
   assert.deepEqual(await getTaskStates({ matches: [match(1)], jira: s.jira, guard: s.guard }), {});
+});
+
+// --- Status of the tasks (closure tracking) ---------------------------------------------------------------------------
+
+test('getTaskStatuses reports the key and Jira\'s own status of each task', async () => {
+  const s = setup({ existing: { [taskLabel('Z-1-2026', 'demo-001')]: 'P-7', [taskLabel('Z-1-2026', 'demo-002')]: 'P-8' } });
+  const statuses = { 'P-7': { status: 'Closed', category: 'done' }, 'P-8': { status: 'In review', category: 'indeterminate' } };
+  const findTasks = s.jira.findTasks;
+  s.jira.findTasks = async function withStatus(labels) {
+    const found = await findTasks.call(this, labels);
+    return new Map([...found].map(([label, task]) => [label, { ...task, ...statuses[task.key] }]));
+  };
+  const out = await getTaskStatuses({ matches: [match(1), match(2), match(3)], jira: s.jira, guard: s.guard });
+  assert.deepEqual(out, {
+    [pairKey('Z-1-2026', 'demo-001')]: { key: 'P-7', status: 'Closed', category: 'done' },
+    [pairKey('Z-1-2026', 'demo-002')]: { key: 'P-8', status: 'In review', category: 'indeterminate' },
+  });
+});
+
+test('getTaskStatuses: a task made a moment ago (guard only) is "new" with no status name, and Jira is not asked for it', async () => {
+  const s = setup();
+  await s.guard.record(taskLabel('Z-1-2026', 'demo-001'), 'P-3');
+  const out = await getTaskStatuses({ matches: [match(1), match(2)], jira: s.jira, guard: s.guard });
+  assert.deepEqual(out, { [pairKey('Z-1-2026', 'demo-001')]: { key: 'P-3', status: '', category: 'new' } });
+  assert.deepEqual(s.state.searches.flat(), [taskLabel('Z-1-2026', 'demo-002')], 'only the label the guard did not know was searched');
+});
+
+test('getTaskStatuses: a claim in progress is not a task yet, "possible" matches are ignored, and a Jira failure is thrown, not hidden', async () => {
+  const s = setup();
+  await s.guard.reserve(taskLabel('Z-1-2026', 'demo-001'));
+  assert.deepEqual(await getTaskStatuses({ matches: [match(1), match(2, { confidence: 'possible' })], jira: s.jira, guard: s.guard }), {});
+  const broken = setup({ searchError: new Error('Jira answered 500') });
+  await assert.rejects(getTaskStatuses({ matches: [match(1)], jira: broken.jira, guard: broken.guard }), /500/);
+});
+
+test('getTaskStates is the same answer reduced to the issue key', async () => {
+  const s = setup({ existing: { [taskLabel('Z-1-2026', 'demo-001')]: 'P-7' } });
+  assert.deepEqual(await getTaskStates({ matches: [match(1)], jira: s.jira, guard: s.guard }), { [pairKey('Z-1-2026', 'demo-001')]: 'P-7' });
+});
+
+test('guard.readMany lists once and returns only the fresh entries asked for', async () => {
+  const clock = { now: T0 };
+  const kv = fakeKv();
+  const guard = createTaskGuard(kv, () => clock.now);
+  await guard.record('a', 'P-1');
+  await guard.record('b', 'P-2');
+  await guard.record('other', 'P-3');
+  clock.now += GUARD_TTL_MS - 1;
+  await guard.record('c', 'P-4');
+  let lists = 0;
+  const listByPrefix = kv.listByPrefix;
+  kv.listByPrefix = async (...args) => { lists += 1; return listByPrefix(...args); };
+  clock.now += 1; // a, b and other are now expired; c is fresh
+  const found = await guard.readMany(['a', 'b', 'c', 'missing']);
+  assert.deepEqual([...found.keys()], ['c']);
+  assert.equal(found.get('c').key, 'P-4');
+  assert.equal(lists, 1);
+});
+
+test('guard.readMany falls back to single reads when the storage cannot list, or listing fails', async () => {
+  const clock = { now: T0 };
+  const kv = fakeKv();
+  const guard = createTaskGuard(kv, () => clock.now);
+  await guard.record('a', 'P-1');
+  await guard.record('b', 'P-2');
+  kv.listByPrefix = async () => { throw new Error('storage trouble'); };
+  assert.deepEqual([...(await guard.readMany(['a', 'b', 'x'])).keys()].sort(), ['a', 'b']);
+  delete kv.listByPrefix;
+  assert.deepEqual([...(await guard.readMany(['a', 'b'])).keys()].sort(), ['a', 'b']);
 });
 
 // --- What the browser may ask for ---------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import DropdownMenu, { DropdownItemGroup, DropdownItem } from '@atlaskit/dropdown-menu';
 import Badge from '@atlaskit/badge';
 import DeleteIcon from '@atlaskit/icon/core/delete';
@@ -24,6 +24,7 @@ import DevicesTable from './dash/DevicesTable';
 import RecentRecalls from './dash/RecentRecalls';
 import DeviceDrawer from './dash/DeviceDrawer';
 import WardTeamsTab from './dash/WardTeamsTab';
+import ProgressTab from './dash/ProgressTab';
 import FirstRun from './dash/FirstRun';
 import { ImportModal, ConfluenceModal, CreateAllModal } from './dash/Modals';
 
@@ -67,6 +68,8 @@ function LoadingScreen({ quiet }) {
   );
 }
 
+const PROGRESS_TAB = 1; // Overview, Progress, Ward teams
+
 export default function Dashboard() {
   const d = useRecallData({ withProjects: true });
   const [tab, setTab] = useState(0);
@@ -75,6 +78,13 @@ export default function Dashboard() {
   const [removeOpen, setRemoveOpen] = useState(false);
   const [confluenceOpen, setConfluenceOpen] = useState(false);
   const [createAllOpen, setCreateAllOpen] = useState(false);
+
+  // The Progress tab reads the status of the tasks from Jira when it is opened and again after a new check or new tasks.
+  const checkedAt = d.result ? d.result.checkedAt : null;
+  const taskCount = Object.keys(d.tasks).length;
+  useEffect(() => {
+    if (tab === PROGRESS_TAB && checkedAt) d.loadProgress();
+  }, [tab, checkedAt, taskCount, d.loadProgress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const screen = screenFor({ devicesCount: d.devicesCount, result: d.result, error: d.devicesCount === null ? d.error : '', loading: false });
   const running = d.progress !== null;
@@ -170,6 +180,7 @@ export default function Dashboard() {
       <Tabs id="rr-tabs" selected={tab} onChange={setTab}>
         <TabList>
           <Tab>Overview</Tab>
+          <Tab>Progress</Tab>
           <Tab>{d.wardLoaded ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: sp(75) }}>Ward teams <Badge>{`${d.wardInfo.mappings.length}/${d.wardInfo.wards.length}`}</Badge></span>) : 'Ward teams'}</Tab>
         </TabList>
         <TabPanel>
@@ -181,17 +192,20 @@ export default function Dashboard() {
             {all.length > 0 && (
               <section style={card} aria-labelledby="rr-affected-h">
                 <div style={{ margin: `0 0 ${sp(150)}` }}><Heading size="medium" as="h2" id="rr-affected-h">Affected devices</Heading></div>
-                <DevicesTable matches={all} tasks={d.tasks} teams={teams} onOpen={setDrawerDevice} tasksReady={d.tasksReady} />
+                <DevicesTable matches={all} tasks={d.tasks} taskInfo={d.taskInfo} teams={teams} onOpen={setDrawerDevice} tasksReady={d.tasksReady} />
               </section>
             )}
             <RecentRecalls recent={d.recent} onOpen={d.loadRecent} />
           </div>
         </TabPanel>
         <TabPanel>
+          <ProgressTab progress={d.taskProgress} hasResult={Boolean(d.result)} teams={teams} onRetry={d.loadProgress} />
+        </TabPanel>
+        <TabPanel>
           <WardTeamsTab wardInfo={d.wardInfo} onChanged={d.loadWardInfo} result={d.result} canManage={d.canManageTeams} />
         </TabPanel>
       </Tabs>
-      <DeviceDrawer deviceId={drawerDevice} result={d.result} tasks={d.tasks} suggestions={d.suggestions} teams={teams} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onCreateMany={(ms) => d.createTasks(ms, false)} onClose={() => setDrawerDevice(null)} />
+      <DeviceDrawer deviceId={drawerDevice} result={d.result} tasks={d.tasks} taskInfo={d.taskInfo} suggestions={d.suggestions} teams={teams} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onCreateMany={(ms) => d.createTasks(ms, false)} onClose={() => setDrawerDevice(null)} />
       <CreateAllModal isOpen={createAllOpen} onClose={() => setCreateAllOpen(false)} count={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} suggestedCount={suggestedCount} projectName={projectName} onConfirm={createAll} running={d.creating.active} />
       <FlagGroup onDismissed={() => d.setNote(null)}>
         {d.note ? (

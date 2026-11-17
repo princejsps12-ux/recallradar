@@ -4,6 +4,7 @@ import Lozenge from '@atlaskit/lozenge';
 import Spinner from '@atlaskit/spinner';
 import Tooltip from '@atlaskit/tooltip';
 import { formatDay, ago, niceFirm, softCase } from '../textCase.mjs';
+import { taskStatusLabel, taskStatusAppearance } from '../dashboardData.mjs';
 
 // Pure text helpers live in textCase.mjs (unit tested); everything in the UI imports them from here.
 export { formatDay, ago, niceFirm, softCase };
@@ -51,6 +52,11 @@ export function ClassLozenge({ recallClass }) {
       {recallClass ? `Class ${recallClass}` : 'Class ?'}
     </Lozenge>
   );
+}
+
+// Jira's status of a task (text AND colour): grey to do, blue in progress, green done. `info` is { status, category }.
+export function TaskStatusLozenge({ info }) {
+  return <Lozenge appearance={taskStatusAppearance(info)}>{taskStatusLabel(info)}</Lozenge>;
 }
 
 export function MatchLozenge({ confidence }) {

@@ -6,7 +6,7 @@ import VisuallyHidden from '@atlaskit/visually-hidden';
 import EmptyState from '@atlaskit/empty-state';
 import Skeleton from '@atlaskit/skeleton';
 import { router } from '@forge/bridge';
-import { sp, cap, color, muted, noBreak, ClassLozenge, MatchLozenge, useNarrow, NameLink, LinkLike } from '../ui/kit';
+import { sp, cap, color, muted, noBreak, ClassLozenge, MatchLozenge, TaskStatusLozenge, useNarrow, NameLink, LinkLike } from '../ui/kit';
 import Pager from '../ui/Pager';
 import { CLASSES, UNKNOWN_CLASS, filterMatches, wardsOf, urgencyRank } from '../dashboardData.mjs';
 import { PAGE_SIZE, sortRows, pageCount, clampPage, pageOf, rangeOf } from '../tablePaging.mjs';
@@ -38,7 +38,7 @@ function summaryText({ from, to, shown, all, pages }) {
 
 // The affected devices: filter by ward and class, sort by any column, ten per page, and open the side drawer from the
 // device name (one way in per row; the whole row is clickable for mouse users as well).
-export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady = true }) {
+export default function DevicesTable({ matches, tasks, taskInfo = {}, teams, onOpen, tasksReady = true }) {
   const [filters, setFilters] = useState({ ward: '', recallClass: '' });
   const [sort, setSort] = useState({ key: 'class', order: 'ASC' });
   const [page, setPage] = useState(1);
@@ -82,7 +82,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady
         { key: SORT_VALUE.recall(m), content: (<div><span style={noBreak}>{m.recallNumber}</span><div style={muted}>{m.firm}</div></div>) },
         { key: SORT_VALUE.class(m), content: <ClassLozenge recallClass={m.recallClass} /> },
         { key: SORT_VALUE.match(m), content: <MatchLozenge confidence={m.confidence} /> },
-        { key: SORT_VALUE.task(m, tasks), content: !tasksReady ? (<Skeleton height="20px" width="64px" isShimmering />) : key ? (<LinkLike onClick={(e) => { e.stopPropagation(); openIssue(key); }}>{key}</LinkLike>) : (<span style={muted}>No task</span>) },
+        { key: SORT_VALUE.task(m, tasks), content: !tasksReady ? (<Skeleton height="20px" width="64px" isShimmering />) : key ? (<div><LinkLike onClick={(e) => { e.stopPropagation(); openIssue(key); }}>{key}</LinkLike><div style={{ marginTop: sp(25) }}><TaskStatusLozenge info={taskInfo[pairOf(m)]} /></div></div>) : (<span style={muted}>No task</span>) },
       ],
     };
   });
@@ -117,7 +117,7 @@ export default function DevicesTable({ matches, tasks, teams, onOpen, tasksReady
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(100), marginTop: sp(100), alignItems: 'center' }}>
                       <ClassLozenge recallClass={m.recallClass} />
                       <MatchLozenge confidence={m.confidence} />
-                      {key ? (<LinkLike onClick={() => openIssue(key)}>{key}</LinkLike>) : (<span style={muted}>No task</span>)}
+                      {key ? (<><LinkLike onClick={() => openIssue(key)}>{key}</LinkLike><TaskStatusLozenge info={taskInfo[pairOf(m)]} /></>) : (<span style={muted}>No task</span>)}
                     </div>
                   </li>
                 );

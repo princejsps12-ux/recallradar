@@ -10,7 +10,9 @@
 import { buildRecallsUrl, parseRecalls, DEFAULT_LIMIT } from './openfda.js';
 import { loadDemoHospital } from './demoHospital.js';
 import { getSavedMatches, requestCheck, getCheckStatus, getLatestResult } from './matchService.js';
-import { createTasks, getTaskStates, validatePairs, selectMatches, MAX_STATE_PAIRS_PER_REQUEST } from './taskService.js';
+import { createTasks, getTaskStatuses, validatePairs, selectMatches, MAX_STATE_PAIRS_PER_REQUEST } from './taskService.js';
+import { openTaskMatches } from './taskRules.js';
+import { summarizeProgress } from './progress.js';
 import { assigneesForMatches, checkExplicitAssignees, setWardTeam } from './teamService.js';
 import { createRecallPages } from './recallPageService.js';
 import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient.js';
@@ -156,14 +158,32 @@ export function createHandlers(deps) {
       }
     },
 
-    // Which of these matches already have a task? Returns { tasks: { "recall|device": "MOBL-12" } }.
+    // Which of these matches already have a task, and what is its status? Returns
+    //   { tasks: { "recall|device": "MOBL-12" }, states: { "recall|device": { key, status, category } } }
+    // `category` is Jira's status category ('new', 'indeterminate', 'done'); `tasks` is kept for the parts that only need the key.
     async getTaskStates({ payload }) {
       try {
         const { matches } = await requestedMatches(payload && payload.pairs, MAX_STATE_PAIRS_PER_REQUEST);
-        return { ok: true, tasks: await getTaskStates({ matches, jira: deps.jira, guard: deps.taskGuard }) };
+        const states = await getTaskStatuses({ matches, jira: deps.jira, guard: deps.taskGuard });
+        return { ok: true, tasks: Object.fromEntries(Object.entries(states).map(([pair, task]) => [pair, task.key])), states };
       } catch (error) {
         log.error('Failed to read task states', error);
         return { ok: false, error: 'Could not look up existing tasks.' };
+      }
+    },
+
+    // How far along the work is: for every affected device and open recall, is there a task and what is its status in Jira,
+    // rolled up per recall and per ward (see progress.js). Read as the signed-in person, from the saved check.
+    async getProgress() {
+      try {
+        const devices = await deps.deviceStore.listDevices();
+        const latest = await getLatestResult({ devices, cache: deps.matchCache, jobs: deps.checkJobs });
+        const matches = openTaskMatches(latest);
+        const states = matches.length ? await getTaskStatuses({ matches, jira: deps.jira, guard: deps.taskGuard }) : {};
+        return { ok: true, progress: summarizeProgress(matches, states) };
+      } catch (error) {
+        log.error('Failed to read the task progress', error);
+        return { ok: false, error: 'Could not read the status of the tasks.' };
       }
     },
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One screenshot of one view in one state, for looking at it (or for a bug report):
 //
-//   node scripts/preview/shot.cjs <view> <state> <theme> [width height] [--out=path.png] [--scale=2] [--full]
+//   node scripts/preview/shot.cjs <view> <state> <theme> [width height] [--out=path.png] [--scale=2] [--full] [--tab=Progress]
 //   node scripts/preview/shot.cjs dashboard none-affected light
 //   node scripts/preview/shot.cjs panel first-run dark 360 262 --out=/tmp/panel.png
 //
@@ -20,6 +20,15 @@ const [view = 'dashboard', state = 'ready', theme = 'light', width, height] = po
   const s = await session({ scale: Number(flag('scale')) || 1 });
   try {
     const opened = await open(s, { view, state, theme, width: Number(width) || undefined, height: Number(height) || undefined });
+    if (flag('tab')) {
+      // Opens a dashboard tab by its name ("Progress", "Ward teams") before the picture is taken.
+      await opened.frame.evaluate((name) => {
+        const tab = [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.trim().startsWith(name));
+        if (!tab) throw new Error(`No tab called "${name}"`);
+        tab.click();
+      }, flag('tab'));
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    }
     await opened.page.screenshot({ path: out, fullPage: args.includes('--full') });
     console.log(out);
   } finally {

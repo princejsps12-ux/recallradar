@@ -32,15 +32,21 @@ function setup({ roles = { administrator: true, projectAdministrator: false }, d
   const taskGuard = createTaskGuard(kv, nowMs);
   const wardTeams = createWardTeamStore(kv, nowMs);
   const calls = { queued: [], bulk: [], logged: [], graph: [], labels: [] };
-  const state = { roles, rolesError: false, existingLabels: new Map(), spaces: [{ key: 'MD', name: 'Mobile Dev', id: '1' }], spacesError: null };
+  const state = { roles, rolesError: false, existingLabels: new Map(), statuses: new Map(), spaces: [{ key: 'MD', name: 'Mobile Dev', id: '1' }], spacesError: null };
   const jira = {
     async adminRoles() {
       if (state.rolesError) throw new Error('Jira answered 500');
       return state.roles;
     },
     async findByLabels(labels) {
+      if (state.jiraSearchError) throw new Error('Jira answered 500');
       calls.labels.push(labels);
       return new Map(labels.filter((l) => state.existingLabels.has(l)).map((l) => [l, state.existingLabels.get(l)]));
+    },
+    // The same lookup with Jira's status of each task: "To Do" (category new) unless the test set one for that key.
+    async findTasks(labels) {
+      const keys = await this.findByLabels(labels);
+      return new Map([...keys].map(([label, key]) => [label, { key, ...(state.statuses.get(key) || { status: 'To Do', category: 'new' }) }]));
     },
     async taskIssueTypeId() {
       return '10001';
@@ -95,7 +101,7 @@ const ask = (h, name, request = {}) => h.handlers[name]({ payload: {}, context: 
 
 test('every resolver the pages call exists', () => {
   const names = Object.keys(setup().handlers).sort();
-  for (const expected of ['clearDevices', 'createRecallPage', 'createTasks', 'fetchRecalls', 'getCapabilities', 'getCheckStatus', 'getSavedMatches', 'getTaskStates', 'getTaskSummary', 'getWardTeams', 'importDevices', 'listDevices', 'listProjects', 'listSpaces', 'listTeams', 'loadDemoHospital', 'removeImportedDevices', 'setWardTeam', 'startCheck', 'suggestAssignees']) {
+  for (const expected of ['clearDevices', 'createRecallPage', 'createTasks', 'fetchRecalls', 'getCapabilities', 'getCheckStatus', 'getSavedMatches', 'getProgress', 'getTaskStates', 'getTaskSummary', 'getWardTeams', 'importDevices', 'listDevices', 'listProjects', 'listSpaces', 'listTeams', 'loadDemoHospital', 'removeImportedDevices', 'setWardTeam', 'startCheck', 'suggestAssignees']) {
     assert.ok(names.includes(expected), expected);
   }
 });
@@ -210,7 +216,48 @@ test('getTaskStates answers from the Jira labels', async () => {
   const labelOf = (await import('./taskRules.js')).taskLabel('Z-1-2026', 'd1');
   h.state.existingLabels.set(labelOf, 'KAN-7');
   const out = await ask(h, 'getTaskStates', { payload: { pairs: [{ recallNumber: 'Z-1-2026', deviceId: 'd1' }] } });
-  assert.deepEqual(out, { ok: true, tasks: { 'Z-1-2026|d1': 'KAN-7' } });
+  assert.deepEqual(out, { ok: true, tasks: { 'Z-1-2026|d1': 'KAN-7' }, states: { 'Z-1-2026|d1': { key: 'KAN-7', status: 'To Do', category: 'new' } } });
+  h.state.statuses.set('KAN-7', { status: 'Closed', category: 'done' });
+  const closed = await ask(h, 'getTaskStates', { payload: { pairs: [{ recallNumber: 'Z-1-2026', deviceId: 'd1' }] } });
+  assert.deepEqual(closed.states['Z-1-2026|d1'], { key: 'KAN-7', status: 'Closed', category: 'done' }, "Jira's own status category comes through");
+});
+
+test('getProgress: per recall and per ward, from the saved check and the tasks Jira holds, open recalls only', async () => {
+  const taskLabel = (await import('./taskRules.js')).taskLabel;
+  const devices = [device('d1', { ward: 'ICU' }), device('d2', { ward: 'ICU' }), device('d3', { ward: 'ER' }), device('d4', { ward: 'ER' })];
+  const matches = [
+    match('d1', 'Z-1-2026'), match('d2', 'Z-1-2026'), match('d3', 'Z-1-2026', { ward: 'ER' }), match('d4', 'Z-2-2026', { ward: 'ER', recallClass: 'II', confidence: 'likely' }),
+    match('d1', 'Z-3-2026', { confidence: 'possible' }), // a weak match: no task is needed
+    match('d2', 'Z-9-2026'), // this recall is over
+  ];
+  const h = setup({ devices, savedMatches: matches });
+  await h.ready;
+  // recallDetails marks Z-9-2026 as terminated, so it is not part of the work
+  await h.matchCache.write(await h.deviceStore.listDevices(), { deviceCount: 4, recallCount: 4, matches, failedQueries: 0, cappedQueries: 0, recallDetails: { 'Z-9-2026': { status: 'Terminated' }, 'Z-1-2026': { status: 'Ongoing' } } }, new Date(T0).toISOString());
+  for (const [recall, dev, key, status, category] of [['Z-1-2026', 'd1', 'KAN-1', 'Done', 'done'], ['Z-1-2026', 'd2', 'KAN-2', 'In review', 'indeterminate'], ['Z-2-2026', 'd4', 'KAN-3', 'To Do', 'new']]) {
+    h.state.existingLabels.set(taskLabel(recall, dev), key);
+    h.state.statuses.set(key, { status, category });
+  }
+  const out = await ask(h, 'getProgress');
+  assert.equal(out.ok, true);
+  const { overall, byRecall, byWard } = out.progress;
+  assert.deepEqual([overall.pairs, overall.noTask, overall.open, overall.inProgress, overall.done, overall.resolvedPercent], [4, 1, 1, 1, 1, 25]);
+  assert.deepEqual(byRecall.map((r) => [r.recallNumber, r.pairs, r.done, r.resolvedPercent]), [['Z-1-2026', 3, 1, 33], ['Z-2-2026', 1, 0, 0]], 'Class I first; the closed recall and the possible match are not counted');
+  assert.deepEqual(byWard.map((w) => [w.ward, w.pairs, w.done]), [['ER', 2, 0], ['ICU', 2, 1]], 'the least finished ward first');
+});
+
+test('getProgress: nothing affected is an empty roll-up, and a Jira failure is a plain message', async () => {
+  const h = setup({ devices: [device('d1')], savedMatches: [match('d1', 'Z-1-2026', { confidence: 'possible' })] });
+  await h.ready;
+  const empty = await ask(h, 'getProgress');
+  assert.equal(empty.ok, true);
+  assert.equal(empty.progress.overall.pairs, 0);
+  const broken = setup({ devices: [device('d1')], savedMatches: [match('d1', 'Z-1-2026')] });
+  await broken.ready;
+  broken.state.jiraSearchError = true;
+  const failed = await ask(broken, 'getProgress');
+  assert.equal(failed.ok, false);
+  assert.match(failed.error, /status of the tasks/);
 });
 
 test('listSpaces: spaces, the plain "not connected" answer, and any other failure', async () => {

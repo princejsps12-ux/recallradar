@@ -20,6 +20,8 @@ import { compact, tokenize, containsPhrase } from './text.js';
 import { manufacturersMatch } from './matching.js';
 import {
   isTaskWorthy,
+  isRecallClosed,
+  CLOSED_STATUSES,
   pairKey,
   dueDateFor,
   dueDaysFor,
@@ -46,9 +48,8 @@ export const MAX_TASKS_PER_ACTION = 20;
 // that a stale preview cannot be confirmed hours later against a changed result.
 export const PREVIEW_TTL_MS = 10 * 60 * 1000;
 
-// openFDA recall statuses that mean the recall is over. Anything else (including "Ongoing", or no
-// status in an older saved check) counts as open.
-export const CLOSED_STATUSES = Object.freeze(['terminated', 'completed']);
+// openFDA recall statuses that mean the recall is over: see taskRules.js. Re-exported because other modules import it from here.
+export { CLOSED_STATUSES };
 
 // What FDA's classes mean, in the words used when explaining a recall (21 CFR 7.3).
 export const CLASS_MEANINGS = Object.freeze({
@@ -131,9 +132,7 @@ function citationsOf(matches) {
   };
 }
 
-function isClosed(details) {
-  return Boolean(details && CLOSED_STATUSES.includes(String(details.status).toLowerCase()));
-}
+const isClosed = isRecallClosed;
 
 function toItem(match, details, taskKey) {
   return {

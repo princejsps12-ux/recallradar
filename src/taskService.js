@@ -12,7 +12,7 @@
 //      that Jira's own search knows about them, so the guard expires and a task that was deleted
 //      in Jira can be created again.
 //
-// `jira` is injected (see jiraClient.js): findByLabels, taskIssueTypeId, bulkCreate.
+// `jira` is injected (see jiraClient.js): findByLabels, findTasks, taskIssueTypeId, bulkCreate.
 // `guard` is made by createTaskGuard below. No Forge imports, so this is unit tested.
 import { buildIssueFields, isTaskWorthy, pairKey, taskLabel } from './taskRules.js';
 
@@ -23,9 +23,11 @@ export const GUARD_TTL_MS = 2 * 60 * 1000;
 // Jira's bulk-create endpoint accepts at most this many issues per call.
 export const BULK_CREATE_LIMIT = 50;
 
+const GUARD_PREFIX = 'task-guard:';
+
 // A guard entry: { at } while a task is being created, { at, key } once it exists.
 export function createTaskGuard(kv, nowMs = () => Date.now()) {
-  const storageKey = (label) => `task-guard:${label}`;
+  const storageKey = (label) => `${GUARD_PREFIX}${label}`;
 
   // The fresh entry for this label, or null.
   async function read(label) {
@@ -42,6 +44,30 @@ export function createTaskGuard(kv, nowMs = () => Date.now()) {
     return null;
   }
 
+  // The fresh entries for these labels as Map(label -> entry). One listing instead of a read per label when the storage can
+  // list (a hospital with hundreds of pairs would otherwise make hundreds of reads); a listing that fails falls back to reads.
+  async function readMany(labels) {
+    const found = new Map();
+    if (labels.length > 1 && typeof kv.listByPrefix === 'function') {
+      try {
+        const wanted = new Set(labels.map(storageKey));
+        for (const { key, value } of await kv.listByPrefix(GUARD_PREFIX)) {
+          if (!wanted.has(key) || !value || typeof value.at !== 'number') continue;
+          const age = nowMs() - value.at;
+          if (age >= 0 && age < GUARD_TTL_MS) found.set(key.slice(GUARD_PREFIX.length), value);
+        }
+        return found;
+      } catch (error) {
+        found.clear();
+      }
+    }
+    for (const label of labels) {
+      const entry = await read(label);
+      if (entry) found.set(label, entry);
+    }
+    return found;
+  }
+
   const reserve = (label) => kv.set(storageKey(label), { at: nowMs() });
   const record = (label, key) => kv.set(storageKey(label), { at: nowMs(), key });
   const release = (label) => kv.delete(storageKey(label));
@@ -50,7 +76,7 @@ export function createTaskGuard(kv, nowMs = () => Date.now()) {
   async function purgeExpired() {
     if (typeof kv.listByPrefix !== 'function') return 0;
     let deleted = 0;
-    for (const { key, value } of await kv.listByPrefix('task-guard:')) {
+    for (const { key, value } of await kv.listByPrefix(GUARD_PREFIX)) {
       const age = value && typeof value.at === 'number' ? nowMs() - value.at : Infinity;
       if (!(age >= 0 && age < GUARD_TTL_MS)) {
         await kv.delete(key);
@@ -60,7 +86,7 @@ export function createTaskGuard(kv, nowMs = () => Date.now()) {
     return deleted;
   }
 
-  return { read, reserve, record, release, purgeExpired };
+  return { read, readMany, reserve, record, release, purgeExpired };
 }
 
 // The most pairs one request may ask for. Measured on the demo site: creating 34 tasks in one
@@ -135,19 +161,31 @@ async function findExisting(items, jira, guard) {
   return { existing, inProgress };
 }
 
-// What the panel shows for each (recall, device) pair: the issue key if a task exists.
+// What the panel shows for each (recall, device) pair that has a task: { key, status, category }, as
+// { "recall|device": { ... } }. `category` is Jira's status category ('new', 'indeterminate', 'done'); a task created a few
+// seconds ago (still in the local guard, maybe not searchable yet) is reported as 'new' with no status name.
 // `matches` must already be limited to the pairs of interest.
-export async function getTaskStates({ matches, jira, guard }) {
+export async function getTaskStatuses({ matches, jira, guard }) {
   const items = matches.filter(isTaskWorthy).map((match) => ({
     match,
     label: taskLabel(match.recallNumber, match.deviceId),
   }));
-  const { existing } = await findExisting(items, jira, guard);
-  const tasks = {};
+  const guarded = guard.readMany ? await guard.readMany(items.map((i) => i.label)) : new Map();
+  const toSearch = items.map((i) => i.label).filter((label) => !(guarded.get(label) && guarded.get(label).key));
+  const found = toSearch.length ? await jira.findTasks(toSearch) : new Map();
+  const states = {};
   for (const { match, label } of items) {
-    if (existing.has(label)) tasks[pairKey(match.recallNumber, match.deviceId)] = existing.get(label);
+    const entry = guarded.get(label);
+    const task = found.get(label) || (entry && entry.key ? { key: entry.key, status: '', category: 'new' } : null);
+    if (task) states[pairKey(match.recallNumber, match.deviceId)] = task;
   }
-  return tasks;
+  return states;
+}
+
+// The same, reduced to the issue key: { "recall|device": "MOBL-12" }.
+export async function getTaskStates(args) {
+  const states = await getTaskStatuses(args);
+  return Object.fromEntries(Object.entries(states).map(([pair, task]) => [pair, task.key]));
 }
 
 // Create a task for each match that does not have one yet.

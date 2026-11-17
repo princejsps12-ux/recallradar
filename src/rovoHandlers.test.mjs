@@ -25,6 +25,7 @@ function setup({ snapshot = saved } = {}) {
     },
     jira: {
       async findByLabels() { return new Map(); },
+      async findTasks() { return new Map(); },
       async taskIssueTypeId() { return '10001'; },
       async bulkCreate(fields) { created.push(fields); return { created: fields.map((_, index) => ({ index, key: `KAN-${index + 1}` })), errors: [] }; },
     },
