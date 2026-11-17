@@ -11,6 +11,20 @@ export const LOCK_TTL_MS = 30 * 1000;
 export const LOCK_ATTEMPTS = 20;
 export const LOCK_WAIT_MS = 150;
 
+// Whether a refused "set only if absent" means "the key already exists" (somebody holds the lock). Forge answers with an API error
+// whose `code` names it (as KEY_NOT_FOUND names a missing key) and whose HTTP status is 409 or 412. The exact code was not seen on
+// a live site, so this is deliberately wide: reading a real conflict as "the storage cannot lock" would run the work unlocked at
+// the very moment a second writer is there, while reading a broken storage as "held" only makes the caller retry and then report.
+/**
+ * @param {any} error
+ * @returns {boolean}
+ */
+export function isKeyExistsError(error) {
+  const status = error && error.responseDetails && error.responseDetails.status;
+  const text = `${(error && error.code) || ''} ${(error && error.message) || ''}`;
+  return status === 409 || status === 412 || /exist|already|conflict/i.test(text);
+}
+
 const defaultSleep = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const defaultToken = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 

@@ -1,6 +1,7 @@
 // Connects the device store to Forge storage (@forge/kvs). Deliberately tiny: all real logic
 // lives in deviceStore.js, which is unit tested against an in-memory fake of this same shape.
 import { kvs, WhereConditions } from '@forge/kvs';
+import { isKeyExistsError } from './lock.js';
 
 // How many keys to ask Forge for per page when listing.
 const LIST_PAGE_SIZE = 100;
@@ -17,8 +18,8 @@ export const forgeKv = {
       await kvs.set(key, value, { keyPolicy: 'FAIL_IF_EXISTS', ttl: { value: Math.max(1, Math.ceil(ttlMs / 1000)), unit: 'SECONDS' } });
       return true;
     } catch (error) {
+      if (isKeyExistsError(error)) return false;
       const text = `${(error && error.code) || ''} ${(error && error.message) || ''}`;
-      if (/exist/i.test(text)) return false;
       console.warn('Storage could not take a lock, carrying on without one', text.slice(0, 120));
       return null;
     }

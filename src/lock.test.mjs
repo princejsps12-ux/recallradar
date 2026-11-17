@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLock } from './lock.js';
+import { createLock, isKeyExistsError } from './lock.js';
 import { fakeKv } from './fakeKv.mjs';
 
 const noSleep = () => new Promise((resolve) => setImmediate(resolve));
@@ -13,7 +13,9 @@ test('two runs under the same lock never overlap, and both finish', async () => 
   const work = async () => {
     inside += 1;
     if (inside > 1) overlapped = true;
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    // The holder works for a few turns of the event loop, the same unit the waiters' sleep is counted in, so the test does not
+    // depend on how fast the machine is (a real timer here made it fail whenever 200 waits were shorter than the work).
+    for (let turn = 0; turn < 3; turn += 1) await noSleep();
     inside -= 1;
     return 'done';
   };
@@ -54,4 +56,17 @@ test('without an atomic set in the storage, or when it cannot lock, the work run
   assert.equal(await createLock(plain).run('x', async () => 'ok'), 'ok');
   const cannot = { ...plain, setIfAbsent: async () => null };
   assert.equal(await createLock(cannot).run('x', async () => 'ok2'), 'ok2');
+});
+
+test('a refused "set only if absent" is read as "the key exists" by its code, its message or its HTTP status, and nothing else is', () => {
+  assert.equal(isKeyExistsError({ code: 'KEY_ALREADY_EXISTS', message: 'x' }), true);
+  assert.equal(isKeyExistsError({ code: 'CONFLICT', message: 'x' }), true);
+  assert.equal(isKeyExistsError(new Error('The key already exists')), true);
+  assert.equal(isKeyExistsError({ code: 'X', message: 'y', responseDetails: { status: 409 } }), true);
+  assert.equal(isKeyExistsError({ code: 'X', message: 'y', responseDetails: { status: 412 } }), true);
+  // Anything else means the storage cannot lock (the work then runs unlocked, with a warning in the log).
+  assert.equal(isKeyExistsError({ code: 'INTERNAL_ERROR', message: 'boom', responseDetails: { status: 500 } }), false);
+  assert.equal(isKeyExistsError(new Error('network down')), false);
+  assert.equal(isKeyExistsError(undefined), false);
+  assert.equal(isKeyExistsError(null), false);
 });
