@@ -4,6 +4,7 @@
 // No Forge imports, so this is unit tested with plain Node.
 import { compact } from './text.js';
 import { DEVICE_SOURCES } from './deviceStore.js';
+import { normalizeDi } from './udi.js';
 
 // An import is written in batches of 25 and a UI function is cut off at 25 s, so one paste stays small.
 // A larger hospital imports in several pastes (each import ADDS to the manual devices only when
@@ -21,6 +22,8 @@ const COLUMN_ALIASES = {
   model: ['model', 'modelnumber', 'modelno', 'catalog', 'catalognumber', 'catalogno', 'partnumber'],
   lotOrSerial: ['serial', 'lot', 'serialnumber', 'lotnumber', 'seriallot', 'lotserial', 'lotorserial', 'serialno'],
   ward: ['ward', 'location', 'unit', 'department', 'room', 'area'],
+  // The UDI-DI printed on the device label (a GS1 GTIN). Optional, and the strongest way to match a recall.
+  udiDi: ['udi', 'udidi', 'di', 'gtin', 'deviceidentifier', 'udideviceidentifier'],
 };
 
 // Split one line into cells. Handles "quoted, cells" and doubled quotes inside them.
@@ -86,6 +89,7 @@ export function parseDeviceCsv(text) {
     const problems = [];
     if (!row.manufacturer) problems.push('manufacturer is empty');
     if (!row.model) problems.push('model is empty');
+    if (row.udiDi && !normalizeDi(row.udiDi, { strict: true })) problems.push(`UDI-DI "${row.udiDi}" is not a valid GTIN (8, 12, 13 or 14 digits with a correct check digit)`);
     for (const [field, value] of Object.entries(row)) {
       if (value.length > MAX_FIELD_LENGTH) problems.push(`${field} is longer than ${MAX_FIELD_LENGTH} characters`);
     }
@@ -101,6 +105,7 @@ export function parseDeviceCsv(text) {
       model: row.model,
       lotOrSerial: row.lotOrSerial || '',
       ward: row.ward || '',
+      udiDi: row.udiDi ? normalizeDi(row.udiDi, { strict: true }) : '',
       source: DEVICE_SOURCES.MANUAL,
     });
   });

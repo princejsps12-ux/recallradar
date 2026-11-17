@@ -11,7 +11,7 @@ import { matchDevicesToRecalls } from './matching';
 import { performCheck, getLatestResult } from './matchService';
 import { createJiraClient } from './jiraClient';
 import { createConfluenceClient } from './confluenceClient';
-import { fetchWithOneRetry } from './openfda';
+import { fetchWithOneRetry, withApiKey } from './openfda';
 import { createTaskGuard, getTaskStates, selectMatches } from './taskService';
 import { createPreviewStore } from './agentTools';
 import { createTeamGraph } from './teamGraph';
@@ -60,7 +60,10 @@ export const CHECK_QUEUE_KEY = 'recall-check';
 // Fetch one openFDA URL as JSON. openFDA answers 404 when a search has no hits: that is
 // "no results", not an error.
 async function fetchOpenFdaJson(url) {
-  const response = await fetchWithOneRetry(() => fetch(url, { headers: { Accept: 'application/json' } }));
+  // OPENFDA_API_KEY is an optional Forge environment variable (forge variables set --encrypt): with it the daily allowance is
+  // 120,000 requests instead of about 1,000 per address. Without it nothing changes.
+  const keyed = withApiKey(url, process.env.OPENFDA_API_KEY);
+  const response = await fetchWithOneRetry(() => fetch(keyed, { headers: { Accept: 'application/json' } }));
   if (response.status === 404) return { results: [] };
   if (!response.ok) throw new Error(`openFDA request failed with status ${response.status}`);
   return response.json();

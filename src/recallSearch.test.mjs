@@ -8,11 +8,17 @@ import {
   phraseClause,
   buildFirmRecallsUrl,
   buildModelRecallsUrl,
+  buildUdiRecallsUrl,
+  withSkip,
+  withApiKey,
   parseRecallForMatching,
 } from './openfda.js';
 import {
   LOOKBACK_DAYS,
   MODELS_PER_QUERY,
+  UDIS_PER_QUERY,
+  MAX_PAGES_PER_QUERY,
+  MAX_CONCURRENT_REQUESTS,
   SEARCH_LIMIT_PER_QUERY,
   SEARCH_DEADLINE_MS,
   planRecallQueries,
@@ -126,8 +132,9 @@ test('planRecallQueries makes one firm query per distinct maker, ignoring suffix
 
 test('planRecallQueries uses the look-back window ending today', () => {
   const [first] = planRecallQueries([device('a', 'Masimo', 'M-1000')], NOW);
-  assert.equal(LOOKBACK_DAYS, 365);
-  assert.ok(first.includes('report_date:[20251114+TO+20261114]'));
+  assert.equal(LOOKBACK_DAYS, 3 * 365, 'three years: recalls stay open that long');
+  assert.ok(first.includes(`report_date:[${daysAgoYmd(NOW, LOOKBACK_DAYS)}+TO+20261114]`));
+  assert.equal(daysAgoYmd(NOW, LOOKBACK_DAYS), '20231115');
 });
 
 test('planRecallQueries groups models into small queries and de-duplicates them', () => {
@@ -224,18 +231,122 @@ test('planRecallQueries accepts a different limit', () => {
   }
 });
 
-test('findRecallsForDevices counts queries whose real total is larger than what came back', async () => {
+test('findRecallsForDevices counts queries whose real total is larger than ALL their pages hold', async () => {
+  const total = MAX_PAGES_PER_QUERY * SEARCH_LIMIT_PER_QUERY + 1; // one more than the pages can hold
   const answers = [
-    { meta: { results: { total: 80 } }, results: [rawRecall('Z-1')] }, // capped
+    { meta: { results: { total } }, results: [rawRecall('Z-1')] }, // capped
     { meta: { results: { total: 1 } }, results: [rawRecall('Z-2')] }, // complete
   ];
-  let i = 0;
+  let first = true;
   const { cappedQueries } = await findRecallsForDevices(
     [device('a', 'Masimo', 'M-1000')],
-    async () => answers[i++ % answers.length],
+    async (url) => (url.includes('skip=') ? { results: [] } : answers[first ? ((first = false), 0) : 1]),
     { now: NOW },
   );
   assert.equal(cappedQueries, 1);
+});
+
+// --- Paging, UDI queries and the rate of requests --------------------------------------------------------------------
+
+const page = (url) => Number((/skip=(\d+)/.exec(url) || [0, 0])[1]) / SEARCH_LIMIT_PER_QUERY;
+const manyRecalls = (prefix, count) => Array.from({ length: count }, (_, i) => rawRecall(`${prefix}-${i}`));
+
+test('a query with more matches than one answer holds is read page by page, and the pages are merged', async () => {
+  const total = 60; // 25 + 25 + 10
+  const seen = [];
+  const out = await findRecallsForDevices([device('a', 'Masimo', 'xx')], async (url) => {
+    seen.push(url);
+    const n = page(url);
+    return { meta: { results: { total } }, results: manyRecalls(`P${n}`, n === 2 ? 10 : SEARCH_LIMIT_PER_QUERY) };
+  }, { now: NOW });
+  const firstPages = seen.filter((url) => !url.includes('skip='));
+  assert.equal(firstPages.length, 1, 'one firm query (the model is too short to search)');
+  assert.deepEqual(seen.filter((url) => url.includes('skip=')).map((url) => /skip=(\d+)/.exec(url)[1]).sort(), ['25', '50']);
+  assert.equal(out.recalls.length, 60);
+  assert.equal(out.cappedQueries, 0, 'everything was read');
+  assert.equal(out.queryCount, 3, 'the count includes the extra pages');
+  assert.equal(out.failedQueries, 0);
+});
+
+test('paging stops at MAX_PAGES_PER_QUERY and says the query was capped', async () => {
+  const seen = [];
+  const out = await findRecallsForDevices([device('a', 'Masimo', 'xx')], async (url) => {
+    seen.push(url);
+    return { meta: { results: { total: 5000 } }, results: manyRecalls(`P${page(url)}`, SEARCH_LIMIT_PER_QUERY) };
+  }, { now: NOW });
+  assert.equal(seen.length, MAX_PAGES_PER_QUERY);
+  assert.equal(out.recalls.length, MAX_PAGES_PER_QUERY * SEARCH_LIMIT_PER_QUERY);
+  assert.equal(out.cappedQueries, 1);
+});
+
+test('a page that fails counts as a failed search and keeps the pages that came', async () => {
+  const out = await findRecallsForDevices([device('a', 'Masimo', 'xx')], async (url) => {
+    if (page(url) === 1) throw new Error('boom');
+    return { meta: { results: { total: 60 } }, results: manyRecalls(`P${page(url)}`, SEARCH_LIMIT_PER_QUERY) };
+  }, { now: NOW });
+  assert.equal(out.failedQueries, 1);
+  assert.equal(out.recalls.length, 50);
+});
+
+test('requests never run more than MAX_CONCURRENT_REQUESTS at a time', async () => {
+  const devices = Array.from({ length: 30 }, (_, i) => device(`d${i}`, `Maker${i} Corp`, `m${i}`));
+  let running = 0;
+  let peak = 0;
+  const out = await findRecallsForDevices(devices, async () => {
+    running += 1;
+    peak = Math.max(peak, running);
+    await sleep(2);
+    running -= 1;
+    return { results: [] };
+  }, { now: NOW });
+  assert.ok(out.queryCount > MAX_CONCURRENT_REQUESTS, 'enough searches to need the limit');
+  assert.equal(peak, MAX_CONCURRENT_REQUESTS);
+  assert.equal(out.failedQueries, 0);
+});
+
+test('progress: the total grows when a query turns out to have more pages, and ends at N of N', async () => {
+  const steps = [];
+  await findRecallsForDevices([device('a', 'Masimo', 'xx')], async (url) => ({ meta: { results: { total: 60 } }, results: manyRecalls(`P${page(url)}`, SEARCH_LIMIT_PER_QUERY) }), {
+    now: NOW,
+    onProgress: (done, total) => steps.push([done, total]),
+  });
+  assert.deepEqual(steps[0], [0, 1]);
+  assert.deepEqual(steps[steps.length - 1], [3, 3]);
+  assert.ok(steps.some(([, total]) => total === 3));
+});
+
+test('a device with a UDI-DI is also searched by it, in every written form, five DIs to a query', () => {
+  const withUdi = (id, udiDi) => ({ ...device(id, 'Acme', 'xx'), udiDi });
+  const urls = planRecallQueries([withUdi('a', '00848838001796'), withUdi('b', '00884838102842')], NOW);
+  const udiUrl = urls.find((url) => url.includes('code_info:%2200848838001796') || url.includes('code_info:"00848838001796"'));
+  assert.ok(udiUrl, 'a UDI query exists');
+  for (const form of ['00848838001796', '0848838001796', '848838001796', '00884838102842']) assert.ok(udiUrl.includes(`code_info:"${form}"`), form);
+  const many = Array.from({ length: UDIS_PER_QUERY + 1 }, (_, i) => withUdi(`d${i}`, ['10889942499953', '05030267044528', '00661392048157', '00885825017231', '00195278010797', '09421901970369'][i]));
+  const udiQueries = planRecallQueries(many, NOW).filter((url) => url.includes('code_info:"10889942499953"') || url.includes('code_info:"09421901970369"'));
+  assert.equal(udiQueries.length, 2, 'six DIs are two queries');
+  assert.equal(planRecallQueries([device('plain', 'Acme', 'xx')], NOW).filter((url) => url.includes('code_info:"0')).length, 0, 'no DI, no UDI query');
+});
+
+test('a device whose UDI-DI is not a GTIN adds no query', () => {
+  assert.equal(planRecallQueries([{ ...device('a', 'Acme', 'xx'), udiDi: 'not a gtin' }], NOW).length, 1);
+});
+
+test('buildUdiRecallsUrl, withSkip and withApiKey', () => {
+  const url = buildUdiRecallsUrl(['00848838001796'], '20231115', '20261114');
+  assert.ok(url.startsWith(`${OPENFDA_BASE_URL}?search=(`));
+  assert.ok(url.includes('+AND+report_date:[20231115+TO+20261114]'));
+  assert.equal(buildUdiRecallsUrl(['nonsense'], '20231115', '20261114'), null);
+  assert.equal(withSkip(url, 0), url);
+  assert.equal(withSkip(url, 50), `${url}&skip=50`);
+  const key = 'abcdefghijklmnopqrstuvwxyz0123456789ABCD';
+  assert.equal(withApiKey(url, key), `${url}&api_key=${key}`);
+  for (const bad of [undefined, '', 'short', 'has spaces in it and more than twenty characters', 'x&search=other_field:evil_value_goes_here']) assert.equal(withApiKey(url, bad), url, String(bad));
+});
+
+test('parseRecallForMatching reads more_code_info too, where the FDA put the rest of the numbers', () => {
+  const recall = parseRecallForMatching({ recall_number: 'Z-1', recalling_firm: 'Acme', product_description: 'p', code_info: 'Serial Numbers: 1, 2', more_code_info: 'UDI-DI 00848838001796' });
+  assert.equal(recall.codeText, 'Serial Numbers: 1, 2 UDI-DI 00848838001796');
+  assert.equal(parseRecallForMatching({ recall_number: 'Z-2', recalling_firm: 'Acme', product_description: 'p', code_info: 'x' }).codeText, 'x');
 });
 
 test('a query with no meta, or an empty answer, is not counted as capped', async () => {

@@ -371,3 +371,109 @@ test('matchDevicesToRecalls handles empty inputs', () => {
   assert.deepEqual(matchDevicesToRecalls([], [plumRecall]), []);
   assert.deepEqual(matchDevicesToRecalls([plumDevice], []), []);
 });
+
+// --- UDI-DI, serial ranges and the qualified "all serial numbers" (recall texts are real openFDA code_info values) ------
+
+const philipsRecall = {
+  recallNumber: 'Z-2579-2026', recallClass: 'II', date: '2026-07-01', firm: 'Philips North America Llc',
+  product: 'IntelliVue Telemetry Monitor 5500', productText: 'Philips IntelliVue Telemetry Monitor 5500, telemetry monitor',
+  codeText: 'Model Number: 867232. UDI-DI: (01)00884838102842. Software Version Number: 4.0.0.0. Serial Numbers: US001A002F, US001A00AW, US001A00C9, US001A00EW, US001A00F0',
+};
+const monitor = { manufacturer: 'Philips', model: '867232', type: 'telemetry monitor', lotOrSerial: 'US001A00AW', udiDi: '00884838102842' };
+
+test('UDI-DI and this unit\'s serial both listed: exact, by the UDI rule', () => {
+  const m = evaluateMatch(monitor, philipsRecall);
+  assert.equal(m.confidence, CONFIDENCE.EXACT);
+  assert.equal(m.rule, RULES.EXACT_UDI_UNIT);
+  assert.match(m.reason, /UDI-DI 00884838102842 is listed/);
+  assert.match(m.reason, /serial\/lot "US001A00AW" is listed/);
+});
+
+test('the UDI-DI finds a recall filed under another firm, with no maker or model text to go on', () => {
+  const relabelled = { manufacturer: 'Some Brand Medical', model: 'XYZ-77', type: 'monitor', lotOrSerial: 'US001A00AW', udiDi: '00884838102842' };
+  const m = evaluateMatch(relabelled, philipsRecall);
+  assert.equal(m.rule, RULES.EXACT_UDI_UNIT);
+  assert.equal(evaluateMatch({ ...relabelled, udiDi: '' }, philipsRecall), null, 'without the UDI-DI there is nothing to match on');
+});
+
+test('a UDI-DI written without its leading zeros in the recall still matches the 14-digit one on the device', () => {
+  const recall = { ...philipsRecall, codeText: 'UDI-DI 884838102842 Serial Numbers: US001A00AW' };
+  assert.equal(evaluateMatch(monitor, recall).rule, RULES.EXACT_UDI_UNIT);
+});
+
+test('UDI-DI listed and the recall covers all serial numbers: exact', () => {
+  const recall = { recallNumber: 'Z-3065-2026', recallClass: 'II', date: '2026-09-09', firm: 'Baxter Healthcare Corporation', product: 'Novum IQ', productText: 'Novum IQ syringe pump', codeText: 'UDI-DI 05413765852428, all serial numbers ' };
+  const m = evaluateMatch({ manufacturer: 'Baxter', model: 'NOVUMX', type: 'pump', lotOrSerial: 'ZZ-1234', udiDi: '05413765852428' }, recall);
+  assert.equal(m.confidence, CONFIDENCE.EXACT);
+  assert.equal(m.rule, RULES.EXACT_UDI_ALL_UNITS);
+});
+
+test('"all serial numbers WITH radio software versions..." is not every unit: the UDI-DI alone is only likely', () => {
+  const recall = { recallNumber: 'Z-2582-2024', recallClass: 'II', date: '2024-08-28', firm: 'Baxter Healthcare Corporation', product: 'Sigma Spectrum', productText: 'Sigma Spectrum infusion pump', codeText: 'Pump UDI/DI GTIN 00085412498683; All serial numbers with radio software versions 22D28, 22D29, and 22D30 ' };
+  const m = evaluateMatch({ manufacturer: 'Baxter Healthcare', model: '35700BAX2', type: 'pump', lotOrSerial: 'SP-30977', udiDi: '00085412498683' }, recall);
+  assert.equal(m.confidence, CONFIDENCE.LIKELY);
+  assert.equal(m.rule, RULES.LIKELY_UDI);
+  assert.match(m.reason, /is not among the numbers listed/);
+});
+
+test('a device with a UDI-DI but no serial recorded is likely, and the reason says what is missing', () => {
+  const m = evaluateMatch({ ...monitor, lotOrSerial: '' }, philipsRecall);
+  assert.equal(m.rule, RULES.LIKELY_UDI);
+  assert.match(m.reason, /no serial\/lot recorded/);
+});
+
+test('recallCoversAllUnits: a condition after "all serial numbers" means some units only', () => {
+  const all = (text) => recallCoversAllUnits({ codeText: text });
+  assert.equal(all('All Serial Numbers. Not model or lot specific.'), true);
+  assert.equal(all('All serial numbers with radio software versions 22D28'), false);
+  assert.equal(all('All serial numbers manufactured between 2019 and 2021'), false);
+  assert.equal(all('All lot numbers having firmware 3.1'), false);
+  assert.equal(all('UDI-DI 05413765852428, all serial numbers '), true);
+  assert.equal(all('All units distributed'), true, 'a bare phrase is still every unit');
+});
+
+const astralRecall = {
+  recallNumber: 'Z-2735-2026', recallClass: 'I', date: '2026-08-05', firm: 'ResMed Ltd.', product: 'Astral 100/150 ventilator', productText: 'ResMed Astral 100 and Astral 150 ventilators',
+  codeText: 'Catalog Number: Astral 100 UDI-DI code: 00619498003259 Serial Numbers: Astral Ventilators-Serial number < 22241890149 PCBA Spare Parts-Serial number < 2707658',
+};
+
+test('the real Astral recall: a serial below the stated limit is exact (before: only likely)', () => {
+  const inside = evaluateMatch({ manufacturer: 'ResMed', model: 'Astral 100', type: 'ventilator', lotOrSerial: '22241800001' }, astralRecall);
+  assert.equal(inside.confidence, CONFIDENCE.EXACT);
+  assert.equal(inside.rule, RULES.EXACT_MODEL_AND_RANGE);
+  assert.match(inside.reason, /falls inside the range the recall gives \("< 22241890149"\)/);
+  const outside = evaluateMatch({ manufacturer: 'ResMed', model: 'Astral 100', type: 'ventilator', lotOrSerial: '22250000001' }, astralRecall);
+  assert.equal(outside.confidence, CONFIDENCE.LIKELY);
+  assert.equal(outside.rule, RULES.LIKELY_MODEL);
+});
+
+test('a range and the UDI-DI together: exact by the UDI rule, and the reason names the range', () => {
+  const m = evaluateMatch({ manufacturer: 'ResMed', model: 'Astral 100', type: 'ventilator', lotOrSerial: '22241800001', udiDi: '00619498003259' }, astralRecall);
+  assert.equal(m.rule, RULES.EXACT_UDI_UNIT);
+  assert.match(m.reason, /falls inside the range/);
+});
+
+test('a serial inside a range, with no model or product to tie it to, is NOT a match (the Getinge vaporizer / ventilator case)', () => {
+  const vaporizer = { recallNumber: 'Z-1877-2024', recallClass: 'I', date: '2024-06-12', firm: 'Getinge Usa Sales Inc', product: 'Vaporizer Sevoflurane Maquet Filling', productText: 'Vaporizer Sevoflurane Maquet Filling, Product code/REF number (6682282), Component of: Flow-i C20, Flow-e.', codeText: 'Part Number 6682282; UDI/DI: 07325710000212: Serial Numbers: 17003 - 23454.' };
+  const ventilator = { manufacturer: 'Getinge', model: '6693662', type: 'ventilator', lotOrSerial: '21500' };
+  assert.equal(evaluateMatch(ventilator, vaporizer), null, 'same maker and a serial in the range, but a different product');
+  assert.equal(evaluateMatch({ ...ventilator, model: '6682282', type: 'vaporizer' }, vaporizer).rule, RULES.EXACT_MODEL_AND_RANGE, 'with the right model it is exact');
+});
+
+test('lot codes that look like ranges never make a unit "inside a range"', () => {
+  const recall = { recallNumber: 'Z-1-2025', recallClass: 'II', date: '2025-01-01', firm: 'Acme Medical Inc', product: 'Acme pump', productText: 'Acme pump model A100', codeText: 'Model A100; Lots: 2008-1459; 2011-2331; 2012-2961' };
+  const m = evaluateMatch({ manufacturer: 'Acme Medical', model: 'A100', type: 'pump', lotOrSerial: '2100' }, recall);
+  assert.equal(m.rule, RULES.LIKELY_MODEL, 'only likely: 2100 is not "inside" 2011-2331, that is a lot code');
+});
+
+test('a serial with letters after its digits is never judged by a range', () => {
+  const recall = { ...astralRecall, codeText: 'Serial number < 99999999999' };
+  const m = evaluateMatch({ manufacturer: 'ResMed', model: 'Astral 100', type: 'ventilator', lotOrSerial: 'US001A00AW' }, recall);
+  assert.equal(m.rule, RULES.LIKELY_MODEL);
+});
+
+test('the match carries the device\'s UDI-DI for display', () => {
+  const match = matchDeviceToRecall({ id: 'd1', name: 'Monitor', ward: 'Telemetry', ...monitor }, philipsRecall);
+  assert.equal(match.deviceUdiDi, '00884838102842');
+  assert.equal(matchDeviceToRecall({ id: 'd2', name: 'Monitor', ward: 'Telemetry', ...monitor, udiDi: undefined }, philipsRecall).deviceUdiDi, '');
+});

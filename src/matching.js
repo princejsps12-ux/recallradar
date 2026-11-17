@@ -10,21 +10,31 @@
 //
 //   confidence  rule                              needs
 //   ----------  --------------------------------  -----------------------------------------
+//   exact       exact-udi-unit                    the device's UDI-DI is listed + this unit's lot/serial (listed or in a range)
+//   exact       exact-udi-all                     the device's UDI-DI is listed + recall covers ALL units
 //   exact       exact-manufacturer-model-lot      manufacturer + model + this unit's lot/serial listed
+//   exact       exact-manufacturer-model-range    manufacturer + model + this unit's serial inside a stated range
 //   exact       exact-manufacturer-model-all      manufacturer + model + recall covers ALL units
+//   likely      likely-udi                        the device's UDI-DI is listed (the unit itself not confirmed)
 //   likely      likely-manufacturer-model         manufacturer + model (lot/serial not listed)
 //   likely      likely-manufacturer-lot           manufacturer + lot/serial (model not written)
 //   possible    possible-model-other-maker        model only, from a DIFFERENT firm (relabel/parent)
 //   possible    possible-manufacturer-type        manufacturer + same kind of device (no model)
 //
+// The UDI-DI rules come first: a UDI-DI (a GS1 GTIN) says exactly which product version a device is, whoever sold it, so
+// no manufacturer or model text is needed and a recall filed under a parent company or distributor is still found. Serial
+// ranges ("serial numbers 1000 through 1500", "serial number < 2224") are read only from text that follows the word
+// "serial" (see serials.js), so lot codes such as "2011-2331" are never mistaken for ranges.
+//
 // No match is reported when none of these rules applies.
 //
-// Known limits (also in the README): serial ranges such as "serial number < 2224" are not
-// understood, so a device inside such a range shows up as "likely" and needs a human check.
-// Plurals and spelling variants are not folded together ("monitor" vs "monitors").
+// Known limits (also in the README): plurals and spelling variants are not folded together
+// ("monitor" vs "monitors"); a serial with letters after its digits ("US001A00AW") is never judged by a range.
 //
 // This file has no Forge imports so every rule can be unit tested with plain Node.
 import { tokenize, compact, containsPhrase } from './text.js';
+import { extractUdis, normalizeDi } from './udi.js';
+import { parseSerialConstraints, serialInConstraints } from './serials.js';
 
 export const CONFIDENCE = Object.freeze({
   EXACT: 'exact',
@@ -33,8 +43,12 @@ export const CONFIDENCE = Object.freeze({
 });
 
 export const RULES = Object.freeze({
+  EXACT_UDI_UNIT: 'exact-udi-unit',
+  EXACT_UDI_ALL_UNITS: 'exact-udi-all',
   EXACT_MODEL_AND_LOT: 'exact-manufacturer-model-lot',
+  EXACT_MODEL_AND_RANGE: 'exact-manufacturer-model-range',
   EXACT_MODEL_ALL_UNITS: 'exact-manufacturer-model-all',
+  LIKELY_UDI: 'likely-udi',
   LIKELY_MODEL: 'likely-manufacturer-model',
   LIKELY_LOT: 'likely-manufacturer-lot',
   POSSIBLE_MODEL_OTHER_MAKER: 'possible-model-other-maker',
@@ -123,10 +137,56 @@ export function lotInRecall(lotOrSerial, recall) {
   return containsPhrase(recall.codeText || '', lotOrSerial);
 }
 
-// Fact 3b. The recall says every unit is affected ("all serial numbers").
+// Words that turn "all serial numbers" into "all serial numbers THAT...": the recall then covers some units only.
+// ("All serial numbers with radio software versions 22D28, 22D29 and 22D30" is not every unit.)
+export const ALL_UNITS_QUALIFIERS = Object.freeze([
+  'with', 'having', 'running', 'configured', 'manufactured', 'between', 'software', 'firmware', 'version', 'versions',
+  'installed', 'equipped', 'after', 'before', 'prior', 'starting', 'beginning',
+]);
+const QUALIFIER_SET = new Set(ALL_UNITS_QUALIFIERS);
+// How many words after the phrase may carry such a qualifier.
+const QUALIFIER_WINDOW = 4;
+
+// Fact 3b. The recall says every unit is affected ("all serial numbers"), without a condition on which ones.
 export function recallCoversAllUnits(recall) {
   const text = tokenize(recall.codeText || '');
-  return ALL_UNITS_PHRASES.some((phrase) => containsPhrase(text, phrase));
+  for (const phrase of ALL_UNITS_PHRASES) {
+    for (let start = 0; start <= text.length - phrase.length; start += 1) {
+      if (!phrase.every((word, i) => text[start + i] === word)) continue;
+      const following = text.slice(start + phrase.length, start + phrase.length + QUALIFIER_WINDOW);
+      // "all serial numbers" or "all lot numbers" may be followed by "numbers"/"number"; skip that word before looking.
+      const after = following[0] === 'numbers' || following[0] === 'number' ? following.slice(1) : following;
+      if (!after.some((word) => QUALIFIER_SET.has(word))) return true;
+    }
+  }
+  return false;
+}
+
+// What a recall's code text says in a form a program can use, worked out once per recall: the UDI-DIs it names and the
+// serial ranges it states. (A WeakMap, so it goes away with the recall and never has to be stored or sent anywhere.)
+const parsedRecalls = new WeakMap();
+function parsedRecall(recall) {
+  let parsed = parsedRecalls.get(recall);
+  if (!parsed) {
+    const text = recall.codeText || '';
+    parsed = { udis: extractUdis(text), constraints: parseSerialConstraints(text) };
+    parsedRecalls.set(recall, parsed);
+  }
+  return parsed;
+}
+
+// Fact 4. The device's own UDI-DI (a GS1 GTIN) is named in the recall. Returns { di } or null.
+export function udiInRecall(deviceUdi, recall) {
+  const di = normalizeDi(deviceUdi);
+  if (!di) return null;
+  return parsedRecall(recall).udis.find((u) => u.di === di) || null;
+}
+
+// Fact 3c. This unit's serial falls inside a range or limit the recall states ("serial numbers 1000 through 1500").
+// Returns the recall's own words for it ("1000 through 1500"), or null.
+export function serialInRecallRange(serial, recall) {
+  const hit = serialInConstraints(serial, parsedRecall(recall).constraints);
+  return hit ? hit.text : null;
 }
 
 // Used only by the "same kind of device" rule: every word of the device's type
@@ -150,6 +210,24 @@ export function evaluateMatch(device, recall) {
   const sameMaker = manufacturersMatch(device.manufacturer, recall.firm);
   const hasModel = modelInRecall(device.model, recall);
   const hasLot = lotInRecall(device.lotOrSerial, recall);
+  const range = hasLot ? null : serialInRecallRange(device.lotOrSerial, recall);
+  const unitListed = hasLot || Boolean(range);
+  const unitHow = hasLot ? `serial/lot "${device.lotOrSerial}" is listed` : `serial "${device.lotOrSerial}" falls inside the range the recall gives ("${range}")`;
+  const whyNotListed = device.lotOrSerial
+    ? `serial/lot "${device.lotOrSerial}" is not among the numbers listed (the recall may use a form we cannot read), so check it manually`
+    : 'this device has no serial/lot recorded, so it cannot be checked against the recall';
+
+  // RULES with the UDI-DI: the identifier names the product version exactly, so no maker or model text is needed.
+  const udi = udiInRecall(device.udiDi, recall);
+  if (udi) {
+    if (unitListed) {
+      return result(CONFIDENCE.EXACT, RULES.EXACT_UDI_UNIT, `UDI-DI ${udi.di} is listed in this recall, and this unit's ${unitHow}.`);
+    }
+    if (recallCoversAllUnits(recall)) {
+      return result(CONFIDENCE.EXACT, RULES.EXACT_UDI_ALL_UNITS, `UDI-DI ${udi.di} is listed in this recall, and the recall covers all serial/lot numbers.`);
+    }
+    return result(CONFIDENCE.LIKELY, RULES.LIKELY_UDI, `UDI-DI ${udi.di} is listed in this recall, but ${whyNotListed}.`);
+  }
 
   if (sameMaker && hasModel) {
     // RULE exact-manufacturer-model-lot: maker, model AND this unit's number are all listed.
@@ -158,6 +236,14 @@ export function evaluateMatch(device, recall) {
         CONFIDENCE.EXACT,
         RULES.EXACT_MODEL_AND_LOT,
         `Manufacturer, model "${device.model}" and serial/lot "${device.lotOrSerial}" are all listed in this recall.`,
+      );
+    }
+    // RULE exact-manufacturer-model-range: maker and model match and this unit's serial is inside a stated range.
+    if (range) {
+      return result(
+        CONFIDENCE.EXACT,
+        RULES.EXACT_MODEL_AND_RANGE,
+        `Manufacturer and model "${device.model}" match, and serial "${device.lotOrSerial}" falls inside the range the recall gives ("${range}").`,
       );
     }
     // RULE exact-manufacturer-model-all: maker and model match and the recall covers every unit.
@@ -170,19 +256,18 @@ export function evaluateMatch(device, recall) {
     }
     // RULE likely-manufacturer-model: maker and model match but the unit's number is not listed.
     // Either we do not know the number, or the recall lists numbers in a form we cannot read
-    // (ranges, partial lists), so a person should check.
-    const why = device.lotOrSerial
-      ? `serial/lot "${device.lotOrSerial}" is not among the numbers listed (the recall may use ranges or a partial list), so check it manually`
-      : 'this device has no serial/lot recorded, so it cannot be checked against the recall';
+    // (partial lists, ranges of a kind we do not parse), so a person should check.
     return result(
       CONFIDENCE.LIKELY,
       RULES.LIKELY_MODEL,
-      `Manufacturer and model "${device.model}" match, but ${why}.`,
+      `Manufacturer and model "${device.model}" match, but ${whyNotListed}.`,
     );
   }
 
-  // RULE likely-manufacturer-lot: maker and this unit's number match, but the recall text does
-  // not mention the model (some recalls list only serial numbers).
+  // RULE likely-manufacturer-lot: maker and this unit's number match, but the recall text does not mention the
+  // model (some recalls list only serial numbers). There is deliberately NO such rule for a serial inside a RANGE: a number
+  // in a range, with no model or product to tie it to, is too weak (a real Getinge vaporizer recall lists "Serial Numbers:
+  // 17003 - 23454", and a ventilator with serial 21500 is not affected by it).
   if (sameMaker && hasLot) {
     return result(
       CONFIDENCE.LIKELY,
@@ -236,6 +321,7 @@ export function matchDeviceToRecall(device, recall) {
     ward: device.ward,
     deviceManufacturer: device.manufacturer,
     deviceModel: device.model,
+    deviceUdiDi: device.udiDi || '',
     lotOrSerial: device.lotOrSerial,
     recallNumber: recall.recallNumber,
     recallClass: recall.recallClass,

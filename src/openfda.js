@@ -1,5 +1,6 @@
 // Pure helpers for the openFDA device recall (enforcement) API.
 // No Forge imports here so everything can be unit tested with plain Node.
+import { diVariants } from './udi.js';
 
 export const OPENFDA_BASE_URL = 'https://api.fda.gov/device/enforcement.json';
 export const DEFAULT_LIMIT = 20;
@@ -83,7 +84,8 @@ export function parseRecallForMatching(raw) {
   return {
     ...recall,
     productText: cleanText(raw.product_description),
-    codeText: cleanText(raw.code_info),
+    // code_info, plus more_code_info where the FDA put the rest of the lot/serial/UDI text.
+    codeText: cleanText(`${typeof raw.code_info === 'string' ? raw.code_info : ''} ${typeof raw.more_code_info === 'string' ? raw.more_code_info : ''}`),
     // Used to explain a recall (see recallDetails below), not for matching.
     reasonForRecall: truncate(cleanText(raw.reason_for_recall), MAX_REASON_LENGTH),
     status: cleanText(raw.status), // "Ongoing", "Completed" or "Terminated"
@@ -131,6 +133,19 @@ function searchUrl(expression, limit) {
   return `${OPENFDA_BASE_URL}?search=${expression}&sort=report_date:desc&limit=${n}`;
 }
 
+// The same search, starting `skip` records further in (openFDA pages with limit + skip, newest first).
+export function withSkip(url, skip) {
+  const offset = Math.trunc(Number(skip)) || 0;
+  return offset > 0 ? `${url}&skip=${offset}` : url;
+}
+
+// Adds the optional openFDA API key (https://open.fda.gov/apis/authentication/): with one the allowance is 120,000
+// requests a day instead of about 1,000 per address. No key, or an unusable one, leaves the URL as it is. Only letters,
+// digits and a few separators are accepted, so the key can never change what is searched.
+export function withApiKey(url, key) {
+  return typeof key === 'string' && /^[A-Za-z0-9_-]{20,80}$/.test(key.trim()) ? `${url}&api_key=${key.trim()}` : url;
+}
+
 // Recalls whose recalling_firm contains these words, inside the date window.
 // Returns null if there are no usable words.
 export function buildFirmRecallsUrl(firmWords, fromYmd, toYmd, limit = MAX_RECALLS_PER_QUERY) {
@@ -147,6 +162,14 @@ export function buildModelRecallsUrl(modelWordLists, fromYmd, toYmd, limit = MAX
     .map((words) => [phraseClause('product_description', words), phraseClause('code_info', words)])
     .map(([product, code]) => (product && code ? `${product}+OR+${code}` : ''))
     .filter(Boolean);
+  if (clauses.length === 0) return null;
+  return searchUrl(`(${clauses.join('+OR+')})+AND+${reportDateRange(fromYmd, toYmd)}`, limit);
+}
+
+// Recalls that name any of these UDI-DIs in the code info, inside the date window. A GTIN is written with or without its
+// leading zeros in recall texts, so each DI is searched in every form (14, 13 and 12 digits). Returns null if no DI is usable.
+export function buildUdiRecallsUrl(dis, fromYmd, toYmd, limit = MAX_RECALLS_PER_QUERY) {
+  const clauses = [...new Set(dis.flatMap((di) => diVariants(di)))].map((form) => `code_info:"${form}"`);
   if (clauses.length === 0) return null;
   return searchUrl(`(${clauses.join('+OR+')})+AND+${reportDateRange(fromYmd, toYmd)}`, limit);
 }

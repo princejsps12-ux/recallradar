@@ -200,6 +200,7 @@ export default function DeviceDrawer({ deviceId, result, tasks, suggestions, tea
                     <Field label="Ward">{first.ward}</Field>
                     <Field label="Team">{first.ward && teams[first.ward] ? teams[first.ward] : 'No team yet'}</Field>
                     <Field label="Serial or lot">{first.lotOrSerial}</Field>
+                    {first.deviceUdiDi ? <Field label="UDI-DI">{first.deviceUdiDi}</Field> : null}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: sp(100) }}>
                     <Heading size="medium">Recalls that affect it ({matches.length})</Heading>

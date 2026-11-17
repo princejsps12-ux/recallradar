@@ -10,10 +10,13 @@
 //   manufacturer  required  e.g. "Becton Dickinson"
 //   model         required  model / catalog number, e.g. "8015"
 //   lotOrSerial   optional  lot or serial number of this physical unit ("" if unknown)
+//   udiDi         optional  the device's UDI-DI, a GS1 GTIN, stored as 14 digits ("" if unknown). The strongest way to
+//                           match a recall: it names the product version exactly, whoever sold it (see udi.js)
 //   ward          optional  where it is, e.g. "ICU"
 //   source        optional  where the record came from: see DEVICE_SOURCES
 //
 // This file has no Forge imports so it can be unit tested with plain Node.
+import { normalizeDi } from './udi.js';
 
 // Every device is stored under its own key so the list can grow past one storage value's size limit.
 export const DEVICE_KEY_PREFIX = 'device:';
@@ -55,6 +58,14 @@ export function normalizeDevice(input) {
   }
   for (const field of OPTIONAL_FIELDS) {
     device[field] = asTrimmedString(input[field]);
+  }
+  const udi = asTrimmedString(input.udiDi);
+  if (udi) {
+    const di = normalizeDi(udi, { strict: true });
+    if (!di) throw new Error(`Device has an invalid UDI-DI "${udi}" (it must be a GTIN: 8, 12, 13 or 14 digits with a correct check digit)`);
+    device.udiDi = di;
+  } else {
+    device.udiDi = '';
   }
   const source = asTrimmedString(input.source);
   device.source = Object.values(DEVICE_SOURCES).includes(source) ? source : DEVICE_SOURCES.MANUAL;

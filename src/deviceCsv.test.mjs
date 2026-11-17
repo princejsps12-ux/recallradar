@@ -8,7 +8,7 @@ test('a comma separated sheet becomes devices with ids, source and defaults', ()
   const { devices, errors } = parseDeviceCsv(csv);
   assert.deepEqual(errors, []);
   assert.equal(devices.length, 2);
-  assert.deepEqual(devices[0], { id: 'own-001', name: 'Sigma pump', type: 'medical device', manufacturer: 'Baxter Healthcare', model: '35700BAX2', lotOrSerial: 'SP-1', ward: 'Med-Surg 4E', source: 'manual' });
+  assert.deepEqual(devices[0], { id: 'own-001', name: 'Sigma pump', type: 'medical device', manufacturer: 'Baxter Healthcare', model: '35700BAX2', lotOrSerial: 'SP-1', ward: 'Med-Surg 4E', udiDi: '', source: 'manual' });
   assert.equal(devices[1].id, 'own-002');
 });
 
@@ -79,4 +79,26 @@ test('importDevices replaces earlier pasted devices, keeps demo devices, and sav
   const bad = await importDevices(store, 'Manufacturer,Model\n,1');
   assert.equal(bad.ok, false);
   assert.deepEqual(calls, []);
+});
+
+test('a UDI-DI column is read, checked and stored as 14 digits (UDI, UDI-DI, DI and GTIN all work as its name)', () => {
+  for (const header of ['UDI-DI', 'UDI', 'GTIN', 'DI', 'Device Identifier']) {
+    const { devices, errors } = parseDeviceCsv(`Manufacturer,Model,Serial,${header}\nPhilips,867232,US001A00AW,884838102842\nBaxter,40800BAXUS,BX-1,(01)05413765852428`);
+    assert.deepEqual(errors, [], header);
+    assert.deepEqual(devices.map((d) => d.udiDi), ['00884838102842', '05413765852428'], header);
+  }
+});
+
+test('a wrong UDI-DI is refused with its line number, and the check digit is the test', () => {
+  const { devices, errors } = parseDeviceCsv('Manufacturer,Model,UDI-DI\nPhilips,867232,00884838102842\nBaxter,40800,00884838102843\nAcme,Z9,12345');
+  assert.deepEqual(devices, []);
+  assert.equal(errors.length, 2);
+  assert.match(errors[0], /Line 3: UDI-DI "00884838102843" is not a valid GTIN/);
+  assert.match(errors[1], /Line 4: UDI-DI "12345" is not a valid GTIN/);
+});
+
+test('the UDI-DI is optional, and an empty cell is fine', () => {
+  const { devices, errors } = parseDeviceCsv('Manufacturer,Model,UDI-DI\nPhilips,867232,');
+  assert.deepEqual(errors, []);
+  assert.equal(devices[0].udiDi, '');
 });

@@ -14,16 +14,32 @@
 import {
   buildFirmRecallsUrl,
   buildModelRecallsUrl,
+  buildUdiRecallsUrl,
+  withSkip,
   daysAgoYmd,
   formatYmd,
   parseRecallForMatching,
 } from './openfda.js';
 import { makerWords } from './matching.js';
+import { normalizeDi } from './udi.js';
 import { tokenize, compact } from './text.js';
 
-// How far back to look for recalls. A year keeps recent, still-relevant recalls without
-// pulling in recalls that were closed out long ago.
-export const LOOKBACK_DAYS = 365;
+// How far back to look for recalls. Recalls often stay open for years (the FDA lists them as "Ongoing" long after they
+// were issued), so three years catches the ones a hospital still has devices for; a recall that was closed out earlier
+// than that no longer needs anyone's attention.
+export const LOOKBACK_DAYS = 3 * 365;
+
+// How many UDI-DIs to put in one search. Each is written in up to three forms, so five keeps the URL short.
+export const UDIS_PER_QUERY = 5;
+
+// A query that has more matches than one answer holds is read page by page, up to this many pages of
+// SEARCH_LIMIT_PER_QUERY (so up to 100 recalls per query). Queries with still more matches are counted as capped and the
+// dashboard says so.
+export const MAX_PAGES_PER_QUERY = 4;
+
+// How many requests run at the same time. openFDA allows about 240 a minute per address; a handful at a time keeps a
+// check well inside that while still finishing in seconds, and stops one big hospital from sending dozens at once.
+export const MAX_CONCURRENT_REQUESTS = 6;
 
 // How many model numbers to put in one search. Every model adds two clauses to the URL, so
 // small groups keep URLs short and stop one very common model from crowding out the others.
@@ -32,8 +48,8 @@ export const MODELS_PER_QUERY = 5;
 // How many recalls to ask for in each query (newest first). Smaller answers are faster:
 // measured against the demo hospital, 100 -> 25 cut a check from about 6.5 s to about 1.7 s on
 // a laptop while keeping every match (10 was faster still but lost 35 of 101 secondary matches).
-// The cost of a small cap is that older recalls inside the window may be left out; queries that
-// hit the cap are counted in `cappedQueries` so the panel can say so. See README, "Speed".
+// The cost of a small answer is that a busy query needs more than one: a query that has more matches is read page by page
+// (MAX_PAGES_PER_QUERY), and one that still has more is counted in `cappedQueries` so the panel can say so. See README, "Speed".
 export const SEARCH_LIMIT_PER_QUERY = 25;
 
 // How long to wait for openFDA before giving up on the searches still running. The check runs
@@ -85,7 +101,15 @@ export function planRecallQueries(devices, now = new Date(), limit = SEARCH_LIMI
     modelUrls.push(buildModelRecallsUrl(models.slice(i, i + MODELS_PER_QUERY), from, to, limit));
   }
 
-  return unique([...firmUrls, ...modelUrls].filter(Boolean));
+  // UDI queries: the identifier is the one thing in a recall text that names a product version exactly, so a device that has
+  // one is searched by it too (catching recalls filed under a parent company, a distributor or another brand).
+  const udis = unique(devices.map((device) => normalizeDi(device.udiDi)).filter(Boolean));
+  const udiUrls = [];
+  for (let i = 0; i < udis.length; i += UDIS_PER_QUERY) {
+    udiUrls.push(buildUdiRecallsUrl(udis.slice(i, i + UDIS_PER_QUERY), from, to, limit));
+  }
+
+  return unique([...firmUrls, ...modelUrls, ...udiUrls].filter(Boolean));
 }
 
 // What a saved check keeps about each recall that matched a device with exact or likely confidence:
@@ -107,58 +131,98 @@ export function buildRecallDetails(recalls, matches) {
   return details;
 }
 
+// Runs `worker` over `items`, at most `limit` at a time. Results come back in the order of `items`.
+async function mapWithLimit(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function lane() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await worker(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+  return results;
+}
+
 // Run the planned queries and merge the answers into one list of recalls (no duplicates,
 // full text kept for matching). A failed query never loses the others: it is counted in
-// `failedQueries` so the caller can warn the user; so is one still running after the deadline. A query that matched more recalls than it
-// returned (openFDA reports the real total in meta.results.total) is counted in `cappedQueries`.
+// `failedQueries` so the caller can warn the user; so is one still running after the deadline. A query that matched more
+// recalls than all its pages hold (openFDA reports the real total in meta.results.total) is counted in `cappedQueries`.
+//
+// The first page of every query runs first, a few at a time; a query whose total is larger than one page then has its next
+// pages (up to MAX_PAGES_PER_QUERY) read the same way. The deadline is one moment for the whole check.
 export async function findRecallsForDevices(devices, fetchJson, options = {}) {
   const {
     now = new Date(),
     limit = SEARCH_LIMIT_PER_QUERY,
     deadlineMs = SEARCH_DEADLINE_MS,
+    maxPages = MAX_PAGES_PER_QUERY,
+    concurrency = MAX_CONCURRENT_REQUESTS,
     onProgress = null,
   } = options;
-  const urls = planRecallQueries(devices, now, limit);
+  const firstPages = planRecallQueries(devices, now, limit);
+  const startedAt = Date.now();
 
-  // Tell the caller how far along we are (searches finished, searches in total). A broken
-  // progress callback must never break the check itself.
+  // Tell the caller how far along we are (searches finished, searches in total; the total grows when a query turns out to
+  // have more pages). A broken progress callback must never break the check itself.
   let finished = 0;
+  let total = firstPages.length;
   const report = () => {
     if (!onProgress) return;
     try {
-      onProgress(finished, urls.length);
+      onProgress(finished, total);
     } catch (error) {
       // progress is best effort
     }
   };
   report();
-  const settled = await Promise.allSettled(
-    urls.map((url) =>
-      withDeadline(fetchJson(url), deadlineMs).finally(() => {
-        finished += 1;
-        report();
-      }),
-    ),
-  );
+
+  const run = (url) => {
+    const remaining = deadlineMs - (Date.now() - startedAt);
+    const attempt = remaining <= 0 ? Promise.reject(new Error('Search timed out before it started')) : withDeadline(Promise.resolve().then(() => fetchJson(url)), remaining);
+    return attempt.then(
+      (value) => ({ status: 'fulfilled', value }),
+      (reason) => ({ status: 'rejected', reason }),
+    ).finally(() => {
+      finished += 1;
+      report();
+    });
+  };
+
   const byNumber = new Map();
   let failedQueries = 0;
   let cappedQueries = 0;
-  for (const outcome of settled) {
+  const take = (outcome) => {
     if (outcome.status !== 'fulfilled') {
       failedQueries += 1;
-      continue;
+      return [];
     }
     const results = outcome.value && Array.isArray(outcome.value.results) ? outcome.value.results : [];
-    const total = outcome.value && outcome.value.meta && outcome.value.meta.results
-      ? outcome.value.meta.results.total
-      : 0;
-    if (Number.isFinite(total) && total > results.length) cappedQueries += 1;
     for (const raw of results) {
       const recall = parseRecallForMatching(raw);
-      if (recall && !byNumber.has(recall.recallNumber)) {
-        byNumber.set(recall.recallNumber, recall);
-      }
+      if (recall && !byNumber.has(recall.recallNumber)) byNumber.set(recall.recallNumber, recall);
     }
+    return results;
+  };
+
+  const first = await mapWithLimit(firstPages, concurrency, run);
+  const morePages = [];
+  first.forEach((outcome, index) => {
+    const results = take(outcome);
+    const matches = outcome.status === 'fulfilled' && outcome.value && outcome.value.meta && outcome.value.meta.results ? outcome.value.meta.results.total : 0;
+    if (!Number.isFinite(matches) || matches <= results.length) return;
+    const pages = Math.min(maxPages, Math.ceil(matches / limit));
+    for (let page = 1; page < pages; page += 1) morePages.push(withSkip(firstPages[index], page * limit));
+    if (matches > maxPages * limit) cappedQueries += 1;
+  });
+
+  if (morePages.length) {
+    total += morePages.length;
+    report();
+    const rest = await mapWithLimit(morePages, concurrency, run);
+    rest.forEach(take);
   }
-  return { recalls: [...byNumber.values()], queryCount: urls.length, failedQueries, cappedQueries };
+  return { recalls: [...byNumber.values()], queryCount: total, failedQueries, cappedQueries };
 }

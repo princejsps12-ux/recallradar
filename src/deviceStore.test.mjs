@@ -19,6 +19,7 @@ const pump = {
   model: '8015',
   lotOrSerial: 'SN-1',
   ward: 'ICU',
+  udiDi: '',
   source: 'demo',
 };
 
@@ -32,7 +33,7 @@ test('normalizeDevice trims text and keeps all fields', () => {
 });
 
 test('normalizeDevice defaults optional fields to empty strings', () => {
-  const { lotOrSerial, ward, source, ...required } = pump;
+  const { lotOrSerial, ward, udiDi, source, ...required } = pump;
   const device = normalizeDevice(required);
   assert.equal(device.lotOrSerial, '');
   assert.equal(device.ward, '');
@@ -157,4 +158,12 @@ test('replaceAll is idempotent: running it twice gives the same list', async () 
   await store.replaceAll(input);
   await store.replaceAll(input);
   assert.equal((await store.listDevices()).length, 2);
+});
+
+test('normalizeDevice keeps a valid UDI-DI as 14 digits and rejects one that is not a GTIN', () => {
+  assert.equal(normalizeDevice({ ...pump, udiDi: '884838102842' }).udiDi, '00884838102842');
+  assert.equal(normalizeDevice({ ...pump, udiDi: ' (01)00884838102842 ' }).udiDi, '00884838102842');
+  assert.equal(normalizeDevice({ ...pump, udiDi: '' }).udiDi, '');
+  assert.throws(() => normalizeDevice({ ...pump, udiDi: '00884838102843' }), /invalid UDI-DI/, 'a wrong check digit');
+  assert.throws(() => normalizeDevice({ ...pump, udiDi: 'abc' }), /invalid UDI-DI/);
 });

@@ -143,6 +143,7 @@ function toItem(match, details, taskKey) {
     manufacturer: match.deviceManufacturer,
     model: match.deviceModel,
     serialOrLot: match.lotOrSerial || null,
+    udiDi: match.deviceUdiDi || null,
     recallNumber: match.recallNumber,
     recallClass: match.recallClass || null,
     confidence: match.confidence,
@@ -284,6 +285,7 @@ export function checkDevice({ snapshot, inputs = {} }) {
       manufacturer: device.manufacturer,
       model: device.model,
       serialOrLot: device.lotOrSerial || null,
+      udiDi: device.udiDi || null,
       verdict,
       matches: matches.map((m) => toItem(m, details[m.recallNumber])),
     };
@@ -379,6 +381,7 @@ export async function recallDetails({ snapshot, inputs = {}, deps = {} }) {
       deviceName: m.deviceName,
       ward: m.ward || null,
       serialOrLot: m.lotOrSerial || null,
+      udiDi: m.deviceUdiDi || null,
       confidence: m.confidence,
       whyMatched: m.reason,
       ...(taskKeys[pairKey(m.recallNumber, m.deviceId)] ? { jiraTask: taskKeys[pairKey(m.recallNumber, m.deviceId)] } : {}),

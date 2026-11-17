@@ -28,7 +28,7 @@ for (const d of devices) {
   const best = ms[0];
   console.log(
     `${d.id} ${d.manufacturer} | ${d.model} | ${d.lotOrSerial || '-'} -> ` +
-      (best ? `${best.confidence.toUpperCase()} (${best.rule}) ${best.recallNumber}${ms.length > 1 ? ` +${ms.length - 1} more` : ''}` : 'no match'),
+      (best ? `${best.confidence.toUpperCase()} (${best.rule}) ${best.recallNumber}${ms.length > 1 ? ` +${ms.length - 1} more` : ''}${process.argv.includes('--why') ? `\n      ${best.reason}` : ''}` : 'no match'),
   );
 }
 const counts = {};

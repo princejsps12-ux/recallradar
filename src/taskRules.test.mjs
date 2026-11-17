@@ -232,3 +232,9 @@ test('buildIssueFields adds an assignee only when one was given', () => {
   assert.equal('assignee' in buildIssueFields(base), false);
   assert.deepEqual(buildIssueFields({ ...base, assigneeAccountId: 'acc-1' }).assignee, { accountId: 'acc-1' });
 });
+
+test('the task description names the device\'s UDI-DI when it has one', () => {
+  const match = { confidence: 'exact', reason: 'r', deviceId: 'd1', deviceName: 'Monitor', deviceManufacturer: 'Philips', deviceModel: '867232', lotOrSerial: 'US001A00AW', deviceUdiDi: '00884838102842', ward: 'ICU', recallNumber: 'Z-1-2026', recallClass: 'II', firm: 'Philips', product: 'Monitor', date: '2026-07-01' };
+  assert.match(JSON.stringify(buildIssueFields({ match, projectKey: 'KAN', issueTypeId: '10001', today: new Date('2026-11-17T00:00:00Z') })), /UDI-DI 00884838102842/);
+  assert.doesNotMatch(JSON.stringify(buildIssueFields({ match: { ...match, deviceUdiDi: '' }, projectKey: 'KAN', issueTypeId: '10001', today: new Date('2026-11-17T00:00:00Z') })), /UDI-DI/);
+});

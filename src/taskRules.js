@@ -118,7 +118,7 @@ export function buildTaskDescription(match, dueDate) {
         text(
           `${match.deviceName}, ${match.deviceManufacturer} ${match.deviceModel}, serial/lot ${
             match.lotOrSerial || 'not recorded'
-          }`,
+          }${match.deviceUdiDi ? `, UDI-DI ${match.deviceUdiDi}` : ''}`,
         ),
       ),
       paragraph(bold(`Why this device (${confidence} match): `), text(match.reason)),
