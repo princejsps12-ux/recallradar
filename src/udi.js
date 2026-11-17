@@ -68,8 +68,9 @@ const ELEMENT_STRING = /\(01\)\s*(\d{8,14})((?:\s*\((?:10|11|17|21|240)\)\s*[^\s
 const AI_VALUE = /\((10|21)\)\s*([^\s,;/()]*)/g;
 
 // A label that introduces identifiers: "UDI-DI", "UDI/DI", "UDI", "GTIN", "UDI-DI/GTIN", "Device Identifier", "DI:", with an
-// optional "code" or "number" after it ("UDI-DI code: 00619498003259").
-const LABEL = /(?:\b(?:udi[-\s/]?di|udi|gtin|device identifier)(?:\s*\/\s*(?:gtin|udi|di))?|\bdi(?=\s*:))(?:\s+(?:codes?|numbers?|nos?\.?))?\s*(?:\([^)]{0,30}\))?\s*[:#=]?\s*/gi;
+// optional "code" or "number" after it ("UDI-DI code: 00619498003259"), then ":", "#", "=" or a dash ("UDI - 04037691643526",
+// as in the real Maquet recall Z-0420-2024).
+const LABEL = /(?:\b(?:udi[-\s/]?di|udi|gtin|device identifier)(?:\s*\/\s*(?:gtin|udi|di))?|\bdi(?=\s*:))(?:\s+(?:codes?|numbers?|nos?\.?))?\s*(?:\([^)]{0,30}\))?\s*[:#=\u2013\u2014-]?\s*/gi;
 // Then one or more numbers, each optionally followed by a package level in brackets, separated by , ; / & or "and".
 const LABELLED_NUMBER = /^(\d{8,14})\b(?:\s*\((?:each|case|box|pack|carton|unit|inner|outer|pallet)[^)]{0,10}\))?\s*(?:[,;/&]|\band\b)?\s*/i;
 

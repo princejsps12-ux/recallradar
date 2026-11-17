@@ -243,11 +243,44 @@ export function typeInRecall(deviceType, recall) {
 // --- One recall, several products --------------------------------------------------------
 // A recall often covers several models in one code text ("WX-200: all serial numbers. WX-300: serial numbers 12345-12400").
 // "All serial numbers", a listed lot or a range belongs to the product named beside it, not to every model of the recall, so
-// a device is judged only against the segments of the code text that name ITS model (or UDI-DI). Only when the text has two or
-// more segments that carry unit words AND one of them names this device; otherwise nothing can be told apart and the whole
-// text is used as before. Known limit: a model named only in the product description (not in the code text) cannot be scoped.
+// a device is judged only against the part of the code text that names ITS model (or UDI-DI). Two ways of cutting the text up,
+// tried in this order:
+//   1. ENTRIES (how real recalls are written): each product has an entry that starts at a label with its number ("Model No
+//      1500-1030", "Part No. 701076205", "REF MPX5305-C", "Product Code 1480") or at a list number ("2." / "3)"). The model, the
+//      UDI-DI and the lots then sit in separate sentences of ONE entry, so cutting at every full stop would separate them.
+//   2. SENTENCES (no labels, "WX-200: all serial numbers. WX-300: lots C9999."): each sentence that carries unit words.
+// Either way the cut only counts when the text has two or more parts that carry unit words AND one of them names this device;
+// otherwise nothing can be told apart and the whole text is used as before. Known limits: a model named only in the product
+// description (not in the code text) cannot be scoped, and neither can an entry that starts with a bare number and a name
+// ("5855300 Slim-Cath ... Lot Number: REKY1364"): there the lots of one product can still be read as another's.
 const EXCLUSION = /\b(except|excepting|excluding|excluded|exclusive of|other than|not including|apart from)\b/i;
 const UNIT_CUE = /\b(serial|lots?|batch(?:es)?|all)\b|\((?:10|21)\)/i;
+// A label that names a product and is followed by its number (the number has a digit: "Model No." alone, or "part of", is not one),
+// or a list number. "(1)" is not a list number: "(01)", "(10)" and "(21)" are GS1 identifiers.
+const ENTRY_START = /(?<![\w.(])\d{1,2}[.)]\s+(?=\S)|\b(?:model|part|catalog(?:ue)?|cat|ref|reference|item|sku|article|product)\b(?:\s*\/\s*[a-z]+)?(?:\s+(?:no|nos|number|numbers|code|codes)\b)?\.?\s*[:#]?\s*(?=\S*\d)/gi;
+
+// The entries of a code text that describes several products, or null. A label or list number starts a NEW entry only when the
+// entry before it has already said something about units (a lot, a serial, "all"): a second label inside one product's own header
+// ("Model No 123, Catalog No 456, Lot Numbers A1234") must not split it.
+/**
+ * @param {string} text
+ * @returns {string[] | null}
+ */
+function entryBlocks(text) {
+  const starts = [...text.matchAll(ENTRY_START)].map((m) => m.index);
+  if (starts.length < 2) return null;
+  /** @type {string[]} */
+  const blocks = [];
+  let from = 0;
+  for (const at of starts) {
+    if (at > from && UNIT_CUE.test(text.slice(from, at))) {
+      blocks.push(text.slice(from, at));
+      from = at;
+    }
+  }
+  blocks.push(text.slice(from));
+  return blocks.length >= 2 ? blocks : null;
+}
 
 /**
  * @param {import('./types.js').Recall} recall
@@ -255,11 +288,16 @@ const UNIT_CUE = /\b(serial|lots?|batch(?:es)?|all)\b|\((?:10|21)\)/i;
  * @returns {import('./types.js').Recall}
  */
 function scopedRecall(recall, phrases) {
-  const segments = (recall.codeText || '').split(/\n+|(?<=[.;])\s+/).map((s) => s.trim()).filter(Boolean);
-  const withCue = segments.filter((s) => UNIT_CUE.test(s));
-  if (withCue.length < 2) return recall;
-  const mine = withCue.filter((s) => phrases.some((p) => p && containsPhrase(s, p)));
-  return mine.length === 0 ? recall : { ...recall, codeText: mine.join(' ') };
+  const text = recall.codeText || '';
+  const sentences = text.split(/\n+|(?<=[.;])\s+/).map((s) => s.trim()).filter(Boolean);
+  for (const parts of [entryBlocks(text), sentences]) {
+    if (!parts) continue;
+    const withCue = parts.filter((s) => UNIT_CUE.test(s));
+    if (withCue.length < 2) continue;
+    const mine = withCue.filter((s) => phrases.some((p) => p && containsPhrase(s, p)));
+    if (mine.length > 0) return { ...recall, codeText: mine.join(' ') };
+  }
+  return recall;
 }
 
 // --- Rules ------------------------------------------------------------------------------

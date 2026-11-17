@@ -2,7 +2,9 @@
 // Builds the labeled accuracy set: real FDA recalls (eval/recalls.json) crossed with devices made from them, each pair with
 // the right answer decided BEFORE the matcher is asked.
 //
-//   node scripts/make-eval-set.mjs --pull    fetch the real recalls named in SPEC from openFDA into eval/recalls.json (about 40 requests)
+//   node scripts/make-eval-set.mjs --pull    fetch the recalls named in SPEC that are not in eval/recalls.json yet (one request each); the
+//                                            records already there stay exactly as they were (the set is frozen on purpose)
+//   node scripts/make-eval-set.mjs --pull --refresh   fetch every recall named in SPEC again (the set moves on: re-run npm run eval)
 //   node scripts/make-eval-set.mjs           build eval/cases.json from eval/recalls.json and the SPEC below
 //
 // How the labels come about. Each SPEC line was written by a person reading the real recall text: the recalling firm's
@@ -22,6 +24,16 @@
 //   range-inside / range-outside   a serial inside / outside the range the recall states        -> affected / excluded
 //   lot-code-lookalike             a serial that is "inside" a hyphenated LOT code             -> product-covered
 //   qualified-all                  "all serial numbers WITH software x": the unit is not confirmed -> product-covered
+//
+// Recalls with several products (SPEC field `others`: the other entries of the same code text, each with the units listed for it):
+//   multi-own-unit                 another product's model and a unit listed for THAT product    -> affected
+//   multi-udi-own-unit             the same, found by that product's UDI-DI only                 -> affected
+//   multi-no-unit                  another product's model, no serial recorded                   -> product-covered
+//   multi-other-product-unit       a model of the recall with a unit the recall lists for a DIFFERENT product -> product-covered
+//   multi-udi-other-product-unit   the same, by UDI-DI only                                      -> product-covered
+// Recalls that name units they leave out (SPEC fields `excludedUnits`, `bound`):
+//   excluded-unit / udi-excluded-unit   a unit the text names as excluded ("Excluding 90425438")   -> excluded (the recall rules it out)
+//   bound-inside                   a unit inside an open-ended bound ("Serial Number Before K17160001") -> affected
 //
 // The matcher is not consulted here. The cases measure whether it applies the stated rules to real recall wording; they are a
 // regression set and a sanity check, not a measure of how often it is right in a hospital (see docs/ACCURACY.md).
@@ -77,14 +89,48 @@ const SPEC = [
   { recall: 'Z-0496-2025', maker: 'Siemens Healthcare Diagnostics', model: 'Atellica CH', type: 'cuvette segment', unit: 'N1527024', udi: '00630414596143' },
   { recall: 'Z-2982-2026', maker: 'Medtronic MiniMed', model: 'MMT-1885CLW', type: 'insulin pump', unit: 'NG3150737H', udi: '00763000974374' },
   { recall: 'Z-2623-2026', maker: 'Remel', model: 'R01460', type: 'agar base', unit: 'lot', udi: '848838001796' },
+  // Several products in one recall: each product lists its own lots, so a lot of one must never confirm another.
+  { recall: 'Z-3140-2026', maker: 'CooperSurgical', model: '44-0712', type: 'nasal cpap', unit: '550031624', udi: '60888937009516',
+    others: [
+      { model: '44-0707', units: ['550021057'], udi: '20888937009488' },
+      { model: '44-0709', units: ['550031623'], udi: '20888937009495' },
+      { model: '44-0715', units: ['550031625'], udi: '20888937009525' },
+    ] },
+  { recall: 'Z-2987-2026', maker: 'restor3d', model: '1500-1030', type: 'glenoid baseplate', unit: 'A00030', units: ['A00030', 'A00065', 'A09828', 'A09830'], udi: '00840097513225',
+    others: [{ model: '1500-1035', units: ['A00064', 'A09829'], udi: '00840097513232' }] },
+  { recall: 'Z-0158-2027', maker: 'W L Gore & Associates', model: 'VSWVH0808', type: 'biliary endoprosthesis', unit: '30907025', udi: '00733132638772',
+    others: [{ model: 'VSWVN1006', units: ['30843556', '30843557'], udi: '00733132638864' }] },
+  { recall: 'Z-3015-2026', maker: 'Henry Schein', model: '114-3933', type: 'temporary resin', unit: '2536179', units: ['2536179', '2606429'],
+    others: [
+      { model: '114-3934', units: ['2539064'] },
+      { model: '114-3935', units: ['2533123'] },
+      { model: '114-3937', units: ['2533203', '2607170'] },
+    ] },
+  // Part numbers share lots (260505F is listed for four of them): "foreign" is a lot of another part that is NOT listed for this one.
+  { recall: 'Z-2900-2026', maker: 'Instrumentation Laboratory', model: '00055407504', type: 'gem premier pak', unit: '260505R', udi: '08426950807537', foreign: '260505J',
+    others: [
+      { model: '00055360011', units: ['260505F', '260505J'], udi: '08426950807605', foreign: '260505R' },
+      { model: '00055415010', units: ['260505H', '260505K'], udi: '08426950807698', foreign: '260505R' },
+    ] },
+  // Recalls that leave units out. Z-0420-2024: part 701048002 is a serial range minus six named units, and those six are listed
+  // under part 701076205; a unit named in an exclusion is not affected, the range itself is.
+  { recall: 'Z-0420-2024', maker: 'Maquet Medical Systems', model: '701048002', type: 'emergency drive', unit: '90421507', udi: '04037691643526',
+    range: { inside: '90425300', outside: '90425800' }, excludedUnits: ['90425438', '90425716'], foreign: null, exclusion: true,
+    others: [{ model: '701076205', units: ['90425438', '90425443', '90425747'], foreign: '90425300' }] },
+  { recall: 'Z-1505-2024', maker: 'Philips Respironics', model: 'DS2000X11B', type: 'ventilator', unit: null, udi: '606959052000', qualifiedAll: true, exclusion: true },
+  { recall: 'Z-1884-2024', maker: 'FUJIFILM Healthcare Americas', model: 'AHM250PS24', type: 'ac adapter', unit: null, udi: '04580292771704', excludedUnits: ['K17160001'], bound: { inside: 'K17150100' }, exclusion: true },
 ];
 
 const FIELDS = ['recall_number', 'recalling_firm', 'product_description', 'code_info', 'more_code_info', 'classification', 'report_date', 'status'];
 
 async function pull() {
   mkdirSync(dirname(RECALLS_FILE), { recursive: true });
-  const out = {};
+  // The records already in the file stay as they are (openFDA edits records over time, and the set is a frozen measurement);
+  // only recalls that are missing are fetched, unless --refresh asks for all of them again.
+  const refresh = process.argv.includes('--refresh');
+  const out = !refresh && existsSync(RECALLS_FILE) ? JSON.parse(readFileSync(RECALLS_FILE, 'utf8')) : {};
   for (const { recall } of SPEC) {
+    if (out[recall]) continue;
     const url = `https://api.fda.gov/device/enforcement.json?search=recall_number:"${recall}"&limit=3`;
     const record = (await fetchJson(url)).results.find((r) => r.recall_number === recall);
     if (!record) throw new Error(`${recall} was not found`);
@@ -92,7 +138,7 @@ async function pull() {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   writeFileSync(RECALLS_FILE, `${JSON.stringify(out, null, 1)}\n`);
-  console.log(`${Object.keys(out).length} recalls written to eval/recalls.json`);
+  console.log(`${Object.keys(out).length} recalls in eval/recalls.json`);
 }
 
 const tidy = (text) => String(text || '').replace(/\s+/g, ' ').trim();
@@ -138,10 +184,11 @@ function build() {
     if (text.includes(unlisted.toLowerCase())) throw new Error(`${spec.recall}: the made-up serial is in the text`);
     const base = { manufacturer: spec.maker, model: spec.model, type: spec.type };
     let n = 0;
-    const add = (template, truth, device, extra = {}) => {
+    // `tag` tells apart several cases of one template in one recall (one per product, one per excluded unit).
+    const add = (template, truth, device, extra = {}, tag = '') => {
       n += 1;
       cases.push({
-        id: `${spec.recall}/${template}`, recall: spec.recall, template, truth,
+        id: `${spec.recall}/${template}${tag ? `/${tag}` : ''}`, recall: spec.recall, template, truth, ...(spec.exclusion ? { exclusion: true } : {}),
         device: { id: `${spec.recall}-${n}`, name: `${spec.maker} ${spec.model}`, ward: 'ICU', lotOrSerial: '', udiDi: '', ...base, ...device }, ...extra,
       });
     };
@@ -176,6 +223,50 @@ function build() {
     }
     if (spec.lotCodeLookalike) add('lot-code-lookalike', 'product-covered', { lotOrSerial: spec.lotCodeLookalike });
     if (spec.qualifiedAll) add('qualified-all', 'product-covered', { lotOrSerial: 'ZQ-0042-X' });
+
+    // --- Several products in one recall -------------------------------------------------------------------------------
+    // Each product has its own units, so a unit listed for one product says nothing about another: the same text names the model
+    // and the lot of every product, and a device is "affected" only through the entry of ITS product.
+    const zenith = { manufacturer: 'Zenith Biomedical', model: 'ZX-9000-ZZ', type: 'dental chair' };
+    if (spec.others) {
+      const primaryUnits = spec.units || (unit ? [unit] : []);
+      const parts = spec.others.map((o) => ({ ...o, di: o.udi ? normalizeDi(o.udi, { strict: true }) : null }));
+      for (const u of primaryUnits) if (!text.includes(u.toLowerCase())) throw new Error(`${spec.recall}: "${u}" is not in the recall text`);
+      for (const o of parts) {
+        if (!text.includes(o.model.toLowerCase())) throw new Error(`${spec.recall}: model ${o.model} is not in the recall text`);
+        for (const u of o.units) if (!text.includes(u.toLowerCase())) throw new Error(`${spec.recall}: "${u}" of ${o.model} is not in the recall text`);
+        if (o.udi && !o.di) notes.push(`${spec.recall}: UDI-DI ${o.udi} of ${o.model} is not a valid GTIN, so its UDI cases are skipped`);
+      }
+      // A unit of ANOTHER product of the recall that is not listed for this one (written down in the SPEC when the lists overlap).
+      const foreignTo = (own, rivals, given) => (given !== undefined ? given : rivals.flatMap((r) => r.units).find((u) => !own.includes(u)) || null);
+      const cross = (model, di, own, rivals, given) => {
+        const foreign = foreignTo(own, rivals, given);
+        if (!foreign) return;
+        add('multi-other-product-unit', 'product-covered', { model, lotOrSerial: foreign }, {}, model);
+        if (di) add('multi-udi-other-product-unit', 'product-covered', { ...zenith, udiDi: di, lotOrSerial: foreign }, {}, model);
+      };
+      cross(spec.model, udi, primaryUnits, parts, spec.foreign);
+      for (const o of parts) {
+        add('multi-own-unit', 'affected', { model: o.model, lotOrSerial: o.units[0] }, {}, o.model);
+        if (o.di) add('multi-udi-own-unit', 'affected', { ...zenith, udiDi: o.di, lotOrSerial: o.units[0] }, {}, o.model);
+        add('multi-no-unit', 'product-covered', { model: o.model }, {}, o.model);
+        cross(o.model, o.di, o.units, [{ units: primaryUnits }, ...parts.filter((x) => x !== o)], o.foreign);
+      }
+    }
+
+    // --- Units the text leaves out ------------------------------------------------------------------------------------
+    // A unit the recall names as excluded is ruled out by the recall itself. The matcher does not rule units out (see the known
+    // limits in docs/ACCURACY.md), so these are counted on their own line; what they must never be is "exact".
+    for (const u of spec.excludedUnits || []) {
+      if (!text.includes(u.toLowerCase())) throw new Error(`${spec.recall}: the excluded unit "${u}" is not in the recall text`);
+      add('excluded-unit', 'excluded', { lotOrSerial: u }, {}, u);
+      if (udi) add('udi-excluded-unit', 'excluded', { ...zenith, lotOrSerial: u, udiDi: udi }, {}, u);
+    }
+    // "Serial Number Before K17160001": a unit inside an open-ended bound is affected, though the text never lists it.
+    if (spec.bound) {
+      add('bound-inside', 'affected', { lotOrSerial: spec.bound.inside });
+      if (udi) add('udi-bound-inside', 'affected', { ...zenith, lotOrSerial: spec.bound.inside, udiDi: udi });
+    }
   }
   writeFileSync(CASES_FILE, `${JSON.stringify({ about: 'Generated by scripts/make-eval-set.mjs from eval/recalls.json (real openFDA recalls). Do not edit by hand.', cases }, null, 1)}\n`);
   console.log(`${cases.length} labeled cases for ${SPEC.length} recalls written to eval/cases.json`);

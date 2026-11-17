@@ -58,6 +58,12 @@ test('extractUdis reads labelled lists, with package levels in brackets', () => 
   assert.deepEqual(extractUdis('Alaris Pump Module Model 8100- All Serial Numbers/ UDI(s): 10885403222054, 10885403517723, 10885403810015').map((u) => u.di), ['10885403222054', '10885403517723', '10885403810015']);
 });
 
+test('extractUdis reads a DI after a dash ("UDI - 04037691643526", the real Maquet recall Z-0420-2024), and does not take a number that is not after a label', () => {
+  assert.deepEqual(extractUdis('Part No. 701048002: UDI - 04037691643526; Serial Numbers 90425259 to 90425748. Part No. 701076205: No UDI; Serial Numbers 90425438').map((u) => u.di), ['04037691643526']);
+  assert.deepEqual(extractUdis('GTIN\u201300884838070806, UDI-DI - 00884838085282').map((u) => u.di), ['00884838070806', '00884838085282']);
+  assert.deepEqual(extractUdis('Serial Numbers - 04037691643526').map((u) => u.di), [], 'a dash after "Serial Numbers" is not a UDI label');
+});
+
 test('extractUdis reads a 12-digit DI and keeps lot numbers and serials that are not DIs out', () => {
   assert.deepEqual(extractUdis('R01460 - GC Agar Base 10/PK UDI-DI 848838001796 Lots 338950 356898 359912').map((u) => u.di), ['00848838001796']);
   assert.deepEqual(extractUdis('Lots: 16188647 16210212 Serial Numbers: SQAD01037 SQAD01038'), []);

@@ -511,3 +511,83 @@ test('exclusions in the code text switch the unit-level rules off: the answer st
   assert.equal(evaluateMatch(dev('1300'), range).confidence, 'likely', 'with an exclusion in the text a person decides');
 });
 
+// --- Real code texts of recalls with several products ---------------------------------------------------
+// The texts below are copied from real openFDA records (the same ones are in eval/recalls.json). Real recalls do not write
+// "WX-200: lots A1234." on one line: the model, the UDI-DI and the lots of one product are separate sentences or fields, so
+// scoping has to find where one product's entry ends and the next begins.
+const real = (recallNumber, firm, productText, codeText) => ({ recallNumber, recallClass: 'II', date: '2026-09-30', firm, product: productText.slice(0, 60), productText, codeText });
+const own = (manufacturer, model, lotOrSerial, udiDi = '') => ({ id: 'd', name: `${manufacturer} ${model}`, type: 'device', manufacturer, model, lotOrSerial, udiDi, ward: 'ICU' });
+
+test('Cooper INCA (Z-3140-2026): fields in separate sentences, one lot per model: a lot of another model is never exact', () => {
+  const recall = real(
+    'Z-3140-2026', 'CooperSurgical, Inc.', 'INCA Neonatal Nasal CPAP, Replacement Set. Model Numbers: 44-0712, 44-0707, 44-0709, 44-0715.',
+    '1. Model Number: 44-0712. UDI-DI: (01)60888937009516. Lot Code: 550031624. 2. Model Number: 44-0707. UDI-DI: (01)20888937009488. Lot Code: 550021057. 3. Model Number: 44-0709. UDI-DI: (01)20888937009495. Lot Code: 550031623. 4. Model Number: 44-0715. UDI-DI: (01)20888937009525. Lot Code: 550031625.',
+  );
+  assert.equal(evaluateMatch(own('CooperSurgical', '44-0707', '550021057'), recall).rule, RULES.EXACT_MODEL_AND_LOT);
+  assert.equal(evaluateMatch(own('CooperSurgical', '44-0709', '550031623'), recall).rule, RULES.EXACT_MODEL_AND_LOT);
+  assert.equal(evaluateMatch(own('CooperSurgical', '44-0707', '550031624'), recall).rule, RULES.LIKELY_MODEL, "the lot of 44-0712 is not 44-0707's");
+  // By UDI-DI alone (another maker's name, another model number): the lot has to be the one listed for THAT DI.
+  assert.equal(evaluateMatch(own('Zenith', 'ZX-9', '550031625', '20888937009495'), recall).rule, RULES.LIKELY_UDI, "the lot of 44-0715 is not the lot of the DI of 44-0709");
+  assert.equal(evaluateMatch(own('Zenith', 'ZX-9', '550031623', '20888937009495'), recall).confidence, 'exact');
+});
+
+test('restor3d (Z-2987-2026): "Model No ...; UDI-DI ...; Lot Numbers ..." entries with no full stops between them', () => {
+  const recall = real(
+    'Z-2987-2026', 'restor3d Inc.', 'Veritas Standard Glenoid Baseplate Model/Catalog Number: 1500-1030; 1500-1035',
+    'Lot Code: Model No 1500-1030; UDI-DI 00840097513225; Lot Numbers A00030, A00065, A09828, A09830 Model No 1500-1035; UDI-DI 00840097513232; Lot Numbers A00064, A09829',
+  );
+  assert.equal(evaluateMatch(own('restor3d', '1500-1035', 'A00064'), recall).rule, RULES.EXACT_MODEL_AND_LOT, 'its own lot, listed after a model it does not belong to');
+  assert.equal(evaluateMatch(own('restor3d', '1500-1030', 'A09830'), recall).rule, RULES.EXACT_MODEL_AND_LOT);
+  assert.equal(evaluateMatch(own('restor3d', '1500-1035', 'A00030'), recall).confidence, 'likely', "a lot of 1500-1030 is not 1500-1035's");
+  assert.equal(evaluateMatch(own('restor3d', '1500-1030', 'A09829'), recall).confidence, 'likely');
+});
+
+test('Henry Schein (Z-3015-2026): list numbers "1)", "2)" start the entries, and the manufacturer code inside an entry does not split it', () => {
+  const recall = real(
+    'Z-3015-2026', 'Henry Schein Inc.', 'Structur 2 SC Temporary Resin Cartridge Refill 75Gm, Product Codes: 1) 114-3933, 2) 114-3934',
+    'Product Codes: 1) 114-3933, Mfr Product Code 1479, Lot Numbers: 2536179, 2606429; 2) 114-3934, Mfr Product Code 1480, Lot Numbers: 2539064; 3) 114-3935, Mfr Product Code 1481, Lot Numbers: 2533123; 4) 114-3937, Mfr Product Code 1482, Lot Numbers: 2533203, 2607170.',
+  );
+  assert.equal(evaluateMatch(own('Henry Schein', '114-3934', '2539064'), recall).confidence, 'exact');
+  assert.equal(evaluateMatch(own('Henry Schein', '114-3937', '2607170'), recall).confidence, 'exact');
+  assert.equal(evaluateMatch(own('Henry Schein', '114-3934', '2536179'), recall).confidence, 'likely', "a lot of 114-3933 is not 114-3934's");
+  assert.equal(evaluateMatch(own('Henry Schein', '1480', '2536179'), recall).confidence, 'likely', "the manufacturer's own code finds the same entry");
+});
+
+test('a recall that shares lots between parts: only the lots of the device\'s own part count (IL GEM Premier, Z-2900-2026)', () => {
+  const recall = real(
+    'Z-2900-2026', 'Instrumentation Laboratory', 'GEM Premier 5000 PAK Part Numbers: 00055360010 00055360011 00055407504',
+    'Part No. 00055360010 UDI-DI 08426950807599 Lots 260505K, 260504AG, 260505F; Part No. 00055360011 UDI-DI 08426950807605 Lots 260505F and 260505J; Part No. 00055407504 UDI-DI 08426950807537 Lot 260505R;',
+  );
+  assert.equal(evaluateMatch(own('Instrumentation Laboratory', '00055360011', '260505F'), recall).confidence, 'exact', 'a lot shared by two parts is exact for both');
+  assert.equal(evaluateMatch(own('Instrumentation Laboratory', '00055360010', '260505F'), recall).confidence, 'exact');
+  assert.equal(evaluateMatch(own('Instrumentation Laboratory', '00055407504', '260505K'), recall).confidence, 'likely', 'listed for another part only');
+  assert.equal(evaluateMatch(own('Instrumentation Laboratory', '00055407504', '260505R'), recall).confidence, 'exact');
+});
+
+test('Maquet Cardiohelp (Z-0420-2024): an exclusion belongs to its own part; the other part\'s list still counts', () => {
+  const recall = real(
+    'Z-0420-2024', 'Maquet Medical Systems USA', 'CARDIOHELP Emergency Drive, Part Numbers 701048002 and 701076205.',
+    'Part No. 701048002: UDI - 04037691643526; Serial Numbers 90425259 to 90425748 (Excluding 90425438, 90425443, 90425568, 90425570, 90425588, 90425716) [***Updated 1/8/24 to include Serial numbers 90421507, 90421980, 90424277. Serial numbers 90425366 and 90423121 are additionally included in the scope***] Part No. 701076205: No UDI; Serial Numbers 90425438, 90425443, 90425568, 90425570, 90425588, 90425716, 90425747, 90425748',
+  );
+  assert.equal(evaluateMatch(own('Maquet Medical Systems', '701076205', '90425438'), recall).rule, RULES.EXACT_MODEL_AND_LOT, 'listed under its own part, which has no exclusion');
+  assert.equal(evaluateMatch(own('Maquet Medical Systems', '701048002', '90425438'), recall).confidence, 'likely', 'named in the exclusion of ITS part: never exact');
+  assert.equal(evaluateMatch(own('Maquet Medical Systems', '701048002', '90425300'), recall).confidence, 'likely', 'with an exclusion in its entry a person decides');
+});
+
+test('a label inside one product\'s own header does not split its entry, and one product with several labels is not "several products"', () => {
+  const two = real('Z-1', 'Acme Medical', 'WX monitors', 'Model No 123-A, Catalog No 456-B, Lot Numbers: LOT1234, LOT5678. Model No 789-C, Catalog No 012-D, Lot Numbers: LOT9999.');
+  assert.equal(evaluateMatch(own('Acme Medical', '123-A', 'LOT5678'), two).confidence, 'exact');
+  assert.equal(evaluateMatch(own('Acme Medical', '456-B', 'LOT1234'), two).confidence, 'exact', 'the catalog number of the same product');
+  assert.equal(evaluateMatch(own('Acme Medical', '789-C', 'LOT1234'), two).confidence, 'likely');
+  const one = real('Z-2', 'Acme Medical', 'WX monitor, Model 123-A', 'Model No 123-A, Catalog No 456-B. Lot Numbers: LOT1234, LOT5678.');
+  assert.equal(evaluateMatch(own('Acme Medical', '123-A', 'LOT5678'), one).confidence, 'exact');
+  assert.equal(evaluateMatch(own('Acme Medical', '456-B', 'LOT1234'), one).confidence, 'exact');
+});
+
+test('"1.05.06.00", a part of a sentence and GS1 identifiers are not entries', () => {
+  const recall = real('Z-3', 'Philips Respironics, Inc.', 'Trilogy Evo, all software versions except 1.05.06.00.', 'Model No. DS2000X11B; UDI-DI: 606959052000; All units except those with software version 1.05.06.00.');
+  assert.equal(evaluateMatch(own('Philips Respironics', 'DS2000X11B', 'ABC12345'), recall).confidence, 'likely', 'the exclusion stays in force');
+  const ai = real('Z-4', 'Acme Medical', 'WX-200 monitor', 'UDI (01) 00884838085282 (10) LOT1234 (21) 5555. Serial numbers 1000 through 1500.');
+  assert.equal(evaluateMatch(own('Acme Medical', 'WX-200', '1200', ''), ai).rule, RULES.EXACT_MODEL_AND_RANGE, '"(10) " and "(21) " are not list numbers: nothing is cut, the model is not in the code text, the whole text is used as before');
+});
+

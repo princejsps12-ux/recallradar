@@ -11,9 +11,10 @@
 //                    number from another firm                               -> possible
 //   unrelated        nothing to do with this recall                         -> no match
 //   excluded         the recall itself rules the unit out (its serial is
-//                    outside a stated range). A perfect system says "no
-//                    match"; this matcher cannot rule units out yet, so
-//                    these are counted on their own line, not in the tables.
+//                    outside a stated range, or the text names it as excluded).
+//                    A perfect system says "no match"; this matcher cannot rule
+//                    units out yet, so these are counted on their own line, not
+//                    in the tables. Saying "exact" for one is an over-claim.
 //
 // No Forge imports, so this is unit tested with plain Node.
 
@@ -80,7 +81,9 @@ export function scoreCases(rows) {
     if (e && p) taskTp += 1;
   }
 
-  const overClaims = scored.filter((row) => row.predicted === 'exact' && expected(row) !== 'exact');
+  // A unit the recall rules out that is called "exact" is the worst over-claim there is, so excluded rows count here too (they stay
+  // out of every table, but never out of this list).
+  const overClaims = rows.filter((row) => row.predicted === 'exact' && row.truth !== 'affected');
   const underClaims = scored.filter((row) => expected(row) === 'exact' && row.predicted !== 'exact');
   return {
     total: scored.length,
@@ -90,7 +93,11 @@ export function scoreCases(rows) {
     overClaims: overClaims.map((row) => row.id),
     underClaims: underClaims.map((row) => row.id),
     wrong: scored.filter((row) => row.predicted !== expected(row)).map((row) => row.id),
-    excluded: { total: excluded.length, saidLikely: excluded.filter((row) => row.predicted === 'likely' || row.predicted === 'exact').length },
+    excluded: {
+      total: excluded.length,
+      saidExact: excluded.filter((row) => row.predicted === 'exact').length,
+      saidLikely: excluded.filter((row) => row.predicted === 'likely').length,
+    },
   };
 }
 

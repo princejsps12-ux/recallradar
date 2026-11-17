@@ -6560,6 +6560,2418 @@
     "model": "QX-5150",
     "type": "dental chair"
    }
+  },
+  {
+   "id": "Z-3140-2026/listed-unit",
+   "recall": "Z-3140-2026",
+   "template": "listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3140-2026-1",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031624",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0712",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/udi-listed-unit",
+   "recall": "Z-3140-2026",
+   "template": "udi-listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3140-2026-2",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031624",
+    "udiDi": "60888937009516",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/model-serial-not-listed",
+   "recall": "Z-3140-2026",
+   "template": "model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-3",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0712",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/model-no-serial",
+   "recall": "Z-3140-2026",
+   "template": "model-no-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-4",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0712",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/udi-no-serial",
+   "recall": "Z-3140-2026",
+   "template": "udi-no-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-5",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "60888937009516",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/udi-unlisted-serial",
+   "recall": "Z-3140-2026",
+   "template": "udi-unlisted-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-6",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "60888937009516",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/udi-off-by-one",
+   "recall": "Z-3140-2026",
+   "template": "udi-off-by-one",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-3140-2026-7",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "60888967009517",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/same-maker-other-model",
+   "recall": "Z-3140-2026",
+   "template": "same-maker-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-3140-2026-8",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-07129",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/same-maker-other-kind",
+   "recall": "Z-3140-2026",
+   "template": "same-maker-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-3140-2026-9",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-07129",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/other-maker-same-model",
+   "recall": "Z-3140-2026",
+   "template": "other-maker-same-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-3140-2026-10",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "44-0712",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/unrelated-device",
+   "recall": "Z-3140-2026",
+   "template": "unrelated-device",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-3140-2026-11",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "QX-77-1234",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-other-product-unit/44-0712",
+   "recall": "Z-3140-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-12",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550021057",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0712",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-udi-other-product-unit/44-0712",
+   "recall": "Z-3140-2026",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-13",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550021057",
+    "udiDi": "60888937009516",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-own-unit/44-0707",
+   "recall": "Z-3140-2026",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3140-2026-14",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550021057",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0707",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-udi-own-unit/44-0707",
+   "recall": "Z-3140-2026",
+   "template": "multi-udi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3140-2026-15",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550021057",
+    "udiDi": "20888937009488",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-no-unit/44-0707",
+   "recall": "Z-3140-2026",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-16",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0707",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-other-product-unit/44-0707",
+   "recall": "Z-3140-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-17",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031624",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0707",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-udi-other-product-unit/44-0707",
+   "recall": "Z-3140-2026",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-18",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031624",
+    "udiDi": "20888937009488",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-own-unit/44-0709",
+   "recall": "Z-3140-2026",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3140-2026-19",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031623",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0709",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-udi-own-unit/44-0709",
+   "recall": "Z-3140-2026",
+   "template": "multi-udi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3140-2026-20",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031623",
+    "udiDi": "20888937009495",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-no-unit/44-0709",
+   "recall": "Z-3140-2026",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-21",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0709",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-other-product-unit/44-0709",
+   "recall": "Z-3140-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-22",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031624",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0709",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-udi-other-product-unit/44-0709",
+   "recall": "Z-3140-2026",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-23",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031624",
+    "udiDi": "20888937009495",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-own-unit/44-0715",
+   "recall": "Z-3140-2026",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3140-2026-24",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031625",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0715",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-udi-own-unit/44-0715",
+   "recall": "Z-3140-2026",
+   "template": "multi-udi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3140-2026-25",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031625",
+    "udiDi": "20888937009525",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-no-unit/44-0715",
+   "recall": "Z-3140-2026",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-26",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0715",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-other-product-unit/44-0715",
+   "recall": "Z-3140-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-27",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031624",
+    "udiDi": "",
+    "manufacturer": "CooperSurgical",
+    "model": "44-0715",
+    "type": "nasal cpap"
+   }
+  },
+  {
+   "id": "Z-3140-2026/multi-udi-other-product-unit/44-0715",
+   "recall": "Z-3140-2026",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3140-2026-28",
+    "name": "CooperSurgical 44-0712",
+    "ward": "ICU",
+    "lotOrSerial": "550031624",
+    "udiDi": "20888937009525",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2987-2026/listed-unit",
+   "recall": "Z-2987-2026",
+   "template": "listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2987-2026-1",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "A00030",
+    "udiDi": "",
+    "manufacturer": "restor3d",
+    "model": "1500-1030",
+    "type": "glenoid baseplate"
+   }
+  },
+  {
+   "id": "Z-2987-2026/udi-listed-unit",
+   "recall": "Z-2987-2026",
+   "template": "udi-listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2987-2026-2",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "A00030",
+    "udiDi": "00840097513225",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "glenoid baseplate"
+   }
+  },
+  {
+   "id": "Z-2987-2026/model-serial-not-listed",
+   "recall": "Z-2987-2026",
+   "template": "model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2987-2026-3",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "restor3d",
+    "model": "1500-1030",
+    "type": "glenoid baseplate"
+   }
+  },
+  {
+   "id": "Z-2987-2026/model-no-serial",
+   "recall": "Z-2987-2026",
+   "template": "model-no-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2987-2026-4",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "restor3d",
+    "model": "1500-1030",
+    "type": "glenoid baseplate"
+   }
+  },
+  {
+   "id": "Z-2987-2026/udi-no-serial",
+   "recall": "Z-2987-2026",
+   "template": "udi-no-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2987-2026-5",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "00840097513225",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2987-2026/udi-unlisted-serial",
+   "recall": "Z-2987-2026",
+   "template": "udi-unlisted-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2987-2026-6",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "00840097513225",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2987-2026/udi-off-by-one",
+   "recall": "Z-2987-2026",
+   "template": "udi-off-by-one",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-2987-2026-7",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "00840027513226",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2987-2026/same-maker-other-model",
+   "recall": "Z-2987-2026",
+   "template": "same-maker-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-2987-2026-8",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "restor3d",
+    "model": "1500-10309",
+    "type": "glenoid baseplate"
+   }
+  },
+  {
+   "id": "Z-2987-2026/same-maker-other-kind",
+   "recall": "Z-2987-2026",
+   "template": "same-maker-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-2987-2026-9",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "restor3d",
+    "model": "1500-10309",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2987-2026/other-maker-same-model",
+   "recall": "Z-2987-2026",
+   "template": "other-maker-same-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-2987-2026-10",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "1500-1030",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2987-2026/unrelated-device",
+   "recall": "Z-2987-2026",
+   "template": "unrelated-device",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-2987-2026-11",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "QX-77-1234",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2987-2026/multi-other-product-unit/1500-1030",
+   "recall": "Z-2987-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2987-2026-12",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "A00064",
+    "udiDi": "",
+    "manufacturer": "restor3d",
+    "model": "1500-1030",
+    "type": "glenoid baseplate"
+   }
+  },
+  {
+   "id": "Z-2987-2026/multi-udi-other-product-unit/1500-1030",
+   "recall": "Z-2987-2026",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2987-2026-13",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "A00064",
+    "udiDi": "00840097513225",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2987-2026/multi-own-unit/1500-1035",
+   "recall": "Z-2987-2026",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2987-2026-14",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "A00064",
+    "udiDi": "",
+    "manufacturer": "restor3d",
+    "model": "1500-1035",
+    "type": "glenoid baseplate"
+   }
+  },
+  {
+   "id": "Z-2987-2026/multi-udi-own-unit/1500-1035",
+   "recall": "Z-2987-2026",
+   "template": "multi-udi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2987-2026-15",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "A00064",
+    "udiDi": "00840097513232",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2987-2026/multi-no-unit/1500-1035",
+   "recall": "Z-2987-2026",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2987-2026-16",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "restor3d",
+    "model": "1500-1035",
+    "type": "glenoid baseplate"
+   }
+  },
+  {
+   "id": "Z-2987-2026/multi-other-product-unit/1500-1035",
+   "recall": "Z-2987-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2987-2026-17",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "A00030",
+    "udiDi": "",
+    "manufacturer": "restor3d",
+    "model": "1500-1035",
+    "type": "glenoid baseplate"
+   }
+  },
+  {
+   "id": "Z-2987-2026/multi-udi-other-product-unit/1500-1035",
+   "recall": "Z-2987-2026",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2987-2026-18",
+    "name": "restor3d 1500-1030",
+    "ward": "ICU",
+    "lotOrSerial": "A00030",
+    "udiDi": "00840097513232",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0158-2027/listed-unit",
+   "recall": "Z-0158-2027",
+   "template": "listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-0158-2027-1",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "30907025",
+    "udiDi": "",
+    "manufacturer": "W L Gore & Associates",
+    "model": "VSWVH0808",
+    "type": "biliary endoprosthesis"
+   }
+  },
+  {
+   "id": "Z-0158-2027/udi-listed-unit",
+   "recall": "Z-0158-2027",
+   "template": "udi-listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-0158-2027-2",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "30907025",
+    "udiDi": "00733132638772",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "biliary endoprosthesis"
+   }
+  },
+  {
+   "id": "Z-0158-2027/model-serial-not-listed",
+   "recall": "Z-0158-2027",
+   "template": "model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0158-2027-3",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "W L Gore & Associates",
+    "model": "VSWVH0808",
+    "type": "biliary endoprosthesis"
+   }
+  },
+  {
+   "id": "Z-0158-2027/model-no-serial",
+   "recall": "Z-0158-2027",
+   "template": "model-no-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0158-2027-4",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "W L Gore & Associates",
+    "model": "VSWVH0808",
+    "type": "biliary endoprosthesis"
+   }
+  },
+  {
+   "id": "Z-0158-2027/udi-no-serial",
+   "recall": "Z-0158-2027",
+   "template": "udi-no-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0158-2027-5",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "00733132638772",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0158-2027/udi-unlisted-serial",
+   "recall": "Z-0158-2027",
+   "template": "udi-unlisted-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0158-2027-6",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "00733132638772",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0158-2027/udi-off-by-one",
+   "recall": "Z-0158-2027",
+   "template": "udi-off-by-one",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-0158-2027-7",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "00733162638773",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0158-2027/same-maker-other-model",
+   "recall": "Z-0158-2027",
+   "template": "same-maker-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-0158-2027-8",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "W L Gore & Associates",
+    "model": "VSWVH08089",
+    "type": "biliary endoprosthesis"
+   }
+  },
+  {
+   "id": "Z-0158-2027/same-maker-other-kind",
+   "recall": "Z-0158-2027",
+   "template": "same-maker-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-0158-2027-9",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "W L Gore & Associates",
+    "model": "VSWVH08089",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0158-2027/other-maker-same-model",
+   "recall": "Z-0158-2027",
+   "template": "other-maker-same-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-0158-2027-10",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "VSWVH0808",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0158-2027/unrelated-device",
+   "recall": "Z-0158-2027",
+   "template": "unrelated-device",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-0158-2027-11",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "QX-77-1234",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0158-2027/multi-other-product-unit/VSWVH0808",
+   "recall": "Z-0158-2027",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0158-2027-12",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "30843556",
+    "udiDi": "",
+    "manufacturer": "W L Gore & Associates",
+    "model": "VSWVH0808",
+    "type": "biliary endoprosthesis"
+   }
+  },
+  {
+   "id": "Z-0158-2027/multi-udi-other-product-unit/VSWVH0808",
+   "recall": "Z-0158-2027",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0158-2027-13",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "30843556",
+    "udiDi": "00733132638772",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0158-2027/multi-own-unit/VSWVN1006",
+   "recall": "Z-0158-2027",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-0158-2027-14",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "30843556",
+    "udiDi": "",
+    "manufacturer": "W L Gore & Associates",
+    "model": "VSWVN1006",
+    "type": "biliary endoprosthesis"
+   }
+  },
+  {
+   "id": "Z-0158-2027/multi-udi-own-unit/VSWVN1006",
+   "recall": "Z-0158-2027",
+   "template": "multi-udi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-0158-2027-15",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "30843556",
+    "udiDi": "00733132638864",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0158-2027/multi-no-unit/VSWVN1006",
+   "recall": "Z-0158-2027",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0158-2027-16",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "W L Gore & Associates",
+    "model": "VSWVN1006",
+    "type": "biliary endoprosthesis"
+   }
+  },
+  {
+   "id": "Z-0158-2027/multi-other-product-unit/VSWVN1006",
+   "recall": "Z-0158-2027",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0158-2027-17",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "30907025",
+    "udiDi": "",
+    "manufacturer": "W L Gore & Associates",
+    "model": "VSWVN1006",
+    "type": "biliary endoprosthesis"
+   }
+  },
+  {
+   "id": "Z-0158-2027/multi-udi-other-product-unit/VSWVN1006",
+   "recall": "Z-0158-2027",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0158-2027-18",
+    "name": "W L Gore & Associates VSWVH0808",
+    "ward": "ICU",
+    "lotOrSerial": "30907025",
+    "udiDi": "00733132638864",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3015-2026/listed-unit",
+   "recall": "Z-3015-2026",
+   "template": "listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3015-2026-1",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "2536179",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3933",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/model-serial-not-listed",
+   "recall": "Z-3015-2026",
+   "template": "model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3015-2026-2",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3933",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/model-no-serial",
+   "recall": "Z-3015-2026",
+   "template": "model-no-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3015-2026-3",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3933",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/same-maker-other-model",
+   "recall": "Z-3015-2026",
+   "template": "same-maker-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-3015-2026-4",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-39339",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/same-maker-other-kind",
+   "recall": "Z-3015-2026",
+   "template": "same-maker-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-3015-2026-5",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-39339",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3015-2026/other-maker-same-model",
+   "recall": "Z-3015-2026",
+   "template": "other-maker-same-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-3015-2026-6",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "114-3933",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3015-2026/unrelated-device",
+   "recall": "Z-3015-2026",
+   "template": "unrelated-device",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-3015-2026-7",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "QX-77-1234",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-other-product-unit/114-3933",
+   "recall": "Z-3015-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3015-2026-8",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "2539064",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3933",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-own-unit/114-3934",
+   "recall": "Z-3015-2026",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3015-2026-9",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "2539064",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3934",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-no-unit/114-3934",
+   "recall": "Z-3015-2026",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3015-2026-10",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3934",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-other-product-unit/114-3934",
+   "recall": "Z-3015-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3015-2026-11",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "2536179",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3934",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-own-unit/114-3935",
+   "recall": "Z-3015-2026",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3015-2026-12",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "2533123",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3935",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-no-unit/114-3935",
+   "recall": "Z-3015-2026",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3015-2026-13",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3935",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-other-product-unit/114-3935",
+   "recall": "Z-3015-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3015-2026-14",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "2536179",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3935",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-own-unit/114-3937",
+   "recall": "Z-3015-2026",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3015-2026-15",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "2533203",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3937",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-no-unit/114-3937",
+   "recall": "Z-3015-2026",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3015-2026-16",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3937",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-3015-2026/multi-other-product-unit/114-3937",
+   "recall": "Z-3015-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3015-2026-17",
+    "name": "Henry Schein 114-3933",
+    "ward": "ICU",
+    "lotOrSerial": "2536179",
+    "udiDi": "",
+    "manufacturer": "Henry Schein",
+    "model": "114-3937",
+    "type": "temporary resin"
+   }
+  },
+  {
+   "id": "Z-2900-2026/listed-unit",
+   "recall": "Z-2900-2026",
+   "template": "listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2900-2026-1",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505R",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055407504",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/udi-listed-unit",
+   "recall": "Z-2900-2026",
+   "template": "udi-listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2900-2026-2",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505R",
+    "udiDi": "08426950807537",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/model-serial-not-listed",
+   "recall": "Z-2900-2026",
+   "template": "model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-3",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055407504",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/model-no-serial",
+   "recall": "Z-2900-2026",
+   "template": "model-no-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-4",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055407504",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/udi-no-serial",
+   "recall": "Z-2900-2026",
+   "template": "udi-no-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-5",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "08426950807537",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/udi-unlisted-serial",
+   "recall": "Z-2900-2026",
+   "template": "udi-unlisted-serial",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-6",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "08426950807537",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/udi-off-by-one",
+   "recall": "Z-2900-2026",
+   "template": "udi-off-by-one",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-2900-2026-7",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "08426980807538",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/same-maker-other-model",
+   "recall": "Z-2900-2026",
+   "template": "same-maker-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-2900-2026-8",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "000554075049",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/same-maker-other-kind",
+   "recall": "Z-2900-2026",
+   "template": "same-maker-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-2900-2026-9",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "000554075049",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/other-maker-same-model",
+   "recall": "Z-2900-2026",
+   "template": "other-maker-same-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-2900-2026-10",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "00055407504",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/unrelated-device",
+   "recall": "Z-2900-2026",
+   "template": "unrelated-device",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-2900-2026-11",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "QX-77-1234",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-other-product-unit/00055407504",
+   "recall": "Z-2900-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-12",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505J",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055407504",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-udi-other-product-unit/00055407504",
+   "recall": "Z-2900-2026",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-13",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505J",
+    "udiDi": "08426950807537",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-own-unit/00055360011",
+   "recall": "Z-2900-2026",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2900-2026-14",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505F",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055360011",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-udi-own-unit/00055360011",
+   "recall": "Z-2900-2026",
+   "template": "multi-udi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2900-2026-15",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505F",
+    "udiDi": "08426950807605",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-no-unit/00055360011",
+   "recall": "Z-2900-2026",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-16",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055360011",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-other-product-unit/00055360011",
+   "recall": "Z-2900-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-17",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505R",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055360011",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-udi-other-product-unit/00055360011",
+   "recall": "Z-2900-2026",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-18",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505R",
+    "udiDi": "08426950807605",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-own-unit/00055415010",
+   "recall": "Z-2900-2026",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2900-2026-19",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505H",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055415010",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-udi-own-unit/00055415010",
+   "recall": "Z-2900-2026",
+   "template": "multi-udi-own-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2900-2026-20",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505H",
+    "udiDi": "08426950807698",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-no-unit/00055415010",
+   "recall": "Z-2900-2026",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-21",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055415010",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-other-product-unit/00055415010",
+   "recall": "Z-2900-2026",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-22",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505R",
+    "udiDi": "",
+    "manufacturer": "Instrumentation Laboratory",
+    "model": "00055415010",
+    "type": "gem premier pak"
+   }
+  },
+  {
+   "id": "Z-2900-2026/multi-udi-other-product-unit/00055415010",
+   "recall": "Z-2900-2026",
+   "template": "multi-udi-other-product-unit",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2900-2026-23",
+    "name": "Instrumentation Laboratory 00055407504",
+    "ward": "ICU",
+    "lotOrSerial": "260505R",
+    "udiDi": "08426950807698",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0420-2024/listed-unit",
+   "recall": "Z-0420-2024",
+   "template": "listed-unit",
+   "truth": "affected",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-1",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90421507",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701048002",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/udi-listed-unit",
+   "recall": "Z-0420-2024",
+   "template": "udi-listed-unit",
+   "truth": "affected",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-2",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90421507",
+    "udiDi": "04037691643526",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/model-serial-not-listed",
+   "recall": "Z-0420-2024",
+   "template": "model-serial-not-listed",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-3",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701048002",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/model-no-serial",
+   "recall": "Z-0420-2024",
+   "template": "model-no-serial",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-4",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701048002",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/udi-no-serial",
+   "recall": "Z-0420-2024",
+   "template": "udi-no-serial",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-5",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "04037691643526",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0420-2024/udi-unlisted-serial",
+   "recall": "Z-0420-2024",
+   "template": "udi-unlisted-serial",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-6",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "04037691643526",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0420-2024/udi-off-by-one",
+   "recall": "Z-0420-2024",
+   "template": "udi-off-by-one",
+   "truth": "unrelated",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-7",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "04037621643527",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0420-2024/same-maker-other-model",
+   "recall": "Z-0420-2024",
+   "template": "same-maker-other-model",
+   "truth": "related",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-8",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "7010480029",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/same-maker-other-kind",
+   "recall": "Z-0420-2024",
+   "template": "same-maker-other-kind",
+   "truth": "unrelated",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-9",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "7010480029",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0420-2024/other-maker-same-model",
+   "recall": "Z-0420-2024",
+   "template": "other-maker-same-model",
+   "truth": "related",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-10",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "701048002",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0420-2024/unrelated-device",
+   "recall": "Z-0420-2024",
+   "template": "unrelated-device",
+   "truth": "unrelated",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-11",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "QX-77-1234",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0420-2024/range-inside",
+   "recall": "Z-0420-2024",
+   "template": "range-inside",
+   "truth": "affected",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-12",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90425300",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701048002",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/range-outside",
+   "recall": "Z-0420-2024",
+   "template": "range-outside",
+   "truth": "excluded",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-13",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90425800",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701048002",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/udi-range-inside",
+   "recall": "Z-0420-2024",
+   "template": "udi-range-inside",
+   "truth": "affected",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-14",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90425300",
+    "udiDi": "04037691643526",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0420-2024/multi-own-unit/701076205",
+   "recall": "Z-0420-2024",
+   "template": "multi-own-unit",
+   "truth": "affected",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-15",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90425438",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701076205",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/multi-no-unit/701076205",
+   "recall": "Z-0420-2024",
+   "template": "multi-no-unit",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-16",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701076205",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/multi-other-product-unit/701076205",
+   "recall": "Z-0420-2024",
+   "template": "multi-other-product-unit",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-17",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90425300",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701076205",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/excluded-unit/90425438",
+   "recall": "Z-0420-2024",
+   "template": "excluded-unit",
+   "truth": "excluded",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-18",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90425438",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701048002",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/udi-excluded-unit/90425438",
+   "recall": "Z-0420-2024",
+   "template": "udi-excluded-unit",
+   "truth": "excluded",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-19",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90425438",
+    "udiDi": "04037691643526",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0420-2024/excluded-unit/90425716",
+   "recall": "Z-0420-2024",
+   "template": "excluded-unit",
+   "truth": "excluded",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-20",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90425716",
+    "udiDi": "",
+    "manufacturer": "Maquet Medical Systems",
+    "model": "701048002",
+    "type": "emergency drive"
+   }
+  },
+  {
+   "id": "Z-0420-2024/udi-excluded-unit/90425716",
+   "recall": "Z-0420-2024",
+   "template": "udi-excluded-unit",
+   "truth": "excluded",
+   "exclusion": true,
+   "device": {
+    "id": "Z-0420-2024-21",
+    "name": "Maquet Medical Systems 701048002",
+    "ward": "ICU",
+    "lotOrSerial": "90425716",
+    "udiDi": "04037691643526",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1505-2024/model-serial-not-listed",
+   "recall": "Z-1505-2024",
+   "template": "model-serial-not-listed",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-1",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "Philips Respironics",
+    "model": "DS2000X11B",
+    "type": "ventilator"
+   }
+  },
+  {
+   "id": "Z-1505-2024/model-no-serial",
+   "recall": "Z-1505-2024",
+   "template": "model-no-serial",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-2",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Philips Respironics",
+    "model": "DS2000X11B",
+    "type": "ventilator"
+   }
+  },
+  {
+   "id": "Z-1505-2024/udi-no-serial",
+   "recall": "Z-1505-2024",
+   "template": "udi-no-serial",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-3",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "00606959052000",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1505-2024/udi-unlisted-serial",
+   "recall": "Z-1505-2024",
+   "template": "udi-unlisted-serial",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-4",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "00606959052000",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1505-2024/udi-off-by-one",
+   "recall": "Z-1505-2024",
+   "template": "udi-off-by-one",
+   "truth": "unrelated",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-5",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "00606989052001",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1505-2024/same-maker-other-model",
+   "recall": "Z-1505-2024",
+   "template": "same-maker-other-model",
+   "truth": "related",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-6",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Philips Respironics",
+    "model": "DS2000X11B9",
+    "type": "ventilator"
+   }
+  },
+  {
+   "id": "Z-1505-2024/same-maker-other-kind",
+   "recall": "Z-1505-2024",
+   "template": "same-maker-other-kind",
+   "truth": "unrelated",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-7",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Philips Respironics",
+    "model": "DS2000X11B9",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1505-2024/other-maker-same-model",
+   "recall": "Z-1505-2024",
+   "template": "other-maker-same-model",
+   "truth": "related",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-8",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "DS2000X11B",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1505-2024/unrelated-device",
+   "recall": "Z-1505-2024",
+   "template": "unrelated-device",
+   "truth": "unrelated",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-9",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "QX-77-1234",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1505-2024/qualified-all",
+   "recall": "Z-1505-2024",
+   "template": "qualified-all",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1505-2024-10",
+    "name": "Philips Respironics DS2000X11B",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "Philips Respironics",
+    "model": "DS2000X11B",
+    "type": "ventilator"
+   }
+  },
+  {
+   "id": "Z-1884-2024/model-serial-not-listed",
+   "recall": "Z-1884-2024",
+   "template": "model-serial-not-listed",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-1",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "FUJIFILM Healthcare Americas",
+    "model": "AHM250PS24",
+    "type": "ac adapter"
+   }
+  },
+  {
+   "id": "Z-1884-2024/model-no-serial",
+   "recall": "Z-1884-2024",
+   "template": "model-no-serial",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-2",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "FUJIFILM Healthcare Americas",
+    "model": "AHM250PS24",
+    "type": "ac adapter"
+   }
+  },
+  {
+   "id": "Z-1884-2024/udi-no-serial",
+   "recall": "Z-1884-2024",
+   "template": "udi-no-serial",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-3",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "04580292771704",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1884-2024/udi-unlisted-serial",
+   "recall": "Z-1884-2024",
+   "template": "udi-unlisted-serial",
+   "truth": "product-covered",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-4",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "04580292771704",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1884-2024/udi-off-by-one",
+   "recall": "Z-1884-2024",
+   "template": "udi-off-by-one",
+   "truth": "unrelated",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-5",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "04580222771705",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1884-2024/same-maker-other-model",
+   "recall": "Z-1884-2024",
+   "template": "same-maker-other-model",
+   "truth": "related",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-6",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "FUJIFILM Healthcare Americas",
+    "model": "AHM250PS249",
+    "type": "ac adapter"
+   }
+  },
+  {
+   "id": "Z-1884-2024/same-maker-other-kind",
+   "recall": "Z-1884-2024",
+   "template": "same-maker-other-kind",
+   "truth": "unrelated",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-7",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "FUJIFILM Healthcare Americas",
+    "model": "AHM250PS249",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1884-2024/other-maker-same-model",
+   "recall": "Z-1884-2024",
+   "template": "other-maker-same-model",
+   "truth": "related",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-8",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "AHM250PS24",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1884-2024/unrelated-device",
+   "recall": "Z-1884-2024",
+   "template": "unrelated-device",
+   "truth": "unrelated",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-9",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "QX-77-1234",
+    "udiDi": "",
+    "manufacturer": "Zenith Biomedical",
+    "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1884-2024/excluded-unit/K17160001",
+   "recall": "Z-1884-2024",
+   "template": "excluded-unit",
+   "truth": "excluded",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-10",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "K17160001",
+    "udiDi": "",
+    "manufacturer": "FUJIFILM Healthcare Americas",
+    "model": "AHM250PS24",
+    "type": "ac adapter"
+   }
+  },
+  {
+   "id": "Z-1884-2024/udi-excluded-unit/K17160001",
+   "recall": "Z-1884-2024",
+   "template": "udi-excluded-unit",
+   "truth": "excluded",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-11",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "K17160001",
+    "udiDi": "04580292771704",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-1884-2024/bound-inside",
+   "recall": "Z-1884-2024",
+   "template": "bound-inside",
+   "truth": "affected",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-12",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "K17150100",
+    "udiDi": "",
+    "manufacturer": "FUJIFILM Healthcare Americas",
+    "model": "AHM250PS24",
+    "type": "ac adapter"
+   }
+  },
+  {
+   "id": "Z-1884-2024/udi-bound-inside",
+   "recall": "Z-1884-2024",
+   "template": "udi-bound-inside",
+   "truth": "affected",
+   "exclusion": true,
+   "device": {
+    "id": "Z-1884-2024-13",
+    "name": "FUJIFILM Healthcare Americas AHM250PS24",
+    "ward": "ICU",
+    "lotOrSerial": "K17150100",
+    "udiDi": "04580292771704",
+    "manufacturer": "Zenith Biomedical",
+    "model": "ZX-9000-ZZ",
+    "type": "dental chair"
+   }
   }
  ]
 }

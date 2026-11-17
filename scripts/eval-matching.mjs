@@ -77,7 +77,7 @@ export function report(result = run()) {
   lines.push(row(score.task.actual, score.task.predicted, percent(score.task.precision), percent(score.task.recall)), '');
   lines.push(`- **Over-claims** (said *exact*, the unit is not confirmed affected): **${score.overClaims.length}**${score.overClaims.length ? ` (${score.overClaims.slice(0, 8).join(', ')})` : ''}.`);
   lines.push(`- **Under-claims** (the unit is affected, said less than *exact*): **${score.underClaims.length}**${score.underClaims.length ? ` (${score.underClaims.slice(0, 8).join(', ')})` : ''}.`);
-  lines.push(`- **Recalls that rule a unit out** (its serial is outside a range the recall states): ${score.excluded.total} pairs, and the matcher still said *likely* for ${score.excluded.saidLikely}. It cannot rule a unit out yet; these are counted here and not in the tables above.`, '');
+  lines.push(`- **Recalls that rule a unit out** (its serial is outside a range the recall states, or the text names it as excluded): ${score.excluded.total} pairs. The matcher said *exact* for ${score.excluded.saidExact}${score.excluded.saidExact === 0 ? ' (it must never)' : ' (an over-claim, listed above)'} and *likely* for ${score.excluded.saidLikely}. It cannot rule a unit out yet; these are counted here and not in the tables above.`, '');
   lines.push('## Every case by what it should be and what it was', '');
   lines.push(row('Should be \\ Said', 'exact', 'likely', 'possible', 'no match'), row('---', '---:', '---:', '---:', '---:'));
   for (const e of ['exact', 'likely', 'possible', 'none']) {
@@ -98,6 +98,19 @@ export function report(result = run()) {
   const sweepRows = rows.filter((x) => x.template === 'sweep');
   const sweepRight = sweepRows.filter((x) => x.predicted === 'none').length;
   lines.push(row('`sweep` (unrelated pairs between the recalls)', sweepRows.length, `${sweepRight} (${percent(sweepRight / (sweepRows.length || 1))})`), '');
+  // Recalls with several products: a lot or serial of one product must never confirm another product of the same recall.
+  const multiRecalls = [...new Set(rows.filter((x) => x.template.startsWith('multi-')).map((x) => x.recall))];
+  const multiRows = rows.filter((x) => multiRecalls.includes(x.recall) && x.template !== 'sweep' && x.truth !== 'excluded');
+  const multiRight = multiRows.filter((x) => x.predicted === TRUTH_LEVEL[x.truth]).length;
+  const crossRows = rows.filter((x) => x.template.includes('other-product'));
+  const crossNotExact = crossRows.filter((x) => x.predicted !== 'exact').length;
+  const exclusionRecalls = [...new Set(rows.filter((x) => x.exclusion).map((x) => x.recall))];
+  const exclusionRows = rows.filter((x) => x.exclusion && x.template !== 'sweep');
+  const exclAffected = exclusionRows.filter((x) => x.truth === 'affected');
+  const exclNamed = exclusionRows.filter((x) => x.truth === 'excluded');
+  lines.push('## Recalls with several products, and recalls that leave units out', '');
+  lines.push(`- **Several products in one recall** (${multiRecalls.length} real recalls whose code text names the model, UDI-DI and lots of every product: ${multiRecalls.map((n) => `\`${n}\``).join(', ')}): ${multiRows.length} pairs, ${multiRight} right (${percent(multiRight / (multiRows.length || 1))}). In ${crossRows.length} of them the model or UDI-DI is right but the lot or serial is one the recall lists for a *different* product of the same recall; the matcher never called those *exact* (${crossNotExact} of ${crossRows.length}).`);
+  lines.push(`- **Recalls that leave units out** (${exclusionRecalls.length} real recalls: ${exclusionRecalls.map((n) => `\`${n}\``).join(', ')}): ${exclusionRows.length} pairs. Of the ${exclAffected.length} units in them that the text really covers, ${exclAffected.filter((x) => x.predicted === 'likely').length} came out *likely* and ${exclAffected.filter((x) => x.predicted === 'exact').length} *exact* (a unit listed in an entry that has no exclusion of its own): where an entry excludes units the matcher does not read its lists, ranges or "all units" (it would be guessing which units are left out), so a person decides, and a *likely* match still gets a task. Of the ${exclNamed.length} units the text rules out, ${exclNamed.filter((x) => x.predicted === 'exact').length} came out *exact*.`, '');
   const wrong = rows.filter((x) => x.truth !== 'excluded' && x.predicted !== TRUTH_LEVEL[x.truth]);
   lines.push(wrong.length === 1 ? '## The 1 pair the matcher got wrong' : `## The ${wrong.length} pairs the matcher got wrong`, '');
   if (wrong.length === 0) lines.push('None.', '');
@@ -109,11 +122,12 @@ export function report(result = run()) {
   }
   lines.push('## Known limits (what these numbers do not cover)', '');
   lines.push('- **Very short serials without a UDI-DI.** A serial or lot of fewer than four characters ("209") is not trusted on its own, because such a number turns up in recall texts by chance (`MIN_LOT_LENGTH` in `src/matching.js`). A pair like that is *likely*, not *exact*, even when the recall lists the unit. With the UDI-DI recorded the same unit is *exact* (the `udi-listed-unit` cases).');
-  lines.push('- **Units a recall rules out.** When a recall states a serial range and the unit is outside it, the matcher still says *likely* for the product: it does not rule units out, because a wrongly read range would hide a real recall. A person decides, and the reason names the range.');
-  lines.push('- **Recalls with several products, and exclusions.** The 40 recalls are mostly one product each, so this set cannot show a unit being judged against another model\'s "all serial numbers" or lot list, or a text like "except lot 123". Independent review found both; they are fixed (`scopedRecall` and the exclusion rule in `src/matching.js`, see `docs/MATCHING.md`) and covered by unit tests, not by this set.');
-  lines.push('- **Wording nobody wrote a rule for.** The set holds the 40 recalls above and the ways they write serials, lots and UDI-DIs. A recall that lists its units in a picture, a link or a PDF cannot be read at all, and is *likely* at best.');
+  lines.push('- **Units a recall rules out.** When a recall states a serial range and the unit is outside it, or the text names the unit as excluded ("Excluding 90425438"), the matcher still says *likely* for the product: it does not rule units out, because a wrongly read range would hide a real recall. A person decides, and the reason names what it found.');
+  lines.push('- **Recalls that leave units out are never read as exact.** Where the text says "except", "excluding" and the like, the matcher switches its unit rules off for that product (a list, a range or "all units" cannot be trusted when the text also names units that are left out). So an affected unit in such a recall is *likely*, not *exact*, and an open-ended bound ("Serial Number before K17160001") is not read at all. These pairs are the under-claims listed above; none is missed, because *likely* also gets a task.');
+  lines.push('- **Several products: entries are found by their labels.** One product\'s entry is cut at a label with its number ("Model No", "Part No.", "REF", "Product Code") or at a list number ("2.", "3)"). A recall that starts each entry with a bare number and a name and no label ("5855300 Slim-Cath ... Lot Number: REKY1364") cannot be cut, and there a lot of one product can still be read as another\'s. No case in this set has that form, so the number above says nothing about it.');
+  lines.push(`- **Wording nobody wrote a rule for.** The set holds the ${recallCount} recalls above and the ways they write serials, lots and UDI-DIs. A recall that lists its units in a picture, a link or a PDF cannot be read at all, and is *likely* at best.`);
   lines.push('- **Not a field measurement.** Labels come from the recall text, written by the developer. A hospital\'s own device list (typos, old model names, missing serials) will do worse than this set; the number to trust is the direction, not the last decimal.', '');
-  lines.push('## Re-running it', '', '```bash', 'node scripts/make-eval-set.mjs --pull   # fetch the real recalls again (about 40 requests), only when the set should move on', 'node scripts/make-eval-set.mjs          # rebuild the cases from them', 'npm run eval                            # measure and rewrite this page', '```', '');
+  lines.push('## Re-running it', '', '```bash', 'node scripts/make-eval-set.mjs --pull   # fetch the recalls added to the list in that script (one request each; the others stay frozen)', 'node scripts/make-eval-set.mjs          # rebuild the cases from them', 'npm run eval                            # measure and rewrite this page', '```', '');
   return lines.join('\n');
 }
 
