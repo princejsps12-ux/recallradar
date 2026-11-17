@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 // the shapes the UI reads, and its scenarios must behave the way their descriptions say.
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
-const { createBackend, SCENARIOS, RESOLVERS, SEARCHES, NOT_CONNECTED_MESSAGE, NOT_TEAM_MANAGER_MESSAGE } = require('../scripts/preview/backend.js');
+const { createBackend, SCENARIOS, RESOLVERS, SEARCHES, NOT_CONNECTED_MESSAGE, NOT_TEAM_MANAGER_MESSAGE, alertRefusedMessage } = require('../scripts/preview/backend.js');
 const fixtures = JSON.parse(readFileSync(join(here, '..', 'scripts', 'preview', 'fixtures', 'demo.json'), 'utf8'));
 
 let clock = 1_700_000_000_000;
@@ -258,5 +258,46 @@ test('creating a task in the preview shows up in the progress as a task to do', 
   const after = (await backend.invoke('getProgress')).progress;
   assert.equal(after.overall.withTask, 1);
   assert.equal(after.overall.open, 1, 'a new task is not done');
+});
+
+test('daily alerts in the preview: the news of the scenarios, the settings, Run now, and the refusal in the real words', async () => {
+  const { friendlyJiraError } = await import('./alertService.js');
+  assert.equal(alertRefusedMessage('BIOMED'), friendlyJiraError(new Error('Jira answered 403'), 'BIOMED'), 'the preview says what the app says');
+  const quiet = await make('ready').invoke('getAlerts');
+  assert.deepEqual([quiet.settings.enabled, quiet.newSince.length, quiet.last], [false, 0, null]);
+  const news = await make('new-since').invoke('getAlerts');
+  assert.equal(news.newSince.length, 3);
+  assert.ok(news.newSince.every((n) => clock - Date.parse(n.firstSeen) < 24 * 3600 * 1000), 'all within the last day');
+  assert.deepEqual([...news.newSince].map((n) => n.firstSeen), [...news.newSince].map((n) => n.firstSeen).sort().reverse(), 'newest first');
+  const on = make('alerts-on');
+  const alerts = await on.invoke('getAlerts');
+  assert.equal(alerts.settings.enabled, true);
+  assert.equal(alerts.last.created.length, 2, 'the last run made two tasks');
+  const saved = await on.invoke('getSavedMatches');
+  const pairs = affected(saved.result).map(pairOf);
+  const { tasks } = await on.invoke('getTaskStates', { pairs });
+  assert.equal(alerts.newSince.filter((n) => tasks[`${n.recallNumber}|${n.deviceId}`]).length, 2, 'the two pairs the last run handled have their tasks');
+  const run = await on.invoke('runAlertsNow');
+  assert.equal(run.ran, true);
+  assert.equal(run.summary.news, 1, 'only the third new device was still waiting');
+  assert.equal(run.summary.created.length, 1);
+  assert.equal((await on.invoke('runAlertsNow')).summary.news, 0, 'a second click does nothing');
+  // settings
+  const off = make('new-since');
+  assert.deepEqual(await off.invoke('runAlertsNow'), { ok: true, ran: false, reason: 'off' });
+  assert.match((await off.invoke('saveAlertSettings', { enabled: true })).error, /Choose the project/);
+  assert.match((await off.invoke('saveAlertSettings', { enabled: false, projectKey: 'no good' })).error, /not a Jira project key/);
+  assert.equal((await off.invoke('saveAlertSettings', { enabled: true, projectKey: 'biomed', commentIssueKey: 'biomed-1' })).settings.projectKey, 'BIOMED');
+  // refused
+  const refused = make('alerts-refused');
+  const state = await refused.invoke('getAlerts');
+  assert.equal(state.last.error, alertRefusedMessage('BIOMED'));
+  assert.equal((await refused.invoke('saveAlertSettings', { enabled: true, projectKey: 'BIOMED', commentIssueKey: '' })).error, alertRefusedMessage('BIOMED'));
+  assert.equal((await refused.invoke('runAlertsNow')).summary.error, alertRefusedMessage('BIOMED'));
+  // not an administrator
+  const stranger = make('not-admin');
+  assert.equal((await stranger.invoke('saveAlertSettings', { enabled: false })).notAllowed, true);
+  assert.equal((await stranger.invoke('runAlertsNow')).notAllowed, true);
+  assert.equal((await stranger.invoke('getAlerts')).ok, true, 'everyone may read');
 });
 

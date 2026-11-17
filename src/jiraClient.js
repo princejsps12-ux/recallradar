@@ -4,6 +4,9 @@
 //   findTasks(labels)           -> Map(label -> { key, status, category }): the same, with Jira's status of each task
 //   taskIssueTypeId(projectKey) -> id of the project's "Task" issue type (or null)
 //   bulkCreate(fieldsList)      -> { created: [{ index, key }], errors: [{ index, message }] }
+//   addComment(issueKey, adf)   -> posts a comment (an ADF document) on an issue
+//   issueSummary(issueKey)      -> { key, summary } of an issue the caller may see (throws when not)
+//   baseUrl()                   -> the site address ("https://example.atlassian.net"), for links in comments
 //
 // `request(path, options)` is Jira's requestJira as the CLICKING USER (asUser), so Jira applies
 // that user's permissions: someone who may not create issues simply gets an error back.
@@ -214,5 +217,31 @@ export function createJiraClient({ request, route }) {
     return { administrator: has('ADMINISTER'), projectAdministrator: has('ADMINISTER_PROJECTS') };
   }
 
-  return { findByLabels, findTasks, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, adminRoles };
+  // A comment on an issue, as the caller. `body` is an ADF document (Jira's rich text format).
+  async function addComment(issueKey, body) {
+    const response = await request(route`/rest/api/3/issue/${issueKey}/comment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ body }),
+    });
+    if (!response.ok && response.status !== 201) throw await readError(response);
+  }
+
+  // The title of an issue, to check that it exists and that the caller may see it.
+  async function issueSummary(issueKey) {
+    const response = await request(route`/rest/api/3/issue/${issueKey}?fields=summary`, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw await readError(response);
+    const body = await response.json();
+    return { key: body.key || issueKey, summary: (body.fields && body.fields.summary) || '' };
+  }
+
+  // The site's own address, without a trailing slash; '' when Jira does not say.
+  async function baseUrl() {
+    const response = await request(route`/rest/api/3/serverInfo`, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw await readError(response);
+    const body = await response.json();
+    return typeof body.baseUrl === 'string' ? body.baseUrl.replace(/\/+$/, '') : '';
+  }
+
+  return { findByLabels, findTasks, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, adminRoles, addComment, issueSummary, baseUrl };
 }

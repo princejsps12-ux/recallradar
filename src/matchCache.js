@@ -48,7 +48,7 @@ function fnv1a(text) {
 export function fingerprintDevices(devices) {
   const rows = devices
     .map((d) =>
-      [d.id, d.name, d.type, d.manufacturer, d.model, d.lotOrSerial, d.ward].join(FIELD_SEPARATOR),
+      [d.id, d.name, d.type, d.manufacturer, d.model, d.lotOrSerial, d.ward, d.udiDi || ''].join(FIELD_SEPARATOR),
     )
     .sort();
   return `${devices.length}:${fnv1a(rows.join(DEVICE_SEPARATOR))}`;

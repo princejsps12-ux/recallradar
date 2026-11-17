@@ -56,6 +56,9 @@ const base = {
   getWardTeams: { ok: true, mappings: [{ ward: 'ICU', teamAri: 'ari:cloud:identity::team/11111111-aaaa-4bbb-8ccc-111111111111', teamName: 'Team Atlas' }], wards: ['ER', 'ICU'] },
   getCheckStatus: { ok: true, job: null },
   getTaskStates: { ok: true, tasks: { 'Z-1|d1': 'MOBL-5' }, states: { 'Z-1|d1': { key: 'MOBL-5', status: 'In review', category: 'indeterminate' } } },
+  getAlerts: { ok: true, settings: { enabled: false, projectKey: '', commentIssueKey: '' }, watching: true, since: new Date(Date.now() - 3 * 86400000).toISOString(), last: null, newSince: [] },
+  saveAlertSettings: { ok: true, settings: { enabled: true, projectKey: 'MOBL', commentIssueKey: '' } },
+  runAlertsNow: { ok: true, ran: true, summary: { at: new Date().toISOString(), news: 1, created: ['MOBL-9'], existing: 0, failed: 0, left: 0, comment: 'none', error: '' } },
   getProgress: { ok: true, progress: {
     overall: { pairs: 3, devices: 3, noTask: 2, open: 0, inProgress: 1, done: 0, withTask: 1, resolvedPercent: 0 },
     byRecall: [
@@ -191,6 +194,28 @@ const pickOption = async (el, inputId, optionText) => {
       }
     }
   });
+  // 2c2. new since yesterday: the card, and the alerts dialog (read by everyone, saved and run by administrators)
+  const news = [{ recallNumber: 'Z-2', deviceId: 'd2', firstSeen: new Date(Date.now() - 3 * 3600000).toISOString() }];
+  const saveCalls = [];
+  await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result }, getAlerts: { ...base.getAlerts, newSince: news }, saveAlertSettings: (payload) => { saveCalls.push(payload); return base.saveAlertSettings; } }, async (el, calls) => {
+    const card = el.querySelector('ul[aria-label="New since yesterday"]');
+    check('the "New since yesterday" card lists the device a recall started to affect in the last day, with its time and no task yet', Boolean(card) && /Pump d2/.test(text(card)) && /found 3 h ago/.test(text(card)) && /No task yet/.test(text(card)) && /Class II/.test(text(card)));
+    check('the card sits above "Do this first" and says how many', el.querySelector('#rr-new-h') && el.querySelector('#rr-urgent') && el.querySelector('#rr-new-h').compareDocumentPosition(el.querySelector('#rr-urgent')) & 4);
+    await clickLabel(el, 'More actions');
+    const item = [...document.querySelectorAll('[role="menuitem"], button, a')].find((n) => /^Daily alerts…/.test(n.textContent.trim()));
+    check('the "..." menu offers "Daily alerts…" and says it is off', Boolean(item) && /Off/.test(item.textContent));
+    await act(async () => { item.click(); await wait(300); });
+    const dialog = document.querySelector('[role="dialog"][aria-label="Daily alerts"], [aria-label="Daily alerts"]');
+    check('the dialog opens with the switch off, the status and no "Run now" until saved', Boolean(dialog) && /Create tasks for new recalls every day/.test(text(dialog)) && /Last daily run/.test(text(dialog)) && /not yet/.test(text(dialog)) && [...dialog.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Run now').disabled);
+    const toggle = dialog && dialog.querySelector('input[type="checkbox"]');
+    check('there is one switch, and the project and issue fields are shut while it is off', Boolean(toggle) && !toggle.checked && Boolean(dialog.querySelector('input#rr-alerts-issue')) && dialog.querySelector('input#rr-alerts-issue').disabled);
+    const saveButton = () => [...dialog.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save');
+    check('Save is shut until something changes', saveButton().disabled);
+    await act(async () => { toggle.click(); await wait(150); });
+    check('turning it on opens the fields, but Save needs a project', !dialog.querySelector('input#rr-alerts-issue').disabled && !saveButton().disabled);
+    check('the dialog explains who creates the tasks and that nobody is assigned', /RecallRadar app user/.test(text(dialog)) && /Nobody is assigned/.test(text(dialog)));
+    check('opening the dialog changed nothing on the server', !calls.includes('saveAlertSettings') && !calls.includes('runAlertsNow'));
+  });
   // 2d. the remove dialog uses Atlaskit radios and a danger button that names what it removes
   const someImported = [{ source: 'manual' }, { source: 'manual' }, { source: 'demo' }];
   await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: someImported }, getSavedMatches: { ok: true, result } }, async (el) => {
@@ -247,7 +272,7 @@ const pickOption = async (el, inputId, optionText) => {
     const t = text(el);
     check('issue panel shows the headline, the urgent devices and the dashboard link', /devices? need(s)? action/.test(t) && /Open dashboard/.test(t) && /Pump d2/.test(t) && /Checked/.test(t));
     check('issue panel rows have no per-device buttons', ![...el.querySelectorAll('button')].some((b) => /^(Create task|Details)$/.test(b.textContent.trim())));
-    check('the light panel does not call the Teamwork Graph, the recent FDA list or the task counts', !calls.includes('suggestAssignees') && !calls.includes('fetchRecalls') && !calls.includes('getTaskSummary') && !calls.includes('getWardTeams'));
+    check('the light panel does not call the Teamwork Graph, the recent FDA list or the task counts', !calls.includes('suggestAssignees') && !calls.includes('fetchRecalls') && !calls.includes('getTaskSummary') && !calls.includes('getWardTeams') && !calls.includes('getAlerts'));
     await click(el, /^Create all/);
     check('"Create all" opens the pop-up with the create-all context', global.__modalOpened === true && global.__modalOpts.context.view === 'create-all');
   });

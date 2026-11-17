@@ -11,8 +11,10 @@ import { buildRecallsUrl, parseRecalls, DEFAULT_LIMIT } from './openfda.js';
 import { loadDemoHospital } from './demoHospital.js';
 import { getSavedMatches, requestCheck, getCheckStatus, getLatestResult } from './matchService.js';
 import { createTasks, getTaskStatuses, validatePairs, selectMatches, MAX_STATE_PAIRS_PER_REQUEST } from './taskService.js';
-import { openTaskMatches } from './taskRules.js';
+import { openTaskMatches, pairKey } from './taskRules.js';
 import { summarizeProgress } from './progress.js';
+import { validateSettings } from './alertSettings.js';
+import { runAlerts, friendlyJiraError, friendlyIssueError } from './alertService.js';
 import { assigneesForMatches, checkExplicitAssignees, setWardTeam } from './teamService.js';
 import { createRecallPages } from './recallPageService.js';
 import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient.js';
@@ -40,6 +42,8 @@ export function projectKeyFrom(context, chosen) {
  *   jira            the Jira client as the signed-in person (jiraClient.js)
  *   confluence      the Confluence client as the signed-in person (confluenceClient.js)
  *   teamGraph, wardTeams, openTaskCounts               Teamwork Graph reads and the saved ward-to-team mapping
+ *   jiraApp         the Jira client as the app itself (asApp), for the daily alert only (jiraClient.js)
+ *   alertState, alertSettings                          what has been seen of the affected pairs, and the administrator's alert choices
  *   loadSnapshot, taskKeyLookup                        the saved check and the Jira task keys for a snapshot (runtime.js)
  *   enqueue(message)   puts a message on the recall-check queue
  *   fetch(url, options) the HTTP call to openFDA
@@ -60,6 +64,22 @@ export function createHandlers(deps) {
     const devices = await deps.deviceStore.listDevices();
     const latest = await getLatestResult({ devices, cache: deps.matchCache, jobs: deps.checkJobs });
     return selectMatches(latest ? latest.matches : [], pairs);
+  }
+
+  // The saved check, or null when there is none (or no devices).
+  async function latestSaved() {
+    const devices = await deps.deviceStore.listDevices();
+    return devices.length ? getLatestResult({ devices, cache: deps.matchCache, jobs: deps.checkJobs }) : null;
+  }
+
+  // The devices changed (imported, loaded, removed): the pairs that appear or go because of it are not news.
+  async function devicesChanged(removed = false) {
+    try {
+      if (removed) await deps.alertState.clear();
+      else await deps.alertState.devicesChanged();
+    } catch (error) {
+      log.error('Could not update the alert state', error); // a side job: the device change itself already worked
+    }
   }
 
   const handlers = {
@@ -99,7 +119,9 @@ export function createHandlers(deps) {
     // "Load demo hospital": adds the 30 sample devices (replacing only earlier demo devices).
     loadDemoHospital: forAdministrators(async () => {
       try {
-        return { ok: true, count: await loadDemoHospital(deps.deviceStore) };
+        const count = await loadDemoHospital(deps.deviceStore);
+        await devicesChanged();
+        return { ok: true, count };
       } catch (error) {
         log.error('Failed to load demo hospital', error);
         return { ok: false, error: 'Could not load the demo hospital.' };
@@ -110,7 +132,9 @@ export function createHandlers(deps) {
     importDevices: forAdministrators(async ({ payload }) => {
       try {
         const text = payload && typeof payload.text === 'string' ? payload.text : '';
-        return await importDevices(deps.deviceStore, text);
+        const outcome = await importDevices(deps.deviceStore, text);
+        if (outcome && outcome.ok) await devicesChanged();
+        return outcome;
       } catch (error) {
         log.error('Failed to import devices', error);
         return { ok: false, errors: ['Could not save the devices. Please try again.'] };
@@ -291,6 +315,7 @@ export function createHandlers(deps) {
     removeImportedDevices: forAdministrators(async () => {
       try {
         await deps.deviceStore.removeBySource('manual');
+        await devicesChanged(true);
         return { ok: true, count: (await deps.deviceStore.listDevices()).length };
       } catch (error) {
         log.error('Failed to remove imported devices', error);
@@ -303,6 +328,7 @@ export function createHandlers(deps) {
       try {
         await deps.deviceStore.clear();
         await deps.matchCache.clear();
+        await devicesChanged(true);
         return { ok: true, count: 0 };
       } catch (error) {
         log.error('Failed to clear devices', error);
@@ -319,6 +345,76 @@ export function createHandlers(deps) {
         return { ok: false, error: 'Could not count the RecallRadar tasks.' };
       }
     },
+
+    // What the dashboard shows about the daily alerts, for everyone: the administrator's choices, since when the hospital is watched,
+    // what the last daily run did, and the pairs that became affected in the last 24 hours (ids and times: the page joins them
+    // with the saved check it already has).
+    async getAlerts() {
+      try {
+        const [settings, overview, news] = await Promise.all([deps.alertSettings.get(), deps.alertState.overview(), deps.alertState.newSince()]);
+        const newSince = news.map(({ pair, firstSeen }) => {
+          const cut = pair.indexOf('|');
+          return { recallNumber: pair.slice(0, cut), deviceId: pair.slice(cut + 1), firstSeen };
+        });
+        return { ok: true, settings, watching: overview.watching, since: overview.since, last: overview.last, newSince };
+      } catch (error) {
+        log.error('Failed to read the alerts', error);
+        return { ok: false, error: 'Could not read the alert settings.' };
+      }
+    },
+
+    // Turn the daily alerts on or off and choose where the tasks go (Jira administrators). Turning them on first tries the
+    // project as the app itself, because that is who will create the tasks: a refusal is reported now, not at 3 a.m.
+    saveAlertSettings: forAdministrators(async ({ payload }) => {
+      try {
+        const checked = validateSettings(payload);
+        if (!checked.ok) return { ok: false, error: checked.error };
+        const { settings } = checked;
+        if (settings.enabled) {
+          try {
+            if (!(await deps.jiraApp.taskIssueTypeId(settings.projectKey))) return { ok: false, error: `Project ${settings.projectKey} has no issue type for tasks.` };
+          } catch (error) {
+            return { ok: false, error: friendlyJiraError(error, settings.projectKey) };
+          }
+          if (settings.commentIssueKey) {
+            try {
+              await deps.jiraApp.issueSummary(settings.commentIssueKey);
+            } catch (error) {
+              return { ok: false, error: friendlyIssueError(error, settings.commentIssueKey) };
+            }
+          }
+        }
+        const before = await deps.alertSettings.get();
+        await deps.alertSettings.save(settings);
+        if (settings.enabled && !before.enabled) {
+          // Switching on starts from today: what is affected now is the baseline, only later news is alerted.
+          try {
+            const latest = await latestSaved();
+            if (latest) await deps.alertState.rebaseline(openTaskMatches(latest).map((m) => pairKey(m.recallNumber, m.deviceId)));
+          } catch (error) {
+            log.error('Could not set the alert baseline', error);
+          }
+        }
+        return { ok: true, settings };
+      } catch (error) {
+        log.error('Failed to save the alert settings', error);
+        return { ok: false, error: 'Could not save the alert settings.' };
+      }
+    }),
+
+    // "Run now" (Jira administrators): the daily alert step on the saved check, so the choices can be tried without waiting for
+    // tomorrow. It does exactly what the daily run does: tasks for pairs that are new, one comment, nothing twice.
+    runAlertsNow: forAdministrators(async () => {
+      try {
+        const latest = await latestSaved();
+        if (!latest) return { ok: false, error: 'There is no saved check yet. Press Refresh first, then try again.' };
+        const outcome = await runAlerts({ state: deps.alertState, settings: deps.alertSettings, result: latest, jira: deps.jiraApp, guard: deps.taskGuard, now, log });
+        return outcome.ran ? { ok: true, ran: true, summary: outcome.summary } : { ok: true, ran: false, reason: outcome.reason };
+      } catch (error) {
+        log.error('Failed to run the alerts', error);
+        return { ok: false, error: 'Could not run the alerts.' };
+      }
+    }),
 
     // The Confluence spaces the signed-in person can see, for the space chooser. Never guessed: the person picks.
     async listSpaces() {

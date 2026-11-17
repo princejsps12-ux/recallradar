@@ -51,6 +51,9 @@ and imports answer the way the dialogs read them. People, teams and projects are
 | --- | --- |
 | `ready` | Saved result 8 minutes old, no tasks yet, three wards have a team, the Graph suggests people |
 | `in-progress` | Like `ready` with eight tasks created, three done (the best state for screenshots) |
+| `new-since` | Like `in-progress`, plus three devices that became affected in the last day: the **New since yesterday** card lists them (the daily alerts are off) |
+| `alerts-on` | The daily alerts are on (tasks to BIOMED, a comment to BIOMED-1); two of the three new devices already have the tasks the last daily run made. Open **Daily alerts…** from the **...** menu |
+| `alerts-refused` | The alerts are on but Jira refuses the app user in the project: the last run and the **Run now** answer say what to fix |
 | `all-done` | Every device that needs action already has a task |
 | `first-run` | No devices: the welcome screen with **Load demo hospital** (click it: the check runs and finishes) |
 | `no-check` | Devices, but no check yet |

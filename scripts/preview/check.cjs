@@ -13,7 +13,7 @@
 const { session, open, click, waitFor, press, choose, axe, measure, sleep } = require('./lib.cjs');
 
 const quick = process.argv.includes('--quick');
-const DASHBOARD_STATES = ['ready', 'in-progress', 'all-done', 'first-run', 'no-check', 'running', 'refreshing', 'stale', 'failed-lookups', 'none-affected', 'no-graph', 'not-admin', 'project-admin', 'first-run-not-admin', 'refresh-error', 'error', 'loading'];
+const DASHBOARD_STATES = ['ready', 'in-progress', 'new-since', 'alerts-on', 'alerts-refused', 'all-done', 'first-run', 'no-check', 'running', 'refreshing', 'stale', 'failed-lookups', 'none-affected', 'no-graph', 'not-admin', 'project-admin', 'first-run-not-admin', 'refresh-error', 'error', 'loading'];
 const PANEL_STATES = ['ready', 'in-progress', 'all-done', 'first-run', 'no-check', 'running', 'stale', 'failed-lookups', 'none-affected', 'refresh-error', 'error', 'loading'];
 
 function matrix() {
@@ -116,6 +116,12 @@ async function tour(s, theme) {
   await step('remove dialog closed', escape);
   await step('create all dialog', () => click(frame, 'Create all', { exact: false, selector: 'button' }));
   await step('create all dialog closed', escape);
+  await step('daily alerts dialog', async () => {
+    await click(frame, 'More actions', { selector: 'button' });
+    await click(frame, 'Daily alerts', { exact: false, selector: '[role="menuitem"], button' });
+    await waitFor(frame, 'Create tasks for new recalls every day');
+  });
+  await step('daily alerts dialog closed', escape);
   await step('progress tab', async () => {
     await click(frame, 'Progress', { selector: '[role="tab"]' });
     await waitFor(frame, 'By recall');
@@ -131,6 +137,34 @@ async function tour(s, theme) {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
   }));
   await opened.page.close();
+}
+
+// The daily alerts dialog where the alerts are on, and where Jira refuses the app user: the last run, the problem and what to do
+// about it must all be on screen, and saving again says what to fix.
+async function alertsTour(s, theme) {
+  for (const state of ['alerts-on', 'alerts-refused']) {
+    const name = `tour/${theme}/daily alerts dialog, ${state}`;
+    try {
+      const opened = await open(s, { view: 'dashboard', state, theme, axe: true });
+      const { frame } = opened;
+      await click(frame, 'More actions', { selector: 'button' });
+      await click(frame, 'Daily alerts', { exact: false, selector: '[role="menuitem"], button' });
+      await waitFor(frame, 'Last daily run');
+      await sleep(350);
+      await inspect(opened, name);
+      if (state === 'alerts-refused') {
+        await waitFor(frame, 'RecallRadar app user');
+        await click(frame, 'Run now', { selector: 'button' });
+        await waitFor(frame, 'Ran just now');
+        await sleep(300);
+        await inspect(opened, `${name}, after Run now`);
+      }
+      await opened.page.close();
+    } catch (error) {
+      results.push({ name, problems: [`step failed: ${error.message}`], warnings: [] });
+      console.log(`FAIL ${name}\n       step failed: ${error.message}`);
+    }
+  }
 }
 
 // The Progress tab on a phone: long product text must be cut with an ellipsis, never push the page wider than the screen.
@@ -191,6 +225,7 @@ async function notConnectedTour(s, theme) {
     for (const theme of quick ? ['light'] : ['light', 'dark']) {
       await tour(s, theme);
       await progressPhone(s, theme);
+      await alertsTour(s, theme);
       await notConnectedTour(s, theme);
     }
   } finally {

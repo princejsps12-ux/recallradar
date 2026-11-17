@@ -15,16 +15,19 @@ import WarningIcon from '@atlaskit/icon/core/warning';
 import RefreshIcon from '@atlaskit/icon/core/refresh';
 import PageIcon from '@atlaskit/icon/core/page';
 import UploadIcon from '@atlaskit/icon/core/upload';
+import ClockIcon from '@atlaskit/icon/core/clock';
 import useRecallData from './data/useRecallData';
 import { pairOf } from './data/tasks';
 import { sp, color, card, muted, Progress, CheckedAt } from './ui/kit';
-import { affectedMatches, heroStats, urgentMatches, taskProgress, screenFor } from './dashboardData.mjs';
+import { affectedMatches, heroStats, urgentMatches, taskProgress, screenFor, newSinceMatches, alertsSummary } from './dashboardData.mjs';
 import { Hero, UrgentList } from './dash/Hero';
 import DevicesTable from './dash/DevicesTable';
 import RecentRecalls from './dash/RecentRecalls';
 import DeviceDrawer from './dash/DeviceDrawer';
 import WardTeamsTab from './dash/WardTeamsTab';
 import ProgressTab from './dash/ProgressTab';
+import NewSince from './dash/NewSince';
+import AlertsModal from './dash/AlertsModal';
 import FirstRun from './dash/FirstRun';
 import { ImportModal, ConfluenceModal, CreateAllModal } from './dash/Modals';
 
@@ -78,6 +81,7 @@ export default function Dashboard() {
   const [removeOpen, setRemoveOpen] = useState(false);
   const [confluenceOpen, setConfluenceOpen] = useState(false);
   const [createAllOpen, setCreateAllOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
 
   // The Progress tab reads the status of the tasks from Jira when it is opened and again after a new check or new tasks.
   const checkedAt = d.result ? d.result.checkedAt : null;
@@ -130,6 +134,7 @@ export default function Dashboard() {
           <DropdownItemGroup>
             <DropdownItem elemBefore={<UploadIcon label="" />} isDisabled={!d.canManage} description={d.canManage ? undefined : 'Jira administrators only'} onClick={() => setImportOpen(true)}>Import devices</DropdownItem>
             <DropdownItem elemBefore={<PageIcon label="" />} isDisabled={!ready} onClick={() => setConfluenceOpen(true)}>Create Confluence pages</DropdownItem>
+            <DropdownItem elemBefore={<ClockIcon label="" />} description={d.alerts.data ? alertsSummary(d.alerts.data.settings) : undefined} onClick={() => setAlertsOpen(true)}>Daily alerts…</DropdownItem>
             <DropdownItem elemBefore={<DeleteIcon label="" />} isDisabled={!d.canManage} description={d.canManage ? undefined : 'Jira administrators only'} onClick={() => setRemoveOpen(true)}>Remove devices…</DropdownItem>
           </DropdownItemGroup>
         </DropdownMenu>
@@ -166,6 +171,7 @@ export default function Dashboard() {
   const progressTasks = taskProgress(d.summary);
   const createOne = (m, assign = false) => d.createTasks([m], assign);
   const missing = all.filter((m) => !d.tasks[pairOf(m)]);
+  const news = newSinceMatches(d.result, d.alerts.data ? d.alerts.data.newSince : []);
   const suggestedCount = missing.filter((m) => d.suggestions[pairOf(m)]).length;
   const projectName = (d.projects.find((p) => p.key === d.projectKey) || {}).name || d.projectKey;
   const createAll = async (assign) => {
@@ -186,6 +192,7 @@ export default function Dashboard() {
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300), width: '100%' }}>
             <Hero stats={stats} devicesCount={d.devicesCount} result={d.result} progressTasks={progressTasks} summaryState={d.summaryState} capped={Boolean(d.summary && d.summary.capped)} covered={d.tasksReady && missing.length === 0} />
+            <NewSince items={news} tasks={d.tasks} taskInfo={d.taskInfo} onOpen={setDrawerDevice} alertsOn={Boolean(d.alerts.data && d.alerts.data.settings.enabled)} />
             {/* Nothing matches an open recall: the hero says so. A "do this first" list and a table of zero rows with
                 filters would only repeat it (the table's empty state even asked to "clear filters" when none was set). */}
             {all.length > 0 && <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} loading={!d.tasksReady} />}
@@ -219,6 +226,7 @@ export default function Dashboard() {
           />
         ) : null}
       </FlagGroup>
+      <AlertsModal isOpen={alertsOpen} onClose={() => setAlertsOpen(false)} alerts={d.alerts} projects={d.projects} canManage={d.canManage} hasResult={Boolean(d.result)} onChanged={async (tasksCreated) => { await d.loadAlerts(); if (tasksCreated) d.refreshTasks(); }} />
       <ConfluenceModal isOpen={confluenceOpen} onClose={() => setConfluenceOpen(false)} result={d.result} />
     </>,
   );

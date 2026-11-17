@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One screenshot of one view in one state, for looking at it (or for a bug report):
 //
-//   node scripts/preview/shot.cjs <view> <state> <theme> [width height] [--out=path.png] [--scale=2] [--full] [--tab=Progress]
+//   node scripts/preview/shot.cjs <view> <state> <theme> [width height] [--out=path.png] [--scale=2] [--full] [--tab=Progress] [--menu="Daily alerts"] [--run="Run now"]
 //   node scripts/preview/shot.cjs dashboard none-affected light
 //   node scripts/preview/shot.cjs panel first-run dark 360 262 --out=/tmp/panel.png
 //
@@ -27,6 +27,25 @@ const [view = 'dashboard', state = 'ready', theme = 'light', width, height] = po
         if (!tab) throw new Error(`No tab called "${name}"`);
         tab.click();
       }, flag('tab'));
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    }
+    if (flag('menu')) {
+      // Opens a dialog from the "..." menu by the item's name before the picture is taken.
+      await opened.frame.evaluate(() => document.querySelector('button[aria-label="More actions"]').click());
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      await opened.frame.evaluate((name) => {
+        const item = [...document.querySelectorAll('[role="menuitem"], button')].find((n) => n.textContent.trim().startsWith(name));
+        if (!item) throw new Error(`No menu item "${name}"`);
+        item.click();
+      }, flag('menu'));
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    }
+    if (flag('run')) {
+      await opened.frame.evaluate((name) => {
+        const button = [...document.querySelectorAll('[role="dialog"] button')].find((n) => n.textContent.trim() === name);
+        if (!button) throw new Error(`No button "${name}"`);
+        button.click();
+      }, flag('run'));
       await new Promise((resolve) => setTimeout(resolve, 700));
     }
     await opened.page.screenshot({ path: out, fullPage: args.includes('--full') });

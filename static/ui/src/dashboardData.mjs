@@ -152,3 +152,51 @@ export function progressParts(group) {
 export function progressText(group) {
   return progressParts(group).filter((part) => part.count > 0).map((part) => `${part.count} ${part.label}`).join(', ');
 }
+
+// --- Daily alerts ---------------------------------------------------------------------------------------------------
+
+// The pairs the server says became affected in the last 24 hours ([{ recallNumber, deviceId, firstSeen }]) joined with the
+// matches on screen: [{ match, firstSeen }], newest first. A pair that is no longer affected (or whose recall closed) is left
+// out, so the card never shows a device that no longer needs anything.
+export function newSinceMatches(result, newSince) {
+  const byPair = new Map(affectedMatches(result).map((m) => [`${m.recallNumber}|${m.deviceId}`, m]));
+  return (newSince || [])
+    .map((n) => ({ match: byPair.get(`${n.recallNumber}|${n.deviceId}`), firstSeen: n.firstSeen }))
+    .filter((item) => item.match)
+    .sort((a, b) => String(b.firstSeen).localeCompare(String(a.firstSeen)) || a.match.recallNumber.localeCompare(b.match.recallNumber));
+}
+
+const KEYS_SHOWN = 5;
+
+// What the last daily run did, in one sentence of parts: "2 new, 2 tasks created (AL-1, AL-2), comment posted". null when it
+// has not run yet.
+export function lastRunText(last) {
+  if (!last) return null;
+  const parts = [last.news ? `${last.news} new` : 'nothing new'];
+  const created = last.created || [];
+  if (created.length) {
+    const keys = created.slice(0, KEYS_SHOWN).join(', ');
+    const more = created.length > KEYS_SHOWN ? ` and ${created.length - KEYS_SHOWN} more` : '';
+    parts.push(`${created.length} ${created.length === 1 ? 'task' : 'tasks'} created (${keys}${more})`);
+  }
+  if (last.existing) parts.push(`${last.existing} already had a task`);
+  if (last.failed) parts.push(`${last.failed} could not be created`);
+  if (last.comment === 'posted') parts.push('comment posted');
+  if (last.comment === 'failed') parts.push('the comment could not be posted');
+  if (last.left) parts.push(`${last.left} waiting for the next run`);
+  return parts.join(', ');
+}
+
+// One line for the menu item: whether the alerts are on and where the tasks go.
+export function alertsSummary(settings) {
+  if (!settings || !settings.enabled) return 'Off';
+  return `On: tasks go to ${settings.projectKey}`;
+}
+
+// Why "Run now" did nothing, in words.
+export const NOT_RUN_REASONS = {
+  off: 'The alerts are off. Turn them on and save first.',
+  'no-project': 'Choose the project for the new tasks and save first.',
+  incomplete: 'The last check did not finish all its FDA searches, so nothing was created. Refresh and try again.',
+};
+

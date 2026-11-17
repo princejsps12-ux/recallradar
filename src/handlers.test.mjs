@@ -6,6 +6,9 @@ import { createMatchCache } from './matchCache.js';
 import { createCheckJobs } from './checkJob.js';
 import { createTaskGuard } from './taskService.js';
 import { createWardTeamStore } from './wardTeams.js';
+import { createAlertState } from './alertState.js';
+import { createAlertSettings } from './alertSettings.js';
+import { taskLabel, pairKey } from './taskRules.js';
 import { NOT_ADMIN_MESSAGE, NOT_TEAM_MANAGER_MESSAGE, PERMISSION_CHECK_FAILED } from './permissions.js';
 import { NOT_CONNECTED_MESSAGE } from './confluenceClient.js';
 import { fakeKv } from './fakeKv.mjs';
@@ -31,6 +34,8 @@ function setup({ roles = { administrator: true, projectAdministrator: false }, d
   const checkJobs = createCheckJobs(kv, nowMs, () => `job-${++jobNumber}`);
   const taskGuard = createTaskGuard(kv, nowMs);
   const wardTeams = createWardTeamStore(kv, nowMs);
+  const alertState = createAlertState(kv, nowMs);
+  const alertSettings = createAlertSettings(kv);
   const calls = { queued: [], bulk: [], logged: [], graph: [], labels: [] };
   const state = { roles, rolesError: false, existingLabels: new Map(), statuses: new Map(), spaces: [{ key: 'MD', name: 'Mobile Dev', id: '1' }], spacesError: null };
   const jira = {
@@ -77,8 +82,22 @@ function setup({ roles = { administrator: true, projectAdministrator: false }, d
       return state.spaces;
     },
   };
+  // Jira as the APP (the daily alert): numbers new issues AL-1, AL-2, ... and can be told to refuse.
+  const app = { typeError: null, issueError: null, comments: [], created: [], existing: new Map(), next: 1 };
+  const jiraApp = {
+    async findByLabels(labels) { return new Map(labels.filter((l) => app.existing.has(l)).map((l) => [l, app.existing.get(l)])); },
+    async taskIssueTypeId() { if (app.typeError) throw app.typeError; return '10001'; },
+    async bulkCreate(fields) {
+      const created = fields.map((f, index) => { const key = `AL-${app.next++}`; app.existing.set(f.labels[1], key); app.created.push(key); return { index, key }; });
+      return { created, errors: [] };
+    },
+    async issueSummary(key) { if (app.issueError) throw app.issueError; return { key, summary: 'Recall watch' }; },
+    async addComment(issueKey, body) { app.comments.push({ issueKey, body }); },
+    async baseUrl() { return 'https://example.atlassian.net'; },
+  };
   const log = { error: (...a) => calls.logged.push(a) };
   const handlers = createHandlers({
+    jiraApp, alertState, alertSettings,
     deviceStore, matchCache, checkJobs, taskGuard, jira, confluence, teamGraph, wardTeams,
     openTaskCounts: async () => new Map(),
     loadSnapshot: async () => ({ devices: await deviceStore.listDevices(), result: null }),
@@ -94,14 +113,14 @@ function setup({ roles = { administrator: true, projectAdministrator: false }, d
       await matchCache.write(await deviceStore.listDevices(), { deviceCount: devices.length, recallCount: 3, matches: savedMatches, failedQueries: 0, cappedQueries: 0 }, new Date(T0).toISOString());
     }
   })();
-  return { handlers, deviceStore, matchCache, wardTeams, state, calls, clock, ready };
+  return { handlers, deviceStore, matchCache, wardTeams, alertState, alertSettings, app, state, calls, clock, ready };
 }
 
 const ask = (h, name, request = {}) => h.handlers[name]({ payload: {}, context: { accountId: 'acc-1' }, ...request });
 
 test('every resolver the pages call exists', () => {
   const names = Object.keys(setup().handlers).sort();
-  for (const expected of ['clearDevices', 'createRecallPage', 'createTasks', 'fetchRecalls', 'getCapabilities', 'getCheckStatus', 'getSavedMatches', 'getProgress', 'getTaskStates', 'getTaskSummary', 'getWardTeams', 'importDevices', 'listDevices', 'listProjects', 'listSpaces', 'listTeams', 'loadDemoHospital', 'removeImportedDevices', 'setWardTeam', 'startCheck', 'suggestAssignees']) {
+  for (const expected of ['clearDevices', 'createRecallPage', 'createTasks', 'fetchRecalls', 'getCapabilities', 'getCheckStatus', 'getSavedMatches', 'getAlerts', 'getProgress', 'getTaskStates', 'getTaskSummary', 'getWardTeams', 'importDevices', 'listDevices', 'listProjects', 'listSpaces', 'listTeams', 'loadDemoHospital', 'removeImportedDevices', 'runAlertsNow', 'saveAlertSettings', 'setWardTeam', 'startCheck', 'suggestAssignees']) {
     assert.ok(names.includes(expected), expected);
   }
 });
@@ -297,3 +316,81 @@ test('projectKeyFrom: the issue the panel is open on wins over a chosen project;
   assert.equal(projectKeyFrom({}, 'not a key!'), null);
   assert.equal(projectKeyFrom(undefined, undefined), null);
 });
+
+// --- daily alerts ---------------------------------------------------------------------------------------------------
+
+const HOUR = 3600 * 1000;
+const pairsOf = (matches) => matches.map((m) => pairKey(m.recallNumber, m.deviceId));
+const on = { enabled: true, projectKey: 'AL', commentIssueKey: '' };
+
+test('getAlerts: nothing is watched before the first check, and everyone may read it', async () => {
+  const h = setup({ roles: { administrator: false, projectAdministrator: false } });
+  assert.deepEqual(await ask(h, 'getAlerts'), { ok: true, settings: { enabled: false, projectKey: '', commentIssueKey: '' }, watching: false, since: null, last: null, newSince: [] });
+});
+
+test('saveAlertSettings is for Jira administrators, checks the keys, and tests the project as the APP before turning alerts on', async () => {
+  const refused = await ask(setup({ roles: { administrator: false, projectAdministrator: true } }), 'saveAlertSettings', { payload: on });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.notAllowed, true);
+  const h = setup();
+  assert.match((await ask(h, 'saveAlertSettings', { payload: { enabled: true, projectKey: 'no good' } })).error, /not a Jira project key/);
+  assert.match((await ask(h, 'saveAlertSettings', { payload: { enabled: true } })).error, /Choose the project/);
+  h.app.typeError = new Error('Jira answered 403: no permission');
+  const noAccess = await ask(h, 'saveAlertSettings', { payload: on });
+  assert.equal(noAccess.ok, false);
+  assert.match(noAccess.error, /RecallRadar app user/);
+  assert.equal((await ask(h, 'getAlerts')).settings.enabled, false, 'nothing was saved');
+  h.app.typeError = null;
+  h.app.issueError = new Error('Jira answered 404: gone');
+  assert.match((await ask(h, 'saveAlertSettings', { payload: { ...on, commentIssueKey: 'AL-9' } })).error, /AL-9.*app user/s);
+  h.app.issueError = null;
+  const saved = await ask(h, 'saveAlertSettings', { payload: { enabled: true, projectKey: ' al ', commentIssueKey: 'al-9' } });
+  assert.deepEqual(saved, { ok: true, settings: { enabled: true, projectKey: 'AL', commentIssueKey: 'AL-9' } });
+  assert.deepEqual((await ask(h, 'getAlerts')).settings, saved.settings);
+  // turning alerts off does not need the app to have access
+  h.app.typeError = new Error('Jira answered 403');
+  assert.equal((await ask(h, 'saveAlertSettings', { payload: { enabled: false, projectKey: 'AL', commentIssueKey: '' } })).ok, true);
+});
+
+test('switching alerts on starts from today: what is affected now is never alerted, only later news is', async () => {
+  const before = [match('d1', 'Z-1')];
+  const h = setup({ devices: [device('d1'), device('d2')], savedMatches: before });
+  await h.ready;
+  assert.equal((await ask(h, 'saveAlertSettings', { payload: on })).ok, true);
+  h.clock.now += HOUR;
+  const after = [...before, match('d2', 'Z-2')];
+  await h.alertState.track(pairsOf(after));
+  await h.matchCache.write(await h.deviceStore.listDevices(), { deviceCount: 2, recallCount: 2, matches: after, failedQueries: 0, cappedQueries: 0, recallDetails: {} }, new Date(h.clock.now).toISOString());
+  const out = await ask(h, 'runAlertsNow');
+  assert.equal(out.ran, true);
+  assert.equal(out.summary.news, 1, 'Z-2 is news; Z-1 was there from the start');
+  assert.deepEqual(out.summary.created, ['AL-1']);
+  assert.ok(h.app.existing.has(taskLabel('Z-2', 'd2')) && !h.app.existing.has(taskLabel('Z-1', 'd1')));
+  const alerts = await ask(h, 'getAlerts');
+  assert.deepEqual(alerts.newSince.map((n) => [n.recallNumber, n.deviceId]), [['Z-2', 'd2']], 'the dashboard lists it as new since yesterday');
+  assert.equal(alerts.last.created[0], 'AL-1');
+  assert.equal((await ask(h, 'runAlertsNow')).summary.news, 0, 'a second click does nothing');
+});
+
+test('runAlertsNow: administrators only; needs a saved check; says why when there is nothing to do', async () => {
+  const stranger = setup({ roles: { administrator: false, projectAdministrator: false } });
+  assert.equal((await ask(stranger, 'runAlertsNow')).notAllowed, true);
+  const none = setup();
+  assert.match((await ask(none, 'runAlertsNow')).error, /no saved check/);
+  const off = setup({ devices: [device('d1')], savedMatches: [match('d1', 'Z-1')] });
+  await off.ready;
+  assert.deepEqual(await ask(off, 'runAlertsNow'), { ok: true, ran: false, reason: 'off' });
+});
+
+test('importing devices or loading the demo is not news; removing devices clears what was seen', async () => {
+  const h = setup({ devices: [device('d1')], savedMatches: [match('d1', 'Z-1')] });
+  await h.ready;
+  await h.alertState.track(['Z-1|d1']);
+  await ask(h, 'importDevices', { payload: { text: 'name,type,manufacturer,model,lot or serial,ward\nPump X,pump,ICU Medical,M-9,SN9,ICU' } });
+  h.clock.now += HOUR;
+  const out = await h.alertState.track(['Z-1|d1', 'Z-2|x1']);
+  assert.deepEqual(out, { baseline: true, added: [] }, 'the pairs the new devices bring are the baseline');
+  await ask(h, 'clearDevices');
+  assert.equal((await h.alertState.overview()).watching, false);
+});
+

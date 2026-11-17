@@ -34,6 +34,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
   const [tasks, setTasks] = useState({});
   const [taskInfo, setTaskInfo] = useState({}); // { "recall|device": { status, category } }: Jira's status of each task
   const [taskProgress, setTaskProgress] = useState({ state: 'idle', data: null }); // 'idle' | 'loading' | 'ready' | 'error'
+  const [alerts, setAlerts] = useState({ state: 'idle', data: null }); // the daily alerts: settings, last run and what is new
   const [summary, setSummary] = useState(null);
   const [summaryState, setSummaryState] = useState('loading'); // 'loading' | 'ok' | 'error'
   const [tasksReady, setTasksReady] = useState(false); // task links known (so rows do not change after they appear)
@@ -183,7 +184,16 @@ export default function useRecallData({ withProjects = false, light = false, wit
       .catch(() => setRecent({ state: 'error', recalls: [] }));
   }, []);
 
+  // The daily alerts, for the "New since yesterday" card and the alerts dialog. A failure only means no card.
+  const loadAlerts = useCallback(() => {
+    return invoke('getAlerts')
+      .then((r) => setAlerts((previous) => (r && r.ok ? { state: 'ready', data: r } : { state: 'error', data: previous.data })))
+      .catch(() => setAlerts((previous) => ({ state: 'error', data: previous.data })));
+  }, []);
+
   // Task state, counts and assignee suggestions whenever a result (or the ward teams) change.
+  const resultRef = useRef(null);
+  resultRef.current = result;
   const checkedAt = result ? result.checkedAt : null;
   const mappingSignature = wardInfo.mappings.map((m) => `${m.ward}:${m.teamAri}`).join(',');
   useEffect(() => {
@@ -204,6 +214,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
       if (!cancelled) setTasksReady(true);
     });
     if (!light) {
+      loadAlerts();
       invoke('getTaskSummary')
         .then((r) => {
           if (cancelled) return;
@@ -236,6 +247,24 @@ export default function useRecallData({ withProjects = false, light = false, wit
       cancelled = true;
     };
   }, [checkedAt, mappingSignature]); // eslint-disable-line
+
+  // Read the status of the tasks again (after tasks were made somewhere else, such as by the daily alert's "Run now").
+  const refreshTasks = useCallback(() => {
+    const current = resultRef.current;
+    if (!current) return;
+    const pairs = affectedMatches(current).map((m) => ({ recallNumber: m.recallNumber, deviceId: m.deviceId }));
+    if (pairs.length) {
+      invoke('getTaskStates', { pairs })
+        .then((r) => {
+          if (r && r.ok) {
+            setTasks(r.tasks);
+            setTaskInfo(r.states || {});
+          }
+        })
+        .catch(() => {});
+    }
+    if (!light) invoke('getTaskSummary').then((r) => { setSummary(r && r.ok ? r.summary : null); setSummaryState(r && r.ok ? 'ok' : 'error'); }).catch(() => {});
+  }, [light]);
 
   // How far along the work is, for the Progress tab: read when the tab is opened and again when the result or the tasks change.
   // The numbers already on screen stay until the new ones arrive.
@@ -324,7 +353,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
   };
 
   return {
-    devicesCount, importedCount, canManage, canManageTeams, result, error, progress, tasks, taskInfo, taskProgress, loadProgress, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, loadRecent, projects, projectKey, creating, note,
+    devicesCount, importedCount, canManage, canManageTeams, result, error, progress, tasks, taskInfo, taskProgress, loadProgress, alerts, loadAlerts, refreshTasks, summary, summaryState, tasksReady, wardLoaded, suggestions, wardInfo, recent, loadRecent, projects, projectKey, creating, note,
     setProjectKey, setNote, load, begin, createTasks, loadDemo, loadWardInfo, afterDevicesChanged,
   };
 }

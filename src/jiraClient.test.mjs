@@ -287,3 +287,32 @@ test('findTasks asks Jira for the labels and the status, and maps each label to 
   const keys = await createJiraClient({ request, route }).findByLabels(['recallradar-Z-1-a']);
   assert.deepEqual([...keys], [['recallradar-Z-1-a', 'MOBL-1']], 'findByLabels still answers with keys only');
 });
+
+// --- comments, issue lookup and the site address (the daily alerts) -----------------------------------------------------
+
+test('addComment posts the ADF body to the issue, and an error carries the status', async () => {
+  const { request, calls } = fakeRequest([{ status: 201, json: {} }, { status: 404, text: 'no such issue' }]);
+  const jira = createJiraClient({ request, route });
+  const body = { version: 1, type: 'doc', content: [] };
+  await jira.addComment('MOBL-12', body);
+  assert.equal(calls[0].path, '/rest/api/3/issue/MOBL-12/comment');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(calls[0].body, { body });
+  await assert.rejects(jira.addComment('MOBL-13', body), /404.*no such issue/);
+});
+
+test('issueSummary returns the key and title of an issue the caller may see, and throws when not', async () => {
+  const { request, calls } = fakeRequest([{ status: 200, json: { key: 'MOBL-12', fields: { summary: 'Recall watch' } } }, { status: 404, text: 'gone' }]);
+  const jira = createJiraClient({ request, route });
+  assert.deepEqual(await jira.issueSummary('MOBL-12'), { key: 'MOBL-12', summary: 'Recall watch' });
+  assert.equal(calls[0].path, '/rest/api/3/issue/MOBL-12?fields=summary');
+  await assert.rejects(jira.issueSummary('MOBL-99'), /404/);
+});
+
+test('baseUrl returns the site address without a trailing slash, or an empty string when Jira does not say', async () => {
+  const { request } = fakeRequest([{ status: 200, json: { baseUrl: 'https://example.atlassian.net/' } }, { status: 200, json: {} }, { status: 500, text: 'x' }]);
+  const jira = createJiraClient({ request, route });
+  assert.equal(await jira.baseUrl(), 'https://example.atlassian.net');
+  assert.equal(await jira.baseUrl(), '');
+  await assert.rejects(jira.baseUrl(), /500/);
+});

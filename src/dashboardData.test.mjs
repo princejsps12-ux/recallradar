@@ -19,6 +19,10 @@ import {
   urgentMatches,
   heroStats,
   matchesForDevice,
+  newSinceMatches,
+  lastRunText,
+  alertsSummary,
+  NOT_RUN_REASONS,
 } from '../static/ui/src/dashboardData.mjs';
 
 const m = (deviceId, recallNumber, extra = {}) => ({ deviceId, recallNumber, confidence: 'exact', recallClass: 'I', ward: 'ICU', ...extra });
@@ -138,5 +142,36 @@ test('progressParts: four parts in drawing order with their share of the bar; pr
   assert.equal(progressText({ pairs: 3, done: 3, inProgress: 0, open: 0, noTask: 0 }), '3 done');
   assert.equal(progressText({ pairs: 0, done: 0, inProgress: 0, open: 0, noTask: 0 }), '');
   assert.deepEqual(progressParts(null).map((p) => p.share), [0, 0, 0, 0], 'no group is an empty bar, not NaN');
+});
+
+test('newSinceMatches joins the server\'s news with the matches on screen, newest first, and drops what no longer needs anything', () => {
+  const m = (id, recall, extra = {}) => ({ confidence: 'exact', deviceId: id, deviceName: id, recallNumber: recall, recallClass: 'II', ...extra });
+  const result = { matches: [m('d1', 'Z-1'), m('d2', 'Z-2'), m('d3', 'Z-3', { confidence: 'possible' }), m('d4', 'Z-4')], recallDetails: { 'Z-4': { status: 'Terminated' } } };
+  const news = [
+    { recallNumber: 'Z-1', deviceId: 'd1', firstSeen: '2026-11-17T01:00:00.000Z' },
+    { recallNumber: 'Z-2', deviceId: 'd2', firstSeen: '2026-11-17T05:00:00.000Z' },
+    { recallNumber: 'Z-3', deviceId: 'd3', firstSeen: '2026-11-17T06:00:00.000Z' }, // only a possible match now
+    { recallNumber: 'Z-4', deviceId: 'd4', firstSeen: '2026-11-17T07:00:00.000Z' }, // the recall is closed
+    { recallNumber: 'Z-9', deviceId: 'gone', firstSeen: '2026-11-17T08:00:00.000Z' }, // the device is no longer there
+  ];
+  assert.deepEqual(newSinceMatches(result, news).map((i) => i.match.deviceId), ['d2', 'd1']);
+  assert.deepEqual(newSinceMatches(result, []), []);
+  assert.deepEqual(newSinceMatches(result, undefined), []);
+  assert.deepEqual(newSinceMatches(null, news), []);
+});
+
+test('lastRunText: what the daily run did, in plain parts', () => {
+  assert.equal(lastRunText(null), null);
+  assert.equal(lastRunText({ news: 0, created: [], comment: 'none' }), 'nothing new');
+  assert.equal(lastRunText({ news: 2, created: ['AL-1', 'AL-2'], existing: 0, failed: 0, left: 0, comment: 'posted' }), '2 new, 2 tasks created (AL-1, AL-2), comment posted');
+  assert.equal(lastRunText({ news: 1, created: ['AL-1'], comment: 'none' }), '1 new, 1 task created (AL-1)');
+  assert.equal(lastRunText({ news: 9, created: ['A-1', 'A-2', 'A-3', 'A-4', 'A-5', 'A-6', 'A-7'], existing: 1, failed: 1, left: 3, comment: 'failed' }), '9 new, 7 tasks created (A-1, A-2, A-3, A-4, A-5 and 2 more), 1 already had a task, 1 could not be created, the comment could not be posted, 3 waiting for the next run');
+});
+
+test('alertsSummary and the reasons "Run now" gives when it does nothing', () => {
+  assert.equal(alertsSummary(null), 'Off');
+  assert.equal(alertsSummary({ enabled: false, projectKey: 'AL' }), 'Off');
+  assert.equal(alertsSummary({ enabled: true, projectKey: 'AL' }), 'On: tasks go to AL');
+  assert.deepEqual(Object.keys(NOT_RUN_REASONS).sort(), ['incomplete', 'no-project', 'off'], 'one sentence for every reason runAlerts can give');
 });
 

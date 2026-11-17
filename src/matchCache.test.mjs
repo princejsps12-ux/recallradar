@@ -234,3 +234,10 @@ test('purgeExpired deletes only a result that is too old or damaged', async () =
   kv.data.set(MATCH_CACHE_KEY, 'garbage');
   assert.equal(await cache.purgeExpired(), true);
 });
+
+test('the UDI-DI is part of the fingerprint: a changed identifier is a changed device list', () => {
+  const plain = { id: 'a', name: 'Pump', type: 'pump', manufacturer: 'ICU Medical', model: 'M1', lotOrSerial: 'S1', ward: 'ICU' };
+  assert.notEqual(fingerprintDevices([plain]), fingerprintDevices([{ ...plain, udiDi: '00884838085282' }]));
+  assert.notEqual(fingerprintDevices([{ ...plain, udiDi: '00884838085282' }]), fingerprintDevices([{ ...plain, udiDi: '00884838099210' }]));
+  assert.equal(fingerprintDevices([plain]), fingerprintDevices([{ ...plain, udiDi: '' }]), 'no identifier and an empty one are the same');
+});

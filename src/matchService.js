@@ -82,7 +82,9 @@ export async function getCheckStatus({ jobs }) {
 // daily trigger) and does nothing if a check is already running. Delivery from a queue is "at
 // least once", so a job that is no longer running is skipped. Never throws: a failure is
 // recorded on the job. Returns 'done', 'failed' or 'skipped'.
-export async function performCheck({ devices, search, cache, jobs, trigger, jobId = null, nowMs = () => Date.now() }) {
+// `afterComplete(result, checkedAt)` (optional) is called with every COMPLETE result (no failed lookups), right after it is saved:
+// the daily alerts use it to notice what is new. It can never fail or slow down the check: its errors are swallowed.
+export async function performCheck({ devices, search, cache, jobs, trigger, jobId = null, nowMs = () => Date.now(), afterComplete = null }) {
   let id = jobId;
   if (id) {
     const job = await jobs.current();
@@ -104,7 +106,16 @@ export async function performCheck({ devices, search, cache, jobs, trigger, jobI
     const result = await search(devices, onProgress);
     const elapsedMs = nowMs() - started;
     const checkedAt = new Date(nowMs()).toISOString();
-    if (result.failedQueries === 0) await cache.write(devices, result, checkedAt);
+    if (result.failedQueries === 0) {
+      await cache.write(devices, result, checkedAt);
+      if (afterComplete) {
+        try {
+          await afterComplete(result, checkedAt);
+        } catch (error) {
+          // tracking what is new is a side job: it must never fail the check
+        }
+      }
+    }
     await writes;
     const outcome = await jobs.complete(id, { ...result, checkedAt, fromCache: false, stale: false, elapsedMs });
     return outcome || 'skipped';

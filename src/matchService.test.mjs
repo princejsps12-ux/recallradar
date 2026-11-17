@@ -341,3 +341,26 @@ test('getLatestResult is null with no saved result and no finished job', async (
   await s.jobs.start('user'); // running, not finished
   assert.equal(await getLatestResult({ devices, cache: s.cache, jobs: s.jobs }), null);
 });
+
+// --- the hook the daily alerts use ---------------------------------------------------------------------------------
+
+test('performCheck calls afterComplete with a complete result that was saved, and never with an incomplete one', async () => {
+  const s = setup();
+  const seen = [];
+  await performCheck({ devices, search: s.search, cache: s.cache, jobs: s.jobs, trigger: 'user', nowMs: () => s.clock.now, afterComplete: (result, checkedAt) => { seen.push([result.recallCount, typeof checkedAt]); } });
+  assert.deepEqual(seen, [[3, 'string']]);
+  const partial = setup({ result: found({ failedQueries: 2 }) });
+  const calls = [];
+  await performCheck({ devices, search: partial.search, cache: partial.cache, jobs: partial.jobs, trigger: 'user', nowMs: () => partial.clock.now, afterComplete: () => calls.push('called') });
+  assert.deepEqual(calls, [], 'a partial result is shown but never tracked');
+});
+
+test('a failing or throwing afterComplete never fails the check or loses its result', async () => {
+  const s = setup();
+  const outcome = await performCheck({ devices, search: s.search, cache: s.cache, jobs: s.jobs, trigger: 'user', nowMs: () => s.clock.now, afterComplete: () => { throw new Error('tracking broke'); } });
+  assert.equal(outcome, 'done');
+  const again = setup();
+  const second = await performCheck({ devices, search: again.search, cache: again.cache, jobs: again.jobs, trigger: 'user', nowMs: () => again.clock.now, afterComplete: async () => { throw new Error('async tracking broke'); } });
+  assert.equal(second, 'done');
+  assert.ok(await again.cache.read(devices), 'the result was saved');
+});

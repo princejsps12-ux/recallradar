@@ -37,10 +37,15 @@
   const RESOLVERS = [
     'listDevices', 'loadDemoHospital', 'importDevices', 'removeImportedDevices', 'clearDevices', 'getSavedMatches', 'startCheck', 'getCheckStatus',
     'getTaskStates', 'getProgress', 'getTaskSummary', 'createTasks', 'getWardTeams', 'listTeams', 'setWardTeam', 'suggestAssignees', 'listProjects', 'fetchRecalls',
-    'listSpaces', 'createRecallPage', 'getCapabilities',
+    'listSpaces', 'createRecallPage', 'getCapabilities', 'getAlerts', 'saveAlertSettings', 'runAlertsNow',
   ];
 
   const HOUR = 3600000;
+
+  // What an administrator is told when Jira refuses the app user in the chosen project (the same words as friendlyJiraError in
+  // src/alertService.js; src/previewBackend.test.mjs fails when they drift apart).
+  const alertRefusedMessage = (projectKey) =>
+    `Jira would not let the RecallRadar app work in ${projectKey || 'that project'}. Open the project, Project settings, Access (or Permissions), and give the RecallRadar app user the permissions to browse the project, create issues and add comments.`;
   const pairKey = (recallNumber, deviceId) => `${recallNumber}|${deviceId}`;
   const matchPair = (m) => pairKey(m.recallNumber, m.deviceId);
   const compact = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -83,6 +88,9 @@
     'not-admin': { about: 'Like ready, but the signed-in person is neither a Jira administrator nor a project administrator: the devices menu items and the ward team choices are shut and the server would refuse them.', ageMs: 8 * 60000, flags: { notAdmin: true, notTeamManager: true } },
     'project-admin': { about: 'Like ready, but the person is a project administrator, not a Jira administrator: devices are shut, ward teams can be chosen.', ageMs: 8 * 60000, flags: { notAdmin: true } },
     'first-run-not-admin': { about: 'No devices yet, and the person is not a Jira administrator: the welcome screen says who can add devices.', devices: 'none', flags: { notAdmin: true, notTeamManager: true } },
+    'new-since': { about: 'Like in-progress, plus three devices became affected in the last day: the "New since yesterday" card lists them. The daily alerts are off.', ageMs: 25 * 60000, tasks: [0, 1, 3, 6, 9, 14, 20, 26], done: 3, news: [{ pick: 1, hoursAgo: 3 }, { pick: 4, hoursAgo: 5 }, { pick: 7, hoursAgo: 19 }] },
+    'alerts-on': { about: 'The daily alerts are on (tasks go to BIOMED, one comment to BIOMED-1). Two of the three new devices already have the tasks the last daily run made.', ageMs: 25 * 60000, tasks: [0, 1, 3, 6, 9, 14, 20, 26], done: 3, alerts: { enabled: true, projectKey: 'BIOMED', commentIssueKey: 'BIOMED-1' }, news: [{ pick: 0, hoursAgo: 4, task: true }, { pick: 1, hoursAgo: 4, task: true }, { pick: 5, hoursAgo: 2 }], lastRun: { hoursAgo: 4 } },
+    'alerts-refused': { about: 'The daily alerts are on, but Jira refuses the RecallRadar app user in the project: the last run says so, and saving or running again says what to fix.', ageMs: 25 * 60000, tasks: [0, 1, 3, 6, 9, 14, 20, 26], done: 3, alerts: { enabled: true, projectKey: 'BIOMED', commentIssueKey: '' }, news: [{ pick: 0, hoursAgo: 4 }, { pick: 2, hoursAgo: 4 }], lastRun: { hoursAgo: 4, refused: true }, flags: { alertsRefused: true } },
     'refresh-error': { about: 'Like ready, but Refresh cannot start a check.', ageMs: 8 * 60000, flags: { startFails: true } },
     error: { about: 'The device list cannot be read: the error screen.', flags: { listDevicesFails: true } },
     loading: { about: 'Nothing ever answers: the loading skeleton.', flags: { hang: true } },
@@ -106,6 +114,7 @@
       job: null,
       mappings: MAPPED_WARDS.map(([ward, t]) => ({ ward, teamAri: t.ari, teamName: t.name })),
       assigned: {}, // accountId -> tasks given to them in this session
+      alerts: { settings: Object.assign({ enabled: false, projectKey: '', commentIssueKey: '' }, spec.alerts), news: [], last: null },
       nextTask: 101,
       log: [],
     };
@@ -134,6 +143,25 @@
       const ordered = byUrgency(st.result.matches.filter(isAffected));
       const picks = spec.tasks === 'all' ? ordered : spec.tasks.map((i) => ordered[i]).filter(Boolean);
       picks.forEach((m) => { st.tasks[matchPair(m)] = newTask(); });
+    }
+
+    // The news of the scenario: devices that became affected a few hours ago (the most urgent ones that still have no task).
+    if (st.result && spec.news) {
+      const free = byUrgency(st.result.matches.filter(isAffected)).filter((m) => !st.tasks[matchPair(m)]);
+      const madeByAlert = [];
+      spec.news.forEach(({ pick, hoursAgo, task }) => {
+        const m = free[pick];
+        if (!m) return;
+        st.alerts.news.push({ pair: matchPair(m), firstSeen: now() - hoursAgo * HOUR });
+        if (task) {
+          st.tasks[matchPair(m)] = newTask();
+          madeByAlert.push(st.tasks[matchPair(m)]);
+        }
+      });
+      if (spec.lastRun) {
+        const refused = Boolean(spec.lastRun.refused);
+        st.alerts.last = { at: new Date(now() - spec.lastRun.hoursAgo * HOUR).toISOString(), news: spec.news.length, created: madeByAlert, existing: 0, failed: 0, left: 0, comment: st.alerts.settings.commentIssueKey && madeByAlert.length ? 'posted' : 'none', error: refused ? alertRefusedMessage(st.alerts.settings.projectKey) : '' };
+      }
     }
 
     const findMatch = (recallNumber, deviceId) => (st.result ? st.result.matches.find((m) => m.recallNumber === recallNumber && m.deviceId === deviceId) : null);
@@ -229,6 +257,7 @@
         st.result = null;
         st.job = null;
         st.tasks = {};
+        st.alerts.news = [];
         return { ok: true, count: st.devices.length };
       },
       importDevices({ payload }) {
@@ -245,6 +274,7 @@
         st.devices = st.devices.concat(added);
         st.result = null;
         st.job = null;
+        st.alerts.news = []; // the pairs the new devices bring are the baseline, not news
         return { ok: true, count: added.length };
       },
       removeImportedDevices() {
@@ -252,6 +282,8 @@
         st.devices = st.devices.filter((d) => d.source !== 'manual');
         st.result = null;
         st.job = null;
+        st.alerts.news = [];
+        st.alerts.last = null;
         return { ok: true, count: st.devices.length };
       },
       clearDevices() {
@@ -260,6 +292,8 @@
         st.result = null;
         st.job = null;
         st.tasks = {};
+        st.alerts.news = [];
+        st.alerts.last = null;
         return { ok: true, count: 0 };
       },
       getSavedMatches() {
@@ -297,6 +331,50 @@
       },
       getProgress() {
         return { ok: true, progress: rollUp() };
+      },
+      getAlerts() {
+        const watching = Boolean(st.result);
+        const news = st.alerts.news.filter((n) => now() - n.firstSeen < 24 * HOUR).sort((a, b) => b.firstSeen - a.firstSeen);
+        return {
+          ok: true,
+          settings: Object.assign({}, st.alerts.settings),
+          watching,
+          since: watching ? new Date(now() - 3 * 24 * HOUR).toISOString() : null,
+          last: st.alerts.last,
+          newSince: news.map((n) => ({ recallNumber: n.pair.split('|')[0], deviceId: n.pair.slice(n.pair.indexOf('|') + 1), firstSeen: new Date(n.firstSeen).toISOString() })),
+        };
+      },
+      saveAlertSettings({ payload }) {
+        if (flags.notAdmin) return { ok: false, notAllowed: true, error: NOT_ADMIN_MESSAGE };
+        const raw = payload || {};
+        const projectKey = String(raw.projectKey || '').trim().toUpperCase();
+        const commentIssueKey = String(raw.commentIssueKey || '').trim().toUpperCase();
+        if (projectKey && !/^[A-Z][A-Z0-9_]{1,9}$/.test(projectKey)) return { ok: false, error: `"${raw.projectKey}" is not a Jira project key (for example MOBL).` };
+        if (commentIssueKey && !/^[A-Z][A-Z0-9_]{1,9}-[1-9][0-9]{0,8}$/.test(commentIssueKey)) return { ok: false, error: `"${raw.commentIssueKey}" is not a Jira issue key (for example MOBL-12).` };
+        const enabled = raw.enabled === true;
+        if (enabled && !projectKey) return { ok: false, error: 'Choose the project the new tasks go in.' };
+        if (enabled && flags.alertsRefused) return { ok: false, error: alertRefusedMessage(projectKey) };
+        st.alerts.settings = { enabled, projectKey, commentIssueKey };
+        return { ok: true, settings: Object.assign({}, st.alerts.settings) };
+      },
+      runAlertsNow() {
+        if (flags.notAdmin) return { ok: false, notAllowed: true, error: NOT_ADMIN_MESSAGE };
+        if (!st.result) return { ok: false, error: 'There is no saved check yet. Press Refresh first, then try again.' };
+        const settings = st.alerts.settings;
+        if (!settings.enabled) return { ok: true, ran: false, reason: 'off' };
+        const due = st.alerts.news.filter((n) => !st.tasks[n.pair] && !n.handled);
+        const summary = { at: new Date(now()).toISOString(), news: due.length, created: [], existing: 0, failed: 0, left: 0, comment: 'none', error: '' };
+        if (flags.alertsRefused && due.length) summary.error = alertRefusedMessage(settings.projectKey);
+        else {
+          due.forEach((n) => {
+            st.tasks[n.pair] = newTask();
+            n.handled = true;
+            summary.created.push(st.tasks[n.pair]);
+          });
+          if (settings.commentIssueKey && summary.created.length) summary.comment = 'posted';
+        }
+        st.alerts.last = summary;
+        return { ok: true, ran: true, summary };
       },
       getTaskSummary() {
         return { ok: true, summary: summary() };
@@ -390,5 +468,5 @@
     return { invoke, state: st, flags, scenario: name };
   }
 
-  return { createBackend, SCENARIOS, RESOLVERS, TEAMS, MEMBERS, PROJECTS, SEARCHES, NOT_CONNECTED_MESSAGE, NOT_ADMIN_MESSAGE, NOT_TEAM_MANAGER_MESSAGE };
+  return { createBackend, SCENARIOS, RESOLVERS, TEAMS, MEMBERS, PROJECTS, SEARCHES, NOT_CONNECTED_MESSAGE, NOT_ADMIN_MESSAGE, NOT_TEAM_MANAGER_MESSAGE, alertRefusedMessage };
 });

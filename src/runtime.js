@@ -16,17 +16,31 @@ import { createTaskGuard, getTaskStates, selectMatches } from './taskService';
 import { createPreviewStore } from './agentTools';
 import { createTeamGraph } from './teamGraph';
 import { createWardTeamStore } from './wardTeams';
+import { createAlertState } from './alertState';
+import { createAlertSettings } from './alertSettings';
+import { runAlerts } from './alertService';
+import { openTaskMatches, pairKey } from './taskRules';
 
 export const deviceStore = createDeviceStore(forgeKv);
 export const matchCache = createMatchCache(forgeKv);
 export const checkJobs = createCheckJobs(forgeKv);
 export const taskGuard = createTaskGuard(forgeKv);
 export const previewStore = createPreviewStore(forgeKv);
+export const alertState = createAlertState(forgeKv);
+export const alertSettings = createAlertSettings(forgeKv);
 
 // Jira as the person who clicked (asUser), so Jira applies THEIR permissions: someone who may not
 // create issues simply gets an error. Never asApp for this.
 export const jiraAsUser = createJiraClient({
   request: (path, options) => api.asUser().requestJira(path, options),
+  route,
+});
+
+// Jira as the APP itself (asApp), used ONLY by the daily alert: a scheduled run has no signed-in person, so there is nobody to
+// act as. Everything a person does (creating tasks, reading their status, checking permissions) stays asUser. The app user
+// needs permission to create issues in the project the administrator chose; saving the alert settings tests exactly that.
+export const jiraAsApp = createJiraClient({
+  request: (path, options) => api.asApp().requestJira(path, options),
   route,
 });
 
@@ -86,6 +100,11 @@ export async function searchRecalls(devices, onProgress) {
   };
 }
 
+// After every complete check: note which (recall, device) pairs are affected, so what is new can be told apart. Ids only.
+async function trackNewMatches(result) {
+  await alertState.track(openTaskMatches(result).map((m) => pairKey(m.recallNumber, m.deviceId)));
+}
+
 // Run a check for the hospital's current devices. Shared by the queue consumer and the daily
 // trigger. Never throws; returns 'done', 'failed' or 'skipped' (or 'no-devices').
 export async function runCheck({ trigger, jobId = null }) {
@@ -99,9 +118,24 @@ export async function runCheck({ trigger, jobId = null }) {
       jobs: checkJobs,
       trigger,
       jobId,
+      afterComplete: trackNewMatches,
     });
   } catch (error) {
     console.error('Recall check failed', error);
+    return 'failed';
+  }
+}
+
+// The daily alert step, run by the daily trigger right after its check: tasks and one comment for the pairs that are new.
+// Never throws. Returns 'ran', the reason it did not ('off', 'no-project', 'incomplete'), 'no-result' or 'failed'.
+export async function runDailyAlerts() {
+  try {
+    const result = await loadSnapshot().then((snapshot) => snapshot.result);
+    if (!result) return 'no-result';
+    const outcome = await runAlerts({ state: alertState, settings: alertSettings, result, jira: jiraAsApp, guard: taskGuard });
+    return outcome.ran ? 'ran' : outcome.reason;
+  } catch (error) {
+    console.error('Daily alerts failed', error);
     return 'failed';
   }
 }
@@ -127,12 +161,13 @@ export function taskKeyLookup(snapshot) {
 // the saved check result and the finished job (which holds a copy of it) after 24 hours. Run by the daily
 // trigger before it refreshes the check; reads and writes enforce the same limits on their own.
 export async function cleanupStorage() {
-  const counts = { previews: 0, guards: 0, cache: 0, job: 0 };
+  const counts = { previews: 0, guards: 0, cache: 0, job: 0, alerts: 0 };
   const steps = [
     ['previews', () => previewStore.purgeExpired()],
     ['guards', () => taskGuard.purgeExpired()],
     ['cache', async () => ((await matchCache.purgeExpired()) ? 1 : 0)],
     ['job', async () => ((await checkJobs.purgeExpired()) ? 1 : 0)],
+    ['alerts', () => alertState.purgeExpired()],
   ];
   for (const [name, step] of steps) {
     try {
