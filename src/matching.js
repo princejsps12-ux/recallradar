@@ -175,7 +175,8 @@ function parsedRecall(recall) {
   return parsed;
 }
 
-// Fact 4. The device's own UDI-DI (a GS1 GTIN) is named in the recall. Returns { di } or null.
+// Fact 4. The device's own UDI-DI (a GS1 GTIN) is named in the recall. Returns { di, serials, lots } or null; the serials and
+// lots are the ones the text ties to that DI ("(01)GTIN(21)serial"), which is why a short serial can be trusted there.
 export function udiInRecall(deviceUdi, recall) {
   const di = normalizeDi(deviceUdi);
   if (!di) return null;
@@ -220,8 +221,12 @@ export function evaluateMatch(device, recall) {
   // RULES with the UDI-DI: the identifier names the product version exactly, so no maker or model text is needed.
   const udi = udiInRecall(device.udiDi, recall);
   if (udi) {
-    if (unitListed) {
-      return result(CONFIDENCE.EXACT, RULES.EXACT_UDI_UNIT, `UDI-DI ${udi.di} is listed in this recall, and this unit's ${unitHow}.`);
+    // A number the text ties to THIS UDI-DI is a stronger statement than the same digits somewhere in the text, so it counts
+    // at any length ("(01)00884838085282(21)209": serial 209 of that product).
+    const own = compact(device.lotOrSerial);
+    const tied = own.length > 0 && [...udi.serials, ...udi.lots].some((n) => compact(n) === own);
+    if (unitListed || tied) {
+      return result(CONFIDENCE.EXACT, RULES.EXACT_UDI_UNIT, `UDI-DI ${udi.di} is listed in this recall, and this unit's ${tied && !unitListed ? `serial/lot "${device.lotOrSerial}" is listed with it` : unitHow}.`);
     }
     if (recallCoversAllUnits(recall)) {
       return result(CONFIDENCE.EXACT, RULES.EXACT_UDI_ALL_UNITS, `UDI-DI ${udi.di} is listed in this recall, and the recall covers all serial/lot numbers.`);

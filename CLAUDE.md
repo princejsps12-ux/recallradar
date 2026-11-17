@@ -12,7 +12,8 @@ npm run test:ui                            # jsdom smoke test of the real panel 
 npm run test:preview                       # the real bundle in headless Chrome, every state, light/dark/phone: CSP, console, axe, panel height
 npm run preview                            # http://localhost:4173/ the app without Jira (see scripts/preview/README.md)
 npm run shots                              # regenerate marketplace/screenshots/01..19 from the preview
-node scripts/check-demo-matches.mjs        # live openFDA check of the demo hospital (needs network)
+node scripts/check-demo-matches.mjs        # live openFDA check of the demo hospital (needs network; --why prints the reasons)
+npm run eval                               # measure the matcher on eval/ (2,354 labeled pairs from 40 real recalls), rewrite docs/ACCURACY.md; npm test fails when that page is stale
 
 # after ANY change to static/ui/src, rebuild BEFORE deploying
 (cd static/ui && npm run build)   # first time: npm install --legacy-peer-deps (template pins React 16)
@@ -40,7 +41,9 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 
 | File | Role |
 | --- | --- |
-| `src/matching.js` | The six match rules (exact / likely / possible), every threshold a named constant with its reason |
+| `src/matching.js` | The ten match rules (exact / likely / possible; UDI-DI rules first), every threshold a named constant with its reason |
+| `src/udi.js`, `src/serials.js` | UDI-DI (GS1 GTIN) extraction from recall text and device lists; serial ranges/limits read only inside a "serial" clause |
+| `src/accuracy.js`, `scripts/eval-matching.mjs`, `scripts/make-eval-set.mjs`, `eval/` | Accuracy evaluation: frozen real recalls (`eval/recalls.json`), labeled cases built from them, precision/recall per level, `docs/ACCURACY.md` |
 | `src/openfda.js`, `src/recallSearch.js`, `src/text.js` | openFDA URLs and parsing; which searches to run (per manufacturer + per model, 1-year window); tokenizing |
 | `src/deviceStore.js` | Device list interface (Forge storage today; a read-only Assets import can plug in later) |
 | `src/matchCache.js` | Saved result, 6-hour freshness, fingerprint of the device list; `peek()` also returns expired entries as stale, but **never past 24 hours** (`MAX_RETENTION_MS`, deleted on read and by the daily cleanup) |
@@ -49,7 +52,8 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 | `src/taskRules.js`, `src/taskService.js`, `src/jiraClient.js` | Jira tasks for matches: due-date rule, title/labels/description; duplicate-free creation; the three Jira calls (as the user) |
 | `src/demoHospital.js` | 30 demo devices using real manufacturer/model names and serials from actual recalls |
 | `src/runtime.js` | **Forge wiring**: storage adapter, `fetch`, `runCheck()` shared by the consumer and the daily trigger, `jiraAsUser`, `taskGuard` |
-| `src/index.js`, `src/consumer.js`, `src/scheduled.js`, `src/kvAdapter.js` | **Forge entry points** (resolvers, queue consumer, daily trigger, storage adapter) |
+| `src/index.js`, `src/consumer.js`, `src/scheduled.js`, `src/kvAdapter.js` | **Forge entry points** (resolvers, queue consumer, daily trigger, storage adapter); thin: `src/index.js` only builds dependencies and registers `createHandlers(deps)` from `src/handlers.js` |
+| `src/handlers.js`, `src/rovoHandlers.js` | The resolver and Rovo action logic as factories with injected dependencies (unit tested with fakes: `handlers.test.mjs`, `rovoHandlers.test.mjs`); `rovoActions.js` wraps them in explicit exported arrow functions because the Forge linter needs visible exports |
 | `src/permissions.js` | Who may change the shared device list: Jira administrators only (`refuseUnlessAdministrator`, server-side; the dashboard shows it via resolver `getCapabilities`) |
 | `static/ui/src/App.js` | The panel |
 | `src/deviceCsv.js` | Paste-in import of the hospital's own devices (all-or-nothing, line-numbered errors); resolver `importDevices`, UI in `Dashboard.js` |
@@ -161,4 +165,4 @@ The Custom UI lives in `static/ui/` (it was the template's `static/hello-world`)
 
 ## Not built / ideas
 
-Read-only Assets import; adding/editing devices in the UI; choosing the project for tasks; showing whether a task is done; skipping the duplicate download of the 8.7 MB record; per-search caching; serial-range parsing ("serial number < 2224").
+Read-only Assets import; adding/editing devices in the UI; choosing the project for tasks; showing whether a task is done; skipping the duplicate download of the 8.7 MB record; per-search caching; ruling a unit OUT when its serial is outside a stated range (deliberately not done: a wrongly read range would hide a recall); HIBC UDI codes.

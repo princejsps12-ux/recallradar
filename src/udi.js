@@ -60,9 +60,15 @@ const LABEL = /(?:\b(?:udi[-\s/]?di|udi|gtin|device identifier)(?:\s*\/\s*(?:gti
 // Then one or more numbers, each optionally followed by a package level in brackets, separated by , ; / & or "and".
 const LABELLED_NUMBER = /^(\d{8,14})\b(?:\s*\((?:each|case|box|pack|carton|unit|inner|outer|pallet)[^)]{0,10}\))?\s*(?:[,;/&]|\band\b)?\s*/i;
 
+// Pairs written without any label, as in "MMT-1885CLW/00763000442187, 00763000974374/NG3150737H": <DI>/<serial> and
+// <model>/<DI>. Digits next to a slash are only taken for a DI when the GS1 check digit is right (a random number passes one
+// time in ten, and it must also sit next to a slash).
+const DI_SLASH_SERIAL = /(?<![\w])(\d{12,14})\/([A-Za-z0-9][A-Za-z0-9-]{2,})/g;
+const MODEL_SLASH_DI = /(?<![\w])([A-Za-z0-9][A-Za-z0-9-]{1,})\/(\d{12,14})(?![\w])/g;
+
 /**
- * Every UDI-DI named in a recall's code text, as { di (14 digits), serial?, lot? }.
- * `serial` and `lot` are only set for the GS1 element form that carries them: (01)GTIN(21)serial / (10)lot.
+ * Every UDI-DI named in a recall's code text, as { di (14 digits), serials, lots }.
+ * `serials` and `lots` are the numbers the text ties to that DI: (01)GTIN(21)serial, (01)GTIN(10)lot, or <DI>/<serial>.
  */
 export function extractUdis(text) {
   if (typeof text !== 'string' || text.length === 0) return [];
@@ -96,6 +102,14 @@ export function extractUdis(text) {
       if (di) note(di, '', '');
       rest = rest.slice(n[0].length);
     }
+  }
+  for (const m of text.matchAll(DI_SLASH_SERIAL)) {
+    const di = normalizeDi(m[1], { strict: true });
+    if (di) note(di, m[2], '');
+  }
+  for (const m of text.matchAll(MODEL_SLASH_DI)) {
+    const di = normalizeDi(m[2], { strict: true });
+    if (di) note(di, '', '');
   }
   return [...found.values()].map(({ di, serials, lots }) => ({ di, serials: [...serials], lots: [...lots] }));
 }

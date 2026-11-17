@@ -52,26 +52,35 @@ Open it, pick your site and install it in **Jira**. That is all RecallRadar need
 
 ## How matching works
 
-A match is built from three facts, each checked on its own:
+A match is built from facts, each checked on its own:
 
-1. **Manufacturer**: the device's maker equals the recall's *recalling firm*.
-2. **Model**: the device's model number is written in the recall's product description or code info.
-3. **Lot/serial**: this unit's lot or serial number is listed in the recall's code info, or the recall says it covers *all* units.
+1. **UDI-DI**: the device's Unique Device Identifier (a GS1 GTIN) is written in the recall's code info, in any of the shapes the FDA uses (`(01)00884838085282(21)209`, `UDI-DI: 10889942499953(each)`, `GTIN: ...`, `MMT-1885CLW/00763000442187`). It names the exact product version whoever sold it, so no maker or model text is needed and a recall filed under a parent company is still found. Check digits are verified on the device list you import.
+2. **Manufacturer**: the device's maker equals the recall's *recalling firm*.
+3. **Model**: the device's model number is written in the recall's product description or code info.
+4. **Lot/serial**: this unit's number is listed in the recall's code info, falls inside a **serial range** the recall states (`serial numbers 1000 through 1500`, `serial number < 2224`), or the recall says it covers *all* units.
 
 Each (device, recall) pair gets **at most one result: the strongest rule that applies**. The code is in [`src/matching.js`](src/matching.js); each rule is explained next to the code that implements it.
 
 | Confidence | Rule | Needs | Why we trust it this much |
 | --- | --- | --- | --- |
+| **Exact** | `exact-udi-unit` | UDI-DI listed + this unit's lot/serial listed or in a stated range | The product version and the unit both agree. |
+| **Exact** | `exact-udi-all` | UDI-DI listed, and the recall covers all units | Every unit of that product version is affected. |
 | **Exact** | `exact-manufacturer-model-lot` | Manufacturer + model + this unit's lot/serial all listed | All three identifiers agree. |
+| **Exact** | `exact-manufacturer-model-range` | Manufacturer + model + this unit's serial inside a range the recall states | The recall describes the affected units as a range, and this unit is in it. |
 | **Exact** | `exact-manufacturer-model-all` | Manufacturer + model, and the recall covers all serial/lot numbers | Every unit of that model is affected, so the unit's own number does not matter. |
+| **Likely** | `likely-udi` | UDI-DI listed, but this unit's lot/serial is not | The product version is recalled; we cannot confirm this unit is in the affected batch. |
 | **Likely** | `likely-manufacturer-model` | Manufacturer + model, but the unit's lot/serial is not listed (or not recorded) | The model is recalled, but we cannot confirm this unit is in the affected batch. A person should check. |
 | **Likely** | `likely-manufacturer-lot` | Manufacturer + lot/serial, but the model is not mentioned | Some recalls only list serial numbers. The serial and maker agreeing is strong, but not conclusive. |
 | **Possible** | `possible-model-other-maker` | A distinctive model number, but a *different* recalling firm | Parent companies, distributors and relabelled products are recalled under another name. Worth a look. |
 | **Possible** | `possible-manufacturer-type` | Same manufacturer + same kind of device, model not mentioned | The weakest signal: the maker has a recall for this kind of device. |
 
-If no rule applies, nothing is reported.
+If no rule applies, nothing is reported. The app looks back **three years** (recalls often stay open that long) and pages through busy searches (up to 100 recalls each); a search that is still capped is flagged on the dashboard.
 
 Each check, every number and the reasons: [`docs/MATCHING.md`](docs/MATCHING.md).
+
+### How accurate is it?
+
+Measured against **2,354 labeled pairs** of a device and a real FDA recall (40 recalls frozen from openFDA, 410 devices built from what each recall says, plus 1,946 unrelated pairs): **exact** is right **100.0%** of the time and finds **98.6%** of the affected units, **likely** 99.3% / 100%, **possible** 100% / 100%; it never says *exact* for a unit that is not confirmed (0 of 2,354), and no unit that needs a task is missed or invented. The one miss is a 3-character serial without a UDI-DI, which the matcher refuses to trust on its own. The labels were written by the developer from the recall text, so this is a regression set and a check of how the rules read real recall wording, **not** a measure of how often the app is right in a hospital. Every pair, every limit and how to re-run it (`npm run eval`): [`docs/ACCURACY.md`](docs/ACCURACY.md).
 
 ## The check runs in the background
 
@@ -226,6 +235,7 @@ Node 22+ and the Forge CLI. `npm install`, `npm test` (unit tests, no network), 
 | Page | What is in it |
 | --- | --- |
 | [`docs/MATCHING.md`](docs/MATCHING.md) | Each fact check, every threshold and why, ordering, known limits |
+| [`docs/ACCURACY.md`](docs/ACCURACY.md) | Precision and recall per match level on 2,354 labeled pairs from real recalls, every wrong pair, the limits of the measurement |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The background check job, its rules and measurements |
 | [`docs/TASKS.md`](docs/TASKS.md) | The due-date rule, how duplicates are prevented, limits |
 | [`docs/TEAMWORK_GRAPH.md`](docs/TEAMWORK_GRAPH.md) | The two Teamwork Graph queries verbatim, what is stored, what was verified |

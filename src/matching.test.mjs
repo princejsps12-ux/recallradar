@@ -477,3 +477,14 @@ test('the match carries the device\'s UDI-DI for display', () => {
   assert.equal(match.deviceUdiDi, '00884838102842');
   assert.equal(matchDeviceToRecall({ id: 'd2', name: 'Monitor', ward: 'Telemetry', ...monitor, udiDi: undefined }, philipsRecall).deviceUdiDi, '');
 });
+
+test('a short serial tied to the device\'s own UDI-DI counts as listed ((21) serial 209), while a bare 3-digit number does not', () => {
+  const recall = { recallNumber: 'Z-2285-2026', recallClass: 'II', date: '2026-06-10', firm: 'PHILIPS MEDICAL SYSTEMS NEDERLAND B.V.', product: 'Philips Azurion 3M15', productText: 'Philips Azurion 3M15, Model Numbers: 722064, 722222', codeText: 'UDI (01)00884838085282(21)209, (01)00884838099210(21)100, (01)00884838099210(21)254' };
+  const withUdi = evaluateMatch({ manufacturer: 'Philips Medical Systems', model: '722064', type: 'azurion', lotOrSerial: '209', udiDi: '00884838085282' }, recall);
+  assert.equal(withUdi.rule, RULES.EXACT_UDI_UNIT);
+  assert.match(withUdi.reason, /serial\/lot "209" is listed with it/);
+  const otherDi = evaluateMatch({ manufacturer: 'Philips Medical Systems', model: '722064', type: 'azurion', lotOrSerial: '100', udiDi: '00884838085282' }, recall);
+  assert.equal(otherDi.rule, RULES.LIKELY_UDI, '100 belongs to the other DI, not this one');
+  const noUdi = evaluateMatch({ manufacturer: 'Philips Medical Systems', model: '722064', type: 'azurion', lotOrSerial: '209' }, recall);
+  assert.equal(noUdi.rule, RULES.LIKELY_MODEL, 'without the DI, a 3-digit number in the text proves nothing');
+});

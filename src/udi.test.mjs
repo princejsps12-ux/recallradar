@@ -70,3 +70,11 @@ test('extractUdis reads "UDI-DI code:" (the real ResMed Astral recall) and "UDI 
   assert.deepEqual(extractUdis('Catalog Number: Astral 100 UDI-DI code: 00619498003259 Serial Numbers: Astral Ventilators-Serial number < 22241890149').map((u) => u.di), ['00619498003259']);
   assert.deepEqual(extractUdis('Model Number: 10432915. UDI Numbers: (01)04056869006703(21)45046, (01)04056869006703(21)45115').map((u) => u.di), ['04056869006703']);
 });
+
+test('extractUdis reads unlabelled <DI>/<serial> and <model>/<DI> pairs, but only with a correct check digit (the real Medtronic recall)', () => {
+  const text = 'Model/UDI-DI Serial Numbers: MMT-1885CLW/00763000442187, 00763000974374/NG3150737H, NG3155194H, NG3151561H, 00763000974374/NG3154693H';
+  const found = Object.fromEntries(extractUdis(text).map((u) => [u.di, u.serials]));
+  assert.deepEqual(Object.keys(found).sort(), ['00763000442187', '00763000974374']);
+  assert.deepEqual(found['00763000974374'], ['NG3150737H', 'NG3154693H']);
+  assert.deepEqual(extractUdis('Order 12345678901234/ABC1234 and ref ABC-12/12345678901234'), [], 'digits next to a slash with a wrong check digit are not a DI');
+});

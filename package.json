@@ -10,7 +10,8 @@
     "preview": "node scripts/preview/server.cjs",
     "test:preview": "node scripts/preview/check.cjs",
     "shots": "node scripts/preview/shots.cjs",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "eval": "node scripts/eval-matching.mjs --write"
   },
   "devDependencies": {
     "eslint": "^8.56.0",
