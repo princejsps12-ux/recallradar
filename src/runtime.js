@@ -77,19 +77,28 @@ async function fetchOpenFdaJson(url) {
   // OPENFDA_API_KEY is an optional Forge environment variable (forge variables set --encrypt): with it the daily allowance is
   // 120,000 requests instead of about 1,000 per address. Without it nothing changes.
   const keyed = withApiKey(url, process.env.OPENFDA_API_KEY);
+  const began = Date.now();
   const response = await fetchWithOneRetry(() => fetch(keyed, { headers: { Accept: 'application/json' } }));
   if (response.status === 404) return { results: [] };
   if (!response.ok) throw new Error(`openFDA request failed with status ${response.status}`);
-  return slimOpenFdaResponse(await response.json());
+  const text = await response.text();
+  const downloaded = Date.now() - began;
+  const body = slimOpenFdaResponse(JSON.parse(text));
+  if (downloaded > 8000 || text.length > 2000000) console.info(`openFDA slow or large answer: ${downloaded} ms to read, ${text.length} characters, ${Date.now() - began} ms in all, ${url.slice(url.indexOf('search='), url.indexOf('search=') + 70)}`);
+  return body;
 }
 
 // The real search: find recent recalls for the hospital's manufacturers and models, then match
 // them to the devices. `onProgress(done, total)` is called as the searches finish.
 export async function searchRecalls(devices, onProgress) {
+  const began = Date.now();
+  const mb = () => Math.round(process.memoryUsage().rss / 1048576);
   const { recalls, failedQueries, cappedQueries } = await findRecallsForDevices(devices, fetchOpenFdaJson, {
     onProgress,
   });
+  console.info(`check: searches done in ${Date.now() - began} ms, ${recalls.length} recalls, ${failedQueries} failed, memory ${mb()} MB`);
   const matches = matchDevicesToRecalls(devices, recalls);
+  console.info(`check: matched in ${Date.now() - began} ms, ${matches.length} matches, memory ${mb()} MB`);
   return {
     deviceCount: devices.length,
     recallCount: recalls.length,

@@ -102,10 +102,18 @@ async function inBatches(items, size, worker) {
   }
 }
 
+// Groups of `size` items, a few groups at a time: for storage that can write a whole group in one call.
+async function inGroups(items, size, worker) {
+  const groups = [];
+  for (let i = 0; i < items.length; i += size) groups.push(items.slice(i, i + size));
+  for (let i = 0; i < groups.length; i += WRITE_CONCURRENCY) await Promise.all(groups.slice(i, i + WRITE_CONCURRENCY).map(worker));
+}
+
 // `kv` is any object with:
 //   set(key, value)            -> Promise
 //   delete(key)                -> Promise
 //   listByPrefix(prefix)       -> Promise<Array<{ key, value }>>
+// and, when the storage has them, setMany(entries) / deleteMany(keys) for up to WRITE_BATCH_SIZE records in one call.
 export function createDeviceStore(kv) {
   async function listDevices() {
     const items = await kv.listByPrefix(DEVICE_KEY_PREFIX);
@@ -114,21 +122,27 @@ export function createDeviceStore(kv) {
 
   async function saveDevices(inputs) {
     const devices = normalizeDevices(inputs);
-    await inBatches(devices, WRITE_BATCH_SIZE, (device) => kv.set(deviceKey(device.id), device));
+    if (typeof kv.setMany === 'function') await inGroups(devices, WRITE_BATCH_SIZE, (group) => kv.setMany(group.map((device) => ({ key: deviceKey(device.id), value: device }))));
+    else await inBatches(devices, WRITE_BATCH_SIZE, (device) => kv.set(deviceKey(device.id), device));
     return devices.length;
   }
 
   async function clear() {
     const items = await kv.listByPrefix(DEVICE_KEY_PREFIX);
-    await inBatches(items, WRITE_BATCH_SIZE, (item) => kv.delete(item.key));
+    await deleteItems(items);
     return items.length;
+  }
+
+  async function deleteItems(items) {
+    if (typeof kv.deleteMany === 'function') await inGroups(items, WRITE_BATCH_SIZE, (group) => kv.deleteMany(group.map((item) => item.key)));
+    else await inBatches(items, WRITE_BATCH_SIZE, (item) => kv.delete(item.key));
   }
 
   // Delete the devices with these ids (the ones not in a new import). Returns how many were removed.
   async function removeDevices(ids) {
     const wanted = new Set(ids);
     const items = (await kv.listByPrefix(DEVICE_KEY_PREFIX)).filter((item) => item.value && wanted.has(item.value.id));
-    await inBatches(items, WRITE_BATCH_SIZE, (item) => kv.delete(item.key));
+    await deleteItems(items);
     return items.length;
   }
 
@@ -137,7 +151,7 @@ export function createDeviceStore(kv) {
   async function removeBySource(source) {
     const items = await kv.listByPrefix(DEVICE_KEY_PREFIX);
     const matching = items.filter((item) => item.value && item.value.source === source);
-    await inBatches(matching, WRITE_BATCH_SIZE, (item) => kv.delete(item.key));
+    await deleteItems(matching);
     return matching.length;
   }
 

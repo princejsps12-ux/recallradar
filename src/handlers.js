@@ -275,7 +275,9 @@ export function createHandlers(deps) {
         return { ok: true, teams: await deps.teamGraph.listTeams(context.accountId) };
       } catch (error) {
         log.error('Failed to read teams from the Teamwork Graph', error);
-        return { ok: false, error: 'Could not read teams from the Teamwork Graph.' };
+        // The reason is short and has no person in it ("Teamwork Graph answered 403"): showing it saves a trip to the logs.
+        const reason = error instanceof Error && /^Teamwork Graph/.test(error.message) ? ` (${error.message.slice(0, 120)})` : '';
+        return { ok: false, error: `Could not read teams from the Teamwork Graph.${reason}` };
       }
     },
 

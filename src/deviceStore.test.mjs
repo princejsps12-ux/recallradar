@@ -177,3 +177,56 @@ test('normalizeDevice keeps a valid UDI-DI as 14 digits and rejects one that is 
   assert.throws(() => normalizeDevice({ ...pump, udiDi: '00884838102843' }), /invalid UDI-DI/, 'a wrong check digit');
   assert.throws(() => normalizeDevice({ ...pump, udiDi: 'abc' }), /invalid UDI-DI/);
 });
+
+// A storage that can write up to 25 records in one call, like Forge's batchSet / batchDelete, and refuses more.
+function batchKv() {
+  const kv = fakeKv();
+  kv.calls = { setMany: [], deleteMany: [] };
+  kv.setMany = async (entries) => {
+    if (entries.length > 25) throw new Error('more than 25 in a batch');
+    kv.calls.setMany.push(entries.length);
+    for (const { key, value } of entries) kv.data.set(key, structuredClone(value));
+  };
+  kv.deleteMany = async (keys) => {
+    if (keys.length > 25) throw new Error('more than 25 in a batch');
+    kv.calls.deleteMany.push(keys.length);
+    for (const key of keys) kv.data.delete(key);
+  };
+  const single = kv.set;
+  kv.set = async (...args) => {
+    kv.singleWrites = (kv.singleWrites || 0) + 1;
+    return single(...args);
+  };
+  return kv;
+}
+
+test('with a storage that writes in batches, 1,000 devices are saved in 40 calls of 25 and not in 1,000 single writes', async () => {
+  const kv = batchKv();
+  const store = createDeviceStore(kv);
+  const devices = Array.from({ length: 1000 }, (_, i) => ({ id: `own-${i}`, name: `Pump ${i}`, type: 'pump', manufacturer: 'Acme', model: 'M-1', lotOrSerial: `SN${i}`, ward: 'ICU' }));
+  assert.equal(await store.saveDevices(devices), 1000);
+  assert.equal(kv.calls.setMany.length, 40);
+  assert.ok(kv.calls.setMany.every((n) => n === 25));
+  assert.equal(kv.singleWrites || 0, 0);
+  assert.equal((await store.listDevices()).length, 1000);
+});
+
+test('with a storage that deletes in batches, removing and clearing use them, in groups of at most 25', async () => {
+  const kv = batchKv();
+  const store = createDeviceStore(kv);
+  const devices = Array.from({ length: 60 }, (_, i) => ({ id: `own-${i}`, name: `Pump ${i}`, type: 'pump', manufacturer: 'Acme', model: 'M-1', lotOrSerial: `SN${i}`, ward: 'ICU', source: i < 30 ? 'demo' : 'manual' }));
+  await store.saveDevices(devices);
+  assert.equal(await store.removeDevices(devices.slice(0, 10).map((d) => d.id)), 10);
+  assert.equal(await store.removeBySource('demo'), 20);
+  assert.equal(await store.clear(), 30);
+  assert.equal(kv.data.size, 0);
+  assert.ok(kv.calls.deleteMany.every((n) => n <= 25) && kv.calls.deleteMany.length >= 3);
+});
+
+test('a batch that the storage fails stops the save instead of pretending it worked', async () => {
+  const kv = batchKv();
+  kv.setMany = async () => {
+    throw new Error('Storage could not save 3 of 25 records (X)');
+  };
+  await assert.rejects(() => createDeviceStore(kv).saveDevices([{ id: 'a', name: 'n', type: 't', manufacturer: 'm', model: 'mod' }]), /could not save/);
+});

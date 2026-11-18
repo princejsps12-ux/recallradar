@@ -25,6 +25,18 @@ export const forgeKv = {
     }
   },
 
+  // Up to 25 records in ONE call (Forge's batch limit). Measured on the live storage: 1,000 single writes took 13 seconds and 1,000
+  // deletes 10, against a 25-second limit on a UI function; a batch of 25 is one round trip. Every record must be saved or this throws.
+  async setMany(entries) {
+    const result = await kvs.batchSet(entries.map(({ key, value }) => ({ key, value })));
+    if (result && result.failedKeys && result.failedKeys.length) throw new Error(`Storage could not save ${result.failedKeys.length} of ${entries.length} records (${result.failedKeys[0].error.code})`);
+  },
+
+  async deleteMany(keys) {
+    const result = await kvs.batchDelete(keys.map((key) => ({ key })));
+    if (result && result.failedKeys && result.failedKeys.length) throw new Error(`Storage could not delete ${result.failedKeys.length} of ${keys.length} records (${result.failedKeys[0].error.code})`);
+  },
+
   // Return every { key, value } whose key starts with `prefix`, following paging cursors.
   async listByPrefix(prefix) {
     const items = [];
