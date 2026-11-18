@@ -35,14 +35,14 @@ test('scoreCases: "gets a task" counts exact and likely together, so exact-for-l
 test('scoreCases: excluded cases are counted on their own line and never in the tables', () => {
   const score = scoreCases([row('a', 'affected', 'exact'), row('x', 'excluded', 'likely'), row('y', 'excluded', 'none')]);
   assert.equal(score.total, 1);
-  assert.deepEqual(score.excluded, { total: 2, saidExact: 0, saidLikely: 1 });
+  assert.deepEqual(score.excluded, { total: 2, saidExact: 0, saidLikely: 1, ruledOut: 1 });
   assert.deepEqual(score.overClaims, []);
 });
 
 test('scoreCases: a unit the recall rules out that is called exact is an over-claim, though excluded cases are not in the tables', () => {
   const score = scoreCases([row('a', 'affected', 'exact'), row('x', 'excluded', 'exact'), row('y', 'excluded', 'likely')]);
   assert.equal(score.total, 1, 'still not in the tables');
-  assert.deepEqual(score.excluded, { total: 2, saidExact: 1, saidLikely: 1 });
+  assert.deepEqual(score.excluded, { total: 2, saidExact: 1, saidLikely: 1, ruledOut: 0 });
   assert.deepEqual(score.overClaims, ['x']);
 });
 

@@ -443,8 +443,8 @@ test('the real Astral recall: a serial below the stated limit is exact (before: 
   assert.equal(inside.rule, RULES.EXACT_MODEL_AND_RANGE);
   assert.match(inside.reason, /falls inside the range the recall gives \("< 22241890149"\)/);
   const outside = evaluateMatch({ manufacturer: 'ResMed', model: 'Astral 100', type: 'ventilator', lotOrSerial: '22250000001' }, astralRecall);
-  assert.equal(outside.confidence, CONFIDENCE.LIKELY);
-  assert.equal(outside.rule, RULES.LIKELY_MODEL);
+  assert.equal(outside.confidence, CONFIDENCE.POSSIBLE, 'above the stated limit: the recall leaves this unit out');
+  assert.equal(outside.rule, RULES.POSSIBLE_UNIT_OUT);
 });
 
 test('a range and the UDI-DI together: exact by the UDI rule, and the reason names the range', () => {
@@ -494,7 +494,7 @@ test('"all serial numbers" or a range for one model of a multi-product recall do
   const recall = { ...base, productText: 'WX-200 and WX-300 monitors', codeText: 'WX-200: all serial numbers. WX-300: serial numbers 12345 through 12400.' };
   const dev = (model, lotOrSerial) => ({ id: 'd', name: 'Monitor', type: 'monitor', manufacturer: 'Acme Medical', model, lotOrSerial, ward: 'ICU' });
   assert.equal(evaluateMatch(dev('WX-200', '55555'), recall).rule, RULES.EXACT_MODEL_ALL_UNITS, 'its own model: all units');
-  assert.equal(evaluateMatch(dev('WX-300', '99999'), recall).confidence, 'likely', 'outside WX-300 range; the all-units of WX-200 is not its');
+  assert.notEqual(evaluateMatch(dev('WX-300', '99999'), recall).confidence, 'exact', 'outside WX-300 range; the all-units of WX-200 is not its');
   assert.equal(evaluateMatch(dev('WX-300', '12350'), recall).rule, RULES.EXACT_MODEL_AND_RANGE);
   const lots = { ...recall, codeText: 'WX-200: lots A1234, B5678. WX-300: lots C9999.' };
   assert.equal(evaluateMatch(dev('WX-300', 'A1234'), lots).confidence, 'likely', "a lot listed for WX-200 is not WX-300's");
@@ -505,9 +505,9 @@ test('exclusions in the code text switch the unit-level rules off: the answer st
   const recall = { recallNumber: 'Z-8', recallClass: 'II', date: '2026-11-01', firm: 'Acme Medical', product: 'WX', productText: 'WX-200 monitor', codeText: 'All lot numbers except lot 12345.' };
   const dev = (lotOrSerial) => ({ id: 'd', name: 'M', type: 'monitor', manufacturer: 'Acme Medical', model: 'WX-200', lotOrSerial, ward: 'ICU' });
   assert.equal(evaluateMatch(dev('77777'), recall).confidence, 'likely');
-  assert.equal(evaluateMatch(dev('12345'), recall).confidence, 'likely', 'the excluded lot is never exact');
+  assert.equal(evaluateMatch(dev('12345'), recall).confidence, 'possible', 'the lot the text excludes by name is ruled out, never exact');
   const range = { ...recall, codeText: 'Serial numbers 1000 through 1500, excluding 1200.' };
-  assert.equal(evaluateMatch(dev('1200'), range).confidence, 'likely');
+  assert.equal(evaluateMatch(dev('1200'), range).confidence, 'possible', 'named as excluded');
   assert.equal(evaluateMatch(dev('1300'), range).confidence, 'likely', 'with an exclusion in the text a person decides');
 });
 
@@ -570,7 +570,7 @@ test('Maquet Cardiohelp (Z-0420-2024): an exclusion belongs to its own part; the
     'Part No. 701048002: UDI - 04037691643526; Serial Numbers 90425259 to 90425748 (Excluding 90425438, 90425443, 90425568, 90425570, 90425588, 90425716) [***Updated 1/8/24 to include Serial numbers 90421507, 90421980, 90424277. Serial numbers 90425366 and 90423121 are additionally included in the scope***] Part No. 701076205: No UDI; Serial Numbers 90425438, 90425443, 90425568, 90425570, 90425588, 90425716, 90425747, 90425748',
   );
   assert.equal(evaluateMatch(own('Maquet Medical Systems', '701076205', '90425438'), recall).rule, RULES.EXACT_MODEL_AND_LOT, 'listed under its own part, which has no exclusion');
-  assert.equal(evaluateMatch(own('Maquet Medical Systems', '701048002', '90425438'), recall).confidence, 'likely', 'named in the exclusion of ITS part: never exact');
+  assert.equal(evaluateMatch(own('Maquet Medical Systems', '701048002', '90425438'), recall).confidence, 'possible', 'named in the exclusion of ITS part: ruled out, never exact');
   assert.equal(evaluateMatch(own('Maquet Medical Systems', '701048002', '90425300'), recall).confidence, 'likely', 'with an exclusion in its entry a person decides');
 });
 
@@ -714,4 +714,54 @@ test('matchDevicesToRecalls gives exactly what comparing every pair gives, for d
   const key = (m) => `${m.deviceId}|${m.recallNumber}|${m.confidence}|${m.rule}`;
   assert.deepEqual(fast.map(key).sort(), everyPair.map(key).sort());
   assert.ok(fast.length >= 4, `${fast.length} matches`);
+});
+
+// --- Ruling a unit out (possible-unit-ruled-out) -------------------------------------------------------------------
+// The product matches, the recall itself leaves this unit out, and nothing in the text can cover it another way.
+
+const rangeRecall = real('Z-5-2026', 'Acme Medical Inc', 'Acme Pump Model QX-200', 'Model QX-200: serial numbers 100000 through 100500');
+
+test('a serial outside the only range the recall states is ruled out, with the recall\'s own words, and no task', () => {
+  const v = evaluateMatch(own('Acme Medical', 'QX-200', '100900'), rangeRecall);
+  assert.equal(v.confidence, CONFIDENCE.POSSIBLE);
+  assert.equal(v.rule, RULES.POSSIBLE_UNIT_OUT);
+  assert.match(v.reason, /outside the range the recall gives/);
+  assert.match(v.reason, /100000 through 100500/);
+});
+
+test('a serial inside the range is still exact', () => {
+  assert.equal(evaluateMatch(own('Acme Medical', 'QX-200', '100200'), rangeRecall).confidence, CONFIDENCE.EXACT);
+});
+
+test('no serial recorded: nothing can be ruled out, the unit stays likely', () => {
+  assert.equal(evaluateMatch(own('Acme Medical', 'QX-200', ''), rangeRecall).confidence, CONFIDENCE.LIKELY);
+});
+
+test('a serial of a different length than the range is not judged by it', () => {
+  assert.equal(evaluateMatch(own('Acme Medical', 'QX-200', '5000'), rangeRecall).confidence, CONFIDENCE.LIKELY);
+});
+
+test('a recall that also lists lots or adds units is never used to rule a unit out', () => {
+  for (const code of [
+    'Model QX-200: serial numbers 100000 through 100500; Lot numbers A1, B2',
+    'Model QX-200: serial numbers 100000 through 100500. Updated to also include serial numbers 100900',
+    'Model QX-200: all serial numbers except 100000 through 100500',
+  ]) {
+    const recall = real('Z-6-2026', 'Acme Medical Inc', 'Acme Pump Model QX-200', code);
+    assert.notEqual(evaluateMatch(own('Acme Medical', 'QX-200', '100900'), recall).rule, RULES.POSSIBLE_UNIT_OUT, code);
+  }
+});
+
+test('a serial named in a plain "excluding" list is ruled out; one the text also adds back is not', () => {
+  const plain = real('Z-7-2026', 'Acme Medical Inc', 'Acme Pump Model QX-200', 'Model QX-200: serial numbers 100000 through 100500 (Excluding 100123, 100456)');
+  assert.equal(evaluateMatch(own('Acme Medical', 'QX-200', '100123'), plain).rule, RULES.POSSIBLE_UNIT_OUT);
+  assert.equal(evaluateMatch(own('Acme Medical', 'QX-200', '100124'), plain).confidence, CONFIDENCE.LIKELY, 'an unnamed unit stays with a person');
+  const added = real('Z-8-2026', 'Acme Medical Inc', 'Acme Pump Model QX-200', 'Model QX-200: serial numbers 100000 through 100500 (Excluding 100123) [Updated to include serial numbers 100123]');
+  assert.notEqual(evaluateMatch(own('Acme Medical', 'QX-200', '100123'), added).rule, RULES.POSSIBLE_UNIT_OUT);
+});
+
+test('the UDI-DI rule rules a unit out the same way', () => {
+  const recall = real('Z-9-2026', 'Acme Medical Inc', 'Acme Pump Model QX-200', 'Model QX-200 UDI-DI 00884838085282: serial numbers 100000 through 100500');
+  const v = evaluateMatch(own('Other Name', 'zz', '100900', '00884838085282'), recall);
+  assert.equal(v.rule, RULES.POSSIBLE_UNIT_OUT);
 });

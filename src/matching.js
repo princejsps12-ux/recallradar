@@ -35,7 +35,7 @@
 import { tokenize, compact, containsPhrase, containsFolded, foldedLower } from './text.js';
 import { sameMakerFamily } from './makerAliases.js';
 import { extractUdis, normalizeDi, diVariants } from './udi.js';
-import { parseSerialConstraints, serialInConstraints } from './serials.js';
+import { parseSerialConstraints, serialInConstraints, serialOutsideConstraints } from './serials.js';
 
 export const CONFIDENCE = Object.freeze({
   EXACT: 'exact',
@@ -54,6 +54,7 @@ export const RULES = Object.freeze({
   LIKELY_LOT: 'likely-manufacturer-lot',
   POSSIBLE_MODEL_OTHER_MAKER: 'possible-model-other-maker',
   POSSIBLE_TYPE: 'possible-manufacturer-type',
+  POSSIBLE_UNIT_OUT: 'possible-unit-ruled-out',
 });
 
 // Strongest first. Used to sort results and to pick the best rule.
@@ -309,6 +310,64 @@ export function serialInRecallRange(serial, recall) {
   return hit ? hit.text : null;
 }
 
+// Ruling a unit OUT. The product matches (maker and model, or the UDI-DI) but this unit is not covered, in one of two ways that
+// leave no room for a guess, and only then does the answer drop from "likely" (a task) to "possible" (no task):
+//   1. its serial is named after an exclusion word ("excluding 90425438", "all serial numbers except K17160001") and appears
+//      nowhere else in the product's text, or
+//   2. the product's text states serial ranges or limits that apply to this serial (same letters, a length they can judge), the
+//      serial is outside all of them, and the text has no other way to cover a unit (no lot or batch list, no "all units",
+//      no exclusion words that could turn the range into the excluded part: "all serials except 1000-1500").
+// Anything else stays "likely" and a person checks, because a wrongly read range would hide a real recall.
+// ("additionally included", "updated to include": the text adds units that may lie outside the range.)
+const RANGE_OUT_BLOCKERS = /\b(lots?|batch(?:es)?|all\s+(?:serial|units|devices|lots)|includ(?:e|es|ed|ing)|additional(?:ly)?|also|added|updated|expanded)\b/i;
+// What may sit between an exclusion word and a serial in a plain list of excluded units. Numbers and codes (anything with a digit)
+// and punctuation are dropped before this is applied.
+const LIST_FILLER = /\b(?:serial|numbers?|nos?|s\/n|sn|units?|devices?|and|or|the|following|of|lots?)\b|\b\w*\d\w*\b/gi;
+/**
+ * @param {string} serial
+ * @param {string} text  the code text of the product the device was matched to
+ * @returns {boolean}
+ */
+function serialNamedAsExcluded(serial, text) {
+  const own = compact(serial);
+  if (own.length < 4) return false;
+  let found = false;
+  for (const sentence of text.split(/\n+|(?<=[.;])\s+/)) {
+    const tokens = [...sentence.matchAll(/[A-Za-z0-9-]+/g)];
+    const hits = tokens.filter((t) => compact(t[0]) === own);
+    if (hits.length === 0) continue;
+    const word = EXCLUSION.exec(sentence);
+    if (!word || hits.some((t) => t.index < word.index)) return false; // listed as affected somewhere
+    // Only a plain list may stand between the exclusion word and the serial ("Excluding 90425438, 90425443, 90425716"): a word
+    // such as "include" or "updated" there ("... [Updated to include serial numbers 90421507]") may turn it back into an affected unit.
+    for (const t of hits) {
+      const between = sentence.slice(word.index + word[0].length, t.index);
+      const leftover = between.replace(LIST_FILLER, ' ').replace(/[^A-Za-z]+/g, ' ').trim();
+      if (leftover) return false;
+    }
+    found = true;
+  }
+  return found;
+}
+
+/**
+ * @param {string} serial
+ * @param {import('./types.js').Recall} scoped
+ * @param {boolean} excluded
+ * @param {import('./types.js').Recall} whole  the recall as a whole
+ * @returns {string | null}  why the unit is ruled out, in the recall's own words, or null
+ */
+function unitRuledOut(serial, scoped, excluded, whole) {
+  if (!serial) return null;
+  const text = scoped.codeText || '';
+  if (excluded) return serialNamedAsExcluded(serial, text) ? `serial "${serial}" is named as excluded in the recall` : null;
+  // The blockers are looked for in the WHOLE code text, not only in the part cut for this product: a closing sentence that adds
+  // units ("updated to also include ...") does not name the model, so the cut leaves it out.
+  if (recallCoversAllUnits(scoped) || RANGE_OUT_BLOCKERS.test(whole.codeText || '')) return null;
+  const outside = serialOutsideConstraints(serial, parsedRecall(scoped).constraints);
+  return outside ? `serial "${serial}" is outside the range the recall gives ("${outside.text}")` : null;
+}
+
 // Used only by the "same kind of device" rule: every word of the device's type
 // ("infusion pump") appears in the recall's product text.
 /**
@@ -487,6 +546,8 @@ export function evaluateMatch(device, recall) {
     if (!excluded && recallCoversAllUnits(scoped)) {
       return result(CONFIDENCE.EXACT, RULES.EXACT_UDI_ALL_UNITS, `UDI-DI ${udi.di} is listed in this recall, and the recall covers all serial/lot numbers.`);
     }
+    const outUdi = unitRuledOut(device.lotOrSerial, scoped, excluded, recall);
+    if (outUdi) return result(CONFIDENCE.POSSIBLE, RULES.POSSIBLE_UNIT_OUT, `UDI-DI ${udi.di} is listed in this recall, but ${outUdi}, so this unit is not covered. No task is created; check the recall notice if you doubt it.`);
     return result(CONFIDENCE.LIKELY, RULES.LIKELY_UDI, `UDI-DI ${udi.di} is listed in this recall, but ${whyNotListed}.`);
   }
 
@@ -514,6 +575,11 @@ export function evaluateMatch(device, recall) {
         RULES.EXACT_MODEL_ALL_UNITS,
         `Manufacturer and model "${device.model}" match, and the recall covers all serial/lot numbers.${company}`,
       );
+    }
+    // RULE possible-unit-ruled-out: maker and model match, but the recall itself leaves this unit out (see unitRuledOut).
+    const outModel = unitRuledOut(device.lotOrSerial, scoped, excluded, recall);
+    if (outModel) {
+      return result(CONFIDENCE.POSSIBLE, RULES.POSSIBLE_UNIT_OUT, `Manufacturer and model "${device.model}" match, but ${outModel}, so this unit is not covered. No task is created; check the recall notice if you doubt it.${company}`);
     }
     // RULE likely-manufacturer-model: maker and model match but the unit's number is not listed.
     // Either we do not know the number, or the recall lists numbers in a form we cannot read

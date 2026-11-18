@@ -89,3 +89,14 @@ test('a limit only applies to serials with the same number of digits, a range to
   assert.ok(inRange('1000', 'serial numbers 950 through 1050'), 'a range with ends of different length covers the lengths between');
   assert.equal(inRange('99999', 'serial numbers 1000 through 5000'), null);
 });
+
+test('serialOutsideConstraints: outside every constraint that applies, never inside, never when nothing applies', async () => {
+  const { parseSerialConstraints, serialOutsideConstraints } = await import('./serials.js');
+  const c = parseSerialConstraints('serial numbers 100000 through 100500; serial number < 22241890149');
+  assert.equal(serialOutsideConstraints('100900', c).text, '100000 through 100500');
+  assert.equal(serialOutsideConstraints('100200', c), null);
+  assert.equal(serialOutsideConstraints('22250000001', c).text.includes('22241890149'), true);
+  assert.equal(serialOutsideConstraints('5000', c), null, 'no constraint judges a 4-digit serial');
+  assert.equal(serialOutsideConstraints('US001A00AW', c), null, 'not a comparable serial');
+  assert.equal(serialOutsideConstraints('100900', null), null);
+});

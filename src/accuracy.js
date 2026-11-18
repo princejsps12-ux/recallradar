@@ -97,6 +97,7 @@ export function scoreCases(rows) {
       total: excluded.length,
       saidExact: excluded.filter((row) => row.predicted === 'exact').length,
       saidLikely: excluded.filter((row) => row.predicted === 'likely').length,
+      ruledOut: excluded.filter((row) => row.predicted === 'possible' || row.predicted === 'none').length,
     },
   };
 }

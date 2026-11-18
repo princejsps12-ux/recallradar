@@ -42,7 +42,7 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 
 | File | Role |
 | --- | --- |
-| `src/matching.js` | The ten match rules (exact / likely / possible; UDI-DI rules first), every threshold a named constant with its reason |
+| `src/matching.js` | The eleven match rules (exact / likely / possible; UDI-DI rules first; `possible-unit-ruled-out` drops a unit the recall itself excludes or leaves outside its stated range, narrowly: see docs/MATCHING.md), every threshold a named constant with its reason |
 | `src/makerAliases.js` | `MAKER_FAMILIES`: the short list of companies that go by more than one name (BD / Becton Dickinson / CareFusion / Bard, Baxter / Hill-Rom / Welch Allyn, GE / Datex-Ohmeda, ...). `manufacturerLink` in matching.js returns 'words', 'family' or null (a 'family' match adds "are the same company" to the reason); `planRecallQueries` also searches a family's main name (`familySearchNames`, at most one more search per family); the eval sweeps skip pairs of one family. Names of 3 letters or fewer count only at the START of the maker. Add a company only with a public source (an acquisition or a rename), and a test |
 | `src/udi.js`, `src/serials.js` | UDI-DI (GS1 GTIN) extraction from recall text and device lists; serial ranges/limits read only inside a "serial" clause |
 | `src/accuracy.js`, `scripts/eval-matching.mjs`, `scripts/make-eval-set.mjs`, `eval/` | Accuracy evaluation: frozen real recalls (`eval/recalls.json`), labeled cases built from them, precision/recall per level, `docs/ACCURACY.md` |
@@ -177,4 +177,4 @@ The Custom UI lives in `static/ui/` (it was the template's `static/hello-world`)
 
 ## Not built / ideas
 
-Read-only Assets import; adding/editing devices in the UI; choosing the project for tasks; a history of progress over time (the Progress tab reads Jira each time, nothing is recorded); skipping the duplicate download of the 8.7 MB record; per-search caching; ruling a unit OUT when its serial is outside a stated range (deliberately not done: a wrongly read range would hide a recall); HIBC UDI codes.
+Read-only Assets import; adding/editing devices in the UI; choosing the project for tasks; a history of progress over time (the Progress tab reads Jira each time, nothing is recorded); skipping the duplicate download of the 8.7 MB record; per-search caching; HIBC UDI codes.

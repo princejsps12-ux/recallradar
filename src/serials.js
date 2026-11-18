@@ -116,3 +116,24 @@ export function serialInConstraints(serial, constraints) {
   for (const a of constraints.above) if (a.prefix === s.prefix && length === a.digits && (a.inclusive ? s.n >= a.limit : s.n > a.limit)) return { text: a.text };
   return null;
 }
+
+/**
+ * Is this serial OUTSIDE every range or limit that applies to it? "Applies" is the same test serialInConstraints uses (same letter
+ * prefix, a length the range or limit can judge), so a serial of another length or form is never ruled out by a limit written
+ * for a different product. Returns the recall's own words for the first constraint that applies (to quote it), or null when the
+ * serial is inside one, when nothing applies to it, or when it is not a comparable serial at all.
+ * @param {unknown} serial
+ * @param {SerialConstraints | null | undefined} constraints
+ * @returns {{ text: string } | null}
+ */
+export function serialOutsideConstraints(serial, constraints) {
+  const s = splitSerial(serial);
+  if (!s || !hasSerialConstraints(constraints) || serialInConstraints(serial, constraints)) return null;
+  const length = s.digits.length;
+  const applies = [
+    ...constraints.ranges.filter((r) => r.prefix === s.prefix && length >= r.shortest && length <= r.longest),
+    ...constraints.below.filter((b) => b.prefix === s.prefix && length === b.digits),
+    ...constraints.above.filter((a) => a.prefix === s.prefix && length === a.digits),
+  ];
+  return applies.length > 0 ? { text: applies[0].text } : null;
+}
