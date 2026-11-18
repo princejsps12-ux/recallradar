@@ -162,6 +162,9 @@ export function lotInRecall(lotOrSerial, recall) {
 export const ALL_UNITS_QUALIFIERS = Object.freeze([
   'with', 'having', 'running', 'configured', 'manufactured', 'between', 'software', 'firmware', 'version', 'versions',
   'installed', 'equipped', 'after', 'before', 'prior', 'starting', 'beginning',
+  // "all units FROM lot 12345", "all serial numbers FROM 5000 onward", "all units BUILT in 2019", "all units THAT were...": each one
+  // narrows "all" to some of the units. ("All units distributed" is deliberately NOT here: that is every unit that was sold.)
+  'from', 'since', 'until', 'through', 'built', 'produced', 'made', 'that', 'which', 'where', 'whose',
 ]);
 const QUALIFIER_SET = new Set(ALL_UNITS_QUALIFIERS);
 // How many words after the phrase may carry such a qualifier.
@@ -253,7 +256,22 @@ export function typeInRecall(deviceType, recall) {
 // otherwise nothing can be told apart and the whole text is used as before. Known limits: a model named only in the product
 // description (not in the code text) cannot be scoped, and neither can an entry that starts with a bare number and a name
 // ("5855300 Slim-Cath ... Lot Number: REKY1364"): there the lots of one product can still be read as another's.
-const EXCLUSION = /\b(except|excepting|excluding|excluded|exclusive of|other than|not including|apart from)\b/i;
+const EXCLUSION = /\b(except|excepting|exception|excludes?|excluding|excluded|exclusive of|other than|not including|apart from)\b/i;
+// "Lots 12345 and 67890 are not affected", "serial numbers 1000 through 1500 are not included": a list of units that are NOT
+// recalled, and the plain list or range must not be read as "affected". The same words in a closing remark about the OTHER units
+// ("units with other serial numbers are not affected") say nothing about the units that are listed, so a sentence that speaks of
+// other, remaining or unlisted units does not count.
+const NEGATION = /\b(not (?:affected|included|impacted|covered|recalled|subject to|part of|in scope)|unaffected|does not include|do not include|out of scope|outside (?:of )?(?:the )?scope)\b/i;
+const OTHER_UNITS = /\b(other|others|remaining|rest|outside|beyond|not (?:listed|shown|named|mentioned|identified))\b/i;
+
+/**
+ * @param {string} text
+ * @returns {boolean}
+ */
+function leavesUnitsOut(text) {
+  if (EXCLUSION.test(text)) return true;
+  return text.split(/\n+|(?<=[.;])\s+/).some((sentence) => NEGATION.test(sentence) && !OTHER_UNITS.test(sentence));
+}
 const UNIT_CUE = /\b(serial|lots?|batch(?:es)?|all)\b|\((?:10|21)\)/i;
 // A label that names a product and is followed by its number (the number has a digit: "Model No." alone, or "part of", is not one),
 // or a list number. "(1)" is not a list number: "(01)", "(10)" and "(21)" are GS1 identifiers.
@@ -325,7 +343,7 @@ export function evaluateMatch(device, recall) {
   const scoped = scopedRecall(recall, [device.model, ...diVariants(device.udiDi)]);
   // "All lot numbers except lot 123" and "1000-1500, excluding 1200" name units that are NOT affected: the text cannot be read as
   // a plain list, range or "all units", so the unit-level rules are off and a person checks (the answer stays "likely").
-  const excluded = EXCLUSION.test(scoped.codeText || '');
+  const excluded = leavesUnitsOut(scoped.codeText || '');
   const hasLot = !excluded && lotInRecall(device.lotOrSerial, scoped);
   const range = hasLot || excluded ? null : serialInRecallRange(device.lotOrSerial, scoped);
   const unitListed = hasLot || Boolean(range);
@@ -341,7 +359,8 @@ export function evaluateMatch(device, recall) {
     // at any length ("(01)00884838085282(21)209": serial 209 of that product).
     const own = compact(device.lotOrSerial);
     const tied = own.length > 0 && [...udi.serials, ...udi.lots].some((n) => compact(n) === own);
-    if (unitListed || tied) {
+    // (A serial the text ties to the DI is a listed unit, unless the text says it is one of the units that are left out.)
+    if (unitListed || (tied && !excluded)) {
       return result(CONFIDENCE.EXACT, RULES.EXACT_UDI_UNIT, `UDI-DI ${udi.di} is listed in this recall, and this unit's ${tied && !unitListed ? `serial/lot "${device.lotOrSerial}" is listed with it` : unitHow}.`);
     }
     if (!excluded && recallCoversAllUnits(scoped)) {

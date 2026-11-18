@@ -40,3 +40,14 @@ test('containsPhrase handles empty needles, short haystacks and pre-tokenized in
   assert.equal(containsPhrase('one', 'one two'), false);
   assert.equal(containsPhrase(['a', 'b', 'c'], ['b', 'c']), true);
 });
+
+test('tokenize folds letters with marks: umlauts take their two-letter spelling, other accents are dropped', () => {
+  assert.deepEqual(tokenize('Dräger Medical'), ['draeger', 'medical']);
+  assert.deepEqual(tokenize('MÜLLER-Größe'), ['mueller', 'groesse']);
+  assert.deepEqual(tokenize('José Ålesund Łódź'), ['jose', 'alesund', 'lodz']);
+  assert.deepEqual(tokenize('Æther Œuvre Ørsted'), ['aether', 'oeuvre', 'orsted']);
+  assert.deepEqual(tokenize('Cafe\u0301'), ['cafe'], 'a letter and its separate accent mark');
+  assert.deepEqual(tokenize('m²'), ['m2'], 'compatibility forms');
+  assert.deepEqual(tokenize('MMT-1885CLW/0076'), ['mmt', '1885clw', '0076'], 'plain text is unchanged');
+  assert.equal(compact('Dräger 4-000'), 'draeger4000');
+});

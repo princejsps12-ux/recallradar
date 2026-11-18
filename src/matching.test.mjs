@@ -591,3 +591,52 @@ test('"1.05.06.00", a part of a sentence and GS1 identifiers are not entries', (
   assert.equal(evaluateMatch(own('Acme Medical', 'WX-200', '1200', ''), ai).rule, RULES.EXACT_MODEL_AND_RANGE, '"(10) " and "(21) " are not list numbers: nothing is cut, the model is not in the code text, the whole text is used as before');
 });
 
+
+// --- Found by independent review: wordings that left units out, and conditions after "all units" ----------------------------
+
+test('"not affected", "unaffected", "not included", "excludes" and "exception" name units that are left out: the answer stays likely', () => {
+  const dev = (lotOrSerial, udiDi = '') => ({ id: 'd', name: 'M', type: 'monitor', manufacturer: 'Acme Medical', model: 'WX-200', lotOrSerial, udiDi, ward: 'ICU' });
+  const recall = (codeText) => ({ recallNumber: 'Z-7', recallClass: 'II', date: '2026-11-01', firm: 'Acme Medical', product: 'WX', productText: 'WX-200 monitor', codeText });
+  const cases = [
+    ['Lot numbers 12345 and 67890 are not affected.', '12345'],
+    ['Serial numbers 1000 through 1500 are not affected by this recall.', '1200'],
+    ['Unaffected lots: 12345.', '12345'],
+    ['All lot numbers; lot 12345 is not included.', '77777'],
+    ['Lot numbers 12345, 67890. Lot 12345 is not subject to this recall.', '12345'],
+    ['This recall excludes lot 12345. Lots 12345, 67890.', '67890'],
+    ['Lots 12345 and 67890, with the exception of units already corrected.', '67890'],
+  ];
+  for (const [text, lot] of cases) assert.equal(evaluateMatch(dev(lot), recall(text)).confidence, 'likely', text);
+  // The same words about the OTHER units are only a closing remark: the listed units stay listed.
+  assert.equal(evaluateMatch(dev('1200'), recall('Serial numbers 1000 through 1500. Units with other serial numbers are not affected.')).confidence, 'exact');
+  assert.equal(evaluateMatch(dev('12345'), recall('Lot numbers 12345 and 67890. All remaining lots are not affected.')).confidence, 'exact');
+  assert.equal(evaluateMatch(dev('12345'), recall('Lot numbers 12345 and 67890. Lots not listed are unaffected.')).confidence, 'exact');
+});
+
+test('the UDI-DI path does not call a unit exact when the text says it is left out', () => {
+  const recall = { recallNumber: 'Z-6', recallClass: 'II', date: '2026-11-01', firm: 'Acme Medical', product: 'WX', productText: 'WX-200 monitor', codeText: 'All units except (01)00884838085282(21)209.' };
+  const unit = { id: 'd', name: 'M', type: 'monitor', manufacturer: 'Acme Medical', model: 'WX-200', lotOrSerial: '209', udiDi: '00884838085282', ward: 'ICU' };
+  assert.equal(evaluateMatch(unit, recall).confidence, 'likely');
+  const noted = { ...recall, codeText: 'UDI-DI 00884838085282. Serial numbers 1000 through 1500 are not affected.' };
+  assert.equal(evaluateMatch({ ...unit, lotOrSerial: '1200' }, noted).confidence, 'likely');
+  const plain = { ...recall, codeText: '(01)00884838085282(21)209' };
+  assert.equal(evaluateMatch(unit, plain).rule, RULES.EXACT_UDI_UNIT, 'without the exclusion the tied serial is still exact');
+});
+
+test('"all units FROM lot 12345", "all serial numbers from 5000 onward" and "all units built in 2019" are some units, not every unit', () => {
+  for (const text of ['Model WX-200: all units from lot 12345.', 'All serial numbers from 5000 onward.', 'All units built in 2019.', 'All units that were shipped after March 2024.', 'All lots since lot 4500.']) {
+    assert.equal(recallCoversAllUnits({ codeText: text }), false, text);
+  }
+  assert.equal(recallCoversAllUnits({ codeText: 'All units distributed' }), true);
+  assert.equal(recallCoversAllUnits({ codeText: 'All serial numbers' }), true);
+});
+
+test('a maker written with umlauts is the same maker as its two-letter spelling (Dräger / Draeger)', () => {
+  assert.equal(manufacturersMatch('Dräger', 'Draeger Medical Systems, Inc.'), true);
+  assert.equal(manufacturersMatch('Draeger', 'Dräger Medical GmbH'), true);
+  assert.equal(manufacturersMatch('Müller Medizintechnik', 'Mueller Medizintechnik GmbH'), true);
+  assert.equal(manufacturersMatch('Dräger', 'Draegerwerk AG'), false, 'a different word stays different');
+  const recall = { recallNumber: 'Z-5', recallClass: 'I', date: '2026-11-01', firm: 'Draeger Medical Systems, Inc.', product: 'Evita V500', productText: 'Evita V500 ventilator, model MK14000', codeText: 'All serial numbers' };
+  const match = evaluateMatch({ manufacturer: 'Dräger', model: 'MK14000', type: 'ventilator', lotOrSerial: 'ASDF-1234', ward: 'ICU' }, recall);
+  assert.equal(match.rule, RULES.EXACT_MODEL_ALL_UNITS, 'a true exact match is no longer downgraded to "possible" (no task)');
+});
