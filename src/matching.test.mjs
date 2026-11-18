@@ -694,3 +694,24 @@ test('Hill-Rom beds recalled by Baxter (the real Z-0228-2025 shape): the company
   assert.equal(evaluateMatch({ ...bed, model: 'P3200B000001' }, recall).rule, RULES.POSSIBLE_TYPE, 'another Hill-Rom bed: same company and kind of device, a look but no task');
   assert.equal(evaluateMatch({ ...bed, model: 'P3200B000001', type: 'patient monitor' }, recall), null, 'another kind of Hill-Rom device: nothing');
 });
+
+test('matchDevicesToRecalls gives exactly what comparing every pair gives, for devices that share a maker, model and UDI-DI', () => {
+  const recalls = [
+    { recallNumber: 'Z-1', recallClass: 'I', date: '2026-10-01', firm: 'Becton, Dickinson and Company', product: 'Alaris', productText: 'Alaris Pump Module Model 8100', codeText: 'Serial Numbers: 12345678, 12345679' },
+    { recallNumber: 'Z-2', recallClass: 'II', date: '2026-09-01', firm: 'Acme Medical', product: 'WX', productText: 'WX-200 monitor', codeText: 'UDI-DI 00884838085282. All serial numbers' },
+    { recallNumber: 'Z-3', recallClass: 'II', date: '2026-08-01', firm: 'Other Firm', product: 'Pump', productText: 'Pump model 8100 relabelled', codeText: 'Lot 55555' },
+    { recallNumber: 'Z-4', recallClass: 'III', date: '2026-07-01', firm: 'Unrelated Corp', product: 'Chair', productText: 'Dental chair QX-5150', codeText: 'Lot 99999' },
+  ];
+  const devices = [
+    { id: 'a', name: 'Pump', type: 'pump module', manufacturer: 'BD', model: '8100', lotOrSerial: '12345678', ward: 'ICU' },
+    { id: 'b', name: 'Pump', type: 'pump module', manufacturer: 'BD', model: '8100', lotOrSerial: '77777777', ward: 'ER' },
+    { id: 'c', name: 'Monitor', type: 'monitor', manufacturer: 'Zenith', model: 'ZX-1', lotOrSerial: '', udiDi: '00884838085282', ward: 'ICU' },
+    { id: 'd', name: 'Chair', type: 'chair', manufacturer: 'Zenith', model: 'QX-5150', lotOrSerial: '99999', ward: 'Dental' },
+    { id: 'e', name: 'Nothing', type: 'x', manufacturer: 'Nobody', model: 'NN', lotOrSerial: '', ward: 'X' },
+  ];
+  const everyPair = devices.flatMap((device) => recalls.map((recall) => matchDeviceToRecall(device, recall)).filter(Boolean));
+  const fast = matchDevicesToRecalls(devices, recalls);
+  const key = (m) => `${m.deviceId}|${m.recallNumber}|${m.confidence}|${m.rule}`;
+  assert.deepEqual(fast.map(key).sort(), everyPair.map(key).sort());
+  assert.ok(fast.length >= 4, `${fast.length} matches`);
+});

@@ -80,7 +80,18 @@ export function enqueueStep(message) {
 
 // Fetch one openFDA URL as JSON. openFDA answers 404 when a search has no hits: that is
 // "no results", not an error.
+const inFlight = new Map();
 async function fetchOpenFdaJson(url) {
+  const tag = url.slice(url.indexOf('search=') + 7, url.indexOf('search=') + 60);
+  inFlight.set(url, { tag, since: Date.now() });
+  try {
+    return await fetchOpenFdaJsonUntracked(url);
+  } finally {
+    inFlight.delete(url);
+  }
+}
+
+async function fetchOpenFdaJsonUntracked(url) {
   // OPENFDA_API_KEY is an optional Forge environment variable (forge variables set --encrypt): with it the daily allowance is
   // 120,000 requests instead of about 1,000 per address. Without it nothing changes.
   const keyed = withApiKey(url, process.env.OPENFDA_API_KEY);
@@ -102,6 +113,8 @@ async function fetchOpenFdaJson(url) {
 // them to the devices. `onProgress(done, total)` is called as the searches finish.
 export async function searchRecalls(devices, onProgress) {
   const began = Date.now();
+  // Every 15 seconds: which searches are still waiting, so a stall can be named from the log.
+  const heartbeat = setInterval(() => console.info(`check: still waiting for ${[...inFlight.values()].map((r) => `${r.tag} (${Math.round((Date.now() - r.since) / 1000)} s)`).join(' | ')}`), 15000);
   const mb = () => Math.round(process.memoryUsage().rss / 1048576);
   console.info(`check: start, heap limit ${Math.round(require('v8').getHeapStatistics().heap_size_limit / 1048576)} MB, memory ${mb()} MB`);
   const { recalls, failedQueries, cappedQueries } = await findRecallsForDevices(devices, fetchOpenFdaJson, {
@@ -110,6 +123,7 @@ export async function searchRecalls(devices, onProgress) {
       if (done % 10 === 0) console.info(`check: ${done}/${total} searches, memory ${mb()} MB`);
     },
   });
+  clearInterval(heartbeat);
   console.info(`check: searches done in ${Date.now() - began} ms, ${recalls.length} recalls, ${failedQueries} failed, memory ${mb()} MB`);
   const matches = matchDevicesToRecalls(devices, recalls);
   console.info(`check: matched in ${Date.now() - began} ms, ${matches.length} matches, memory ${mb()} MB`);

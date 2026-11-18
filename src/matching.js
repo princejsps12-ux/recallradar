@@ -623,8 +623,22 @@ function compareMatches(a, b) {
 export function matchDevicesToRecalls(devices, recalls) {
   /** @type {import('./types.js').Match[]} */
   const matches = [];
+  // A pair can only match when the makers are the same company, or the device's UDI-DI is in the recall, or its model number (five
+  // characters or more) is: every rule in evaluateMatch starts from one of these. So devices with the same maker, model and UDI-DI
+  // (a hospital owns many of one pump) share ONE pass over the recalls, and each device is then compared only with the recalls that
+  // passed. Same answers as comparing every pair, a lot fewer comparisons (a thousand devices took minutes on the platform).
+  /** @type {Map<string, import('./types.js').Recall[]>} */
+  const candidatesOf = new Map();
   for (const device of devices) {
-    for (const recall of recalls) {
+    const key = `${device.manufacturer}\u0000${device.model}\u0000${device.udiDi || ''}`;
+    let candidates = candidatesOf.get(key);
+    if (!candidates) {
+      candidates = recalls.filter(
+        (recall) => manufacturersMatch(device.manufacturer, recall.firm) || Boolean(udiInRecall(device.udiDi, recall)) || modelInRecall(device.model, recall, MIN_MODEL_LENGTH_OTHER_MAKER),
+      );
+      candidatesOf.set(key, candidates);
+    }
+    for (const recall of candidates) {
       const match = matchDeviceToRecall(device, recall);
       if (match) matches.push(match);
     }
