@@ -103,8 +103,12 @@ async function fetchOpenFdaJson(url) {
 export async function searchRecalls(devices, onProgress) {
   const began = Date.now();
   const mb = () => Math.round(process.memoryUsage().rss / 1048576);
+  console.info(`check: start, heap limit ${Math.round(require('v8').getHeapStatistics().heap_size_limit / 1048576)} MB, memory ${mb()} MB`);
   const { recalls, failedQueries, cappedQueries } = await findRecallsForDevices(devices, fetchOpenFdaJson, {
-    onProgress,
+    onProgress: (done, total) => {
+      if (onProgress) onProgress(done, total);
+      if (done % 10 === 0) console.info(`check: ${done}/${total} searches, memory ${mb()} MB`);
+    },
   });
   console.info(`check: searches done in ${Date.now() - began} ms, ${recalls.length} recalls, ${failedQueries} failed, memory ${mb()} MB`);
   const matches = matchDevicesToRecalls(devices, recalls);

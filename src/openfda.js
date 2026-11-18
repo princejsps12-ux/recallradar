@@ -55,7 +55,7 @@ export function parseRecall(raw) {
     recallNumber,
     firm: cleanText(raw.recalling_firm),
     product: truncate(cleanText(raw.product_description), MAX_PRODUCT_LENGTH),
-    codeInfo: truncate(cleanText(raw.code_info), MAX_CODE_INFO_LENGTH),
+    codeInfo: truncate(cleanText(typeof raw.code_info === 'string' ? raw.code_info.slice(0, MAX_CODE_TEXT_LENGTH) : raw.code_info), MAX_CODE_INFO_LENGTH),
     recallClass: parseClass(raw.classification),
     date: formatFdaDate(raw.report_date),
   };
@@ -100,6 +100,12 @@ export const MAX_REASON_LENGTH = 500;
 // Same as parseRecall, plus the FULL product and code_info text (the display fields above
 // are shortened). Matching needs the full text because a serial number can sit anywhere in a
 // list of thousands. Keep these two fields on the server; do not send them to the panel.
+// A recall's code text is kept up to this many characters. Some real recalls list millions of serial numbers (8.9 million characters
+// in one); holding them all, for every such recall of a check, ran the function out of memory on the live site (killed with SIGKILL
+// about 80 seconds in, right after the largest answers). 400,000 characters hold about 40,000 serial numbers; a unit listed beyond that
+// is not found by its serial (the UDI-DI and the model still find the recall). docs/MATCHING.md lists this as a limit.
+export const MAX_CODE_TEXT_LENGTH = 400000;
+
 export function parseRecallForMatching(raw) {
   const recall = parseRecall(raw);
   if (!recall) return null;
@@ -107,7 +113,7 @@ export function parseRecallForMatching(raw) {
     ...recall,
     productText: cleanText(raw.product_description),
     // code_info, plus more_code_info where the FDA put the rest of the lot/serial/UDI text.
-    codeText: cleanText(`${typeof raw.code_info === 'string' ? raw.code_info : ''} ${typeof raw.more_code_info === 'string' ? raw.more_code_info : ''}`),
+    codeText: cleanText(`${typeof raw.code_info === 'string' ? raw.code_info.slice(0, MAX_CODE_TEXT_LENGTH) : ''} ${typeof raw.more_code_info === 'string' ? raw.more_code_info.slice(0, MAX_CODE_TEXT_LENGTH) : ''}`).slice(0, MAX_CODE_TEXT_LENGTH),
     // Used to explain a recall (see recallDetails below), not for matching.
     reasonForRecall: truncate(cleanText(raw.reason_for_recall), MAX_REASON_LENGTH),
     status: cleanText(raw.status), // "Ongoing", "Completed" or "Terminated"

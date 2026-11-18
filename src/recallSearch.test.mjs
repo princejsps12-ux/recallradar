@@ -486,3 +486,11 @@ test('withTimeout fails a request that stalls, passes one that answers, and clea
   assert.equal(await withTimeout(async () => 'ok', 1000), 'ok');
   await assert.rejects(() => withTimeout(async () => { throw new Error('boom'); }, 1000), /boom/);
 });
+
+test('a recall with millions of characters of serial numbers keeps only the first 400,000 of its code text', async () => {
+  const { parseRecallForMatching, MAX_CODE_TEXT_LENGTH } = await import('./openfda.js');
+  const raw = { recall_number: 'Z-1-2026', recalling_firm: 'Acme', product_description: 'Pump', code_info: `Serial Numbers: ${'1234567, '.repeat(900000)}`, classification: 'Class II', report_date: '20261101' };
+  const recall = parseRecallForMatching(raw);
+  assert.equal(recall.codeText.length <= MAX_CODE_TEXT_LENGTH, true);
+  assert.match(recall.codeText, /^Serial Numbers: 1234567/);
+});

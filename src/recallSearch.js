@@ -40,7 +40,7 @@ export const MAX_PAGES_PER_QUERY = 4;
 
 // How many requests run at the same time. openFDA allows about 240 a minute per address; a handful at a time keeps a
 // check well inside that while still finishing in seconds, and stops one big hospital from sending dozens at once.
-export const MAX_CONCURRENT_REQUESTS = 3;
+export const MAX_CONCURRENT_REQUESTS = 2;
 
 // How many model numbers to put in one search. Every model adds two clauses to the URL, so
 // small groups keep URLs short and stop one very common model from crowding out the others.
