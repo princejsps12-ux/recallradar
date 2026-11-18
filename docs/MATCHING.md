@@ -26,7 +26,7 @@ There are no unexplained constants. All are named exports in [`src/matching.js`]
 | `LOOKBACK_DAYS` | 3 x 365 | Looks at the last three years: recalls often stay open (the FDA lists them as "Ongoing") long after they were issued, and a hospital still has the devices. |
 | `UDIS_PER_QUERY` | 5 | One search per five identifiers (each written in up to three forms), to keep URLs short. |
 | `MAX_PAGES_PER_QUERY` | 4 | A search with more matches than one answer holds is read page by page, up to 100 recalls; a search with still more is flagged as capped. |
-| `MAX_CONCURRENT_REQUESTS` | 6 | openFDA allows about 240 requests a minute per address; six at a time finishes a check in seconds and stays well inside that. |
+| `MAX_CONCURRENT_REQUESTS` | 3 | openFDA allows about 240 requests a minute per address; three at a time stays well inside that and keeps the answers being parsed at once few (the live check ran out of memory at six). |
 | `MODELS_PER_QUERY` | 5 | Keeps search URLs short and stops one very common model crowding out others. |
 | `MAX_RECALLS_PER_QUERY` | 100 | openFDA's per-request maximum. |
 | `SEARCH_LIMIT_PER_QUERY` | 25 | Recalls requested per page. Smaller is faster; 25 kept every match in the demo, and a busy search continues on the next page. |

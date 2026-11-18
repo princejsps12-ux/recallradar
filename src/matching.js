@@ -32,7 +32,7 @@
 // ("monitor" vs "monitors"); a serial with letters after its digits ("US001A00AW") is never judged by a range.
 //
 // This file has no Forge imports so every rule can be unit tested with plain Node.
-import { tokenize, compact, containsPhrase } from './text.js';
+import { tokenize, compact, containsPhrase, foldedLower } from './text.js';
 import { sameMakerFamily } from './makerAliases.js';
 import { extractUdis, normalizeDi, diVariants } from './udi.js';
 import { parseSerialConstraints, serialInConstraints } from './serials.js';
@@ -153,8 +153,7 @@ export function manufacturerLink(deviceMaker, recallFirm) {
  */
 export function modelInRecall(model, recall, minLength = MIN_MODEL_LENGTH) {
   if (compact(model).length < minLength) return false;
-  const text = tokenize(`${recall.productText || ''} ${recall.codeText || ''}`);
-  return containsPhrase(text, model);
+  return containsPhrase(recall.productText || '', model) || containsPhrase(recall.codeText || '', model);
 }
 
 // Fact 3a. This unit's lot/serial appears, as whole words, in the recall's code text.
@@ -179,8 +178,11 @@ export const ALL_UNITS_QUALIFIERS = Object.freeze([
   'from', 'since', 'until', 'through', 'built', 'produced', 'made', 'that', 'which', 'where', 'whose',
 ]);
 const QUALIFIER_SET = new Set(ALL_UNITS_QUALIFIERS);
-// How many words after the phrase may carry such a qualifier.
+// How many words after the phrase may carry such a qualifier, and how many characters are enough to hold them.
 const QUALIFIER_WINDOW = 4;
+const QUALIFIER_LOOK_AHEAD_CHARS = 200;
+/** @type {WeakMap<object, boolean>} */
+const coversAllCache = new WeakMap();
 
 // Fact 3b. The recall says every unit is affected ("all serial numbers"), without a condition on which ones.
 /**
@@ -188,17 +190,27 @@ const QUALIFIER_WINDOW = 4;
  * @returns {boolean}
  */
 export function recallCoversAllUnits(recall) {
-  const text = tokenize(recall.codeText || '');
+  const known = coversAllCache.get(recall);
+  if (known !== undefined) return known;
+  const text = foldedLower(recall.codeText || '');
+  let covers = false;
   for (const phrase of ALL_UNITS_PHRASES) {
-    for (let start = 0; start <= text.length - phrase.length; start += 1) {
-      if (!phrase.every((word, i) => text[start + i] === word)) continue;
-      const following = text.slice(start + phrase.length, start + phrase.length + QUALIFIER_WINDOW);
+    // Searched as text (see containsPhrase), then only the few words after each hit are split.
+    const found = new RegExp(`(?<![a-z0-9])${phrase.join('[^a-z0-9]+')}(?![a-z0-9])`, 'g');
+    for (const hit of text.matchAll(found)) {
+      const from = (hit.index || 0) + hit[0].length;
+      const following = tokenize(text.slice(from, from + QUALIFIER_LOOK_AHEAD_CHARS)).slice(0, QUALIFIER_WINDOW);
       // "all serial numbers" or "all lot numbers" may be followed by "numbers"/"number"; skip that word before looking.
       const after = following[0] === 'numbers' || following[0] === 'number' ? following.slice(1) : following;
-      if (!after.some((word) => QUALIFIER_SET.has(word))) return true;
+      if (!after.some((word) => QUALIFIER_SET.has(word))) {
+        covers = true;
+        break;
+      }
     }
+    if (covers) break;
   }
-  return false;
+  coversAllCache.set(recall, covers);
+  return covers;
 }
 
 // What a recall's code text says in a form a program can use, worked out once per recall: the UDI-DIs it names and the
@@ -284,6 +296,25 @@ function leavesUnitsOut(text) {
   if (EXCLUSION.test(text)) return true;
   return text.split(/\n+|(?<=[.;])\s+/).some((sentence) => NEGATION.test(sentence) && !OTHER_UNITS.test(sentence));
 }
+
+// The same, for the whole code text of a recall, once per recall (it is asked for every device).
+/** @type {WeakMap<object, boolean>} */
+const leavesOutCache = new WeakMap();
+
+/**
+ * @param {import('./types.js').Recall} recall  the recall itself, or a part of it cut by scopedRecall
+ * @param {import('./types.js').Recall} whole
+ * @returns {boolean}
+ */
+function recallLeavesUnitsOut(recall, whole) {
+  if (recall !== whole) return leavesUnitsOut(recall.codeText || '');
+  let known = leavesOutCache.get(whole);
+  if (known === undefined) {
+    known = leavesUnitsOut(whole.codeText || '');
+    leavesOutCache.set(whole, known);
+  }
+  return known;
+}
 const UNIT_CUE = /\b(serial|lots?|batch(?:es)?|all)\b|\((?:10|21)\)/i;
 // A label that names a product and is followed by its number (the number has a digit: "Model No." alone, or "part of", is not one),
 // or a list number. "(1)" is not a list number: "(01)", "(10)" and "(21)" are GS1 identifiers.
@@ -318,16 +349,34 @@ function entryBlocks(text) {
  * @returns {import('./types.js').Recall}
  */
 function scopedRecall(recall, phrases) {
-  const text = recall.codeText || '';
-  const sentences = text.split(/\n+|(?<=[.;])\s+/).map((s) => s.trim()).filter(Boolean);
-  for (const parts of [entryBlocks(text), sentences]) {
-    if (!parts) continue;
-    const withCue = parts.filter((s) => UNIT_CUE.test(s));
-    if (withCue.length < 2) continue;
+  for (const withCue of cuePartsOf(recall)) {
     const mine = withCue.filter((s) => phrases.some((p) => p && containsPhrase(s, p)));
     if (mine.length > 0) return { ...recall, codeText: mine.join(' ') };
   }
   return recall;
+}
+
+// The parts of a recall's code text that carry unit words, cut by entries and by sentences (see above), worked out ONCE per recall:
+// the same text is compared with every device, and a text of millions of characters is cut up in a moment but not thirty times over.
+// Only the cuts that have two or more such parts are kept.
+/** @type {WeakMap<object, string[][]>} */
+const cuePartsCache = new WeakMap();
+
+/**
+ * @param {import('./types.js').Recall} recall
+ * @returns {string[][]}
+ */
+function cuePartsOf(recall) {
+  let cuts = cuePartsCache.get(recall);
+  if (!cuts) {
+    const text = recall.codeText || '';
+    const sentences = text.split(/\n+|(?<=[.;])\s+/).map((s) => s.trim()).filter(Boolean);
+    cuts = [entryBlocks(text), sentences]
+      .map((parts) => (parts || []).filter((s) => UNIT_CUE.test(s)))
+      .filter((withCue) => withCue.length >= 2);
+    cuePartsCache.set(recall, cuts);
+  }
+  return cuts;
 }
 
 // --- Rules ------------------------------------------------------------------------------
@@ -358,7 +407,7 @@ export function evaluateMatch(device, recall) {
   const scoped = scopedRecall(recall, [device.model, ...diVariants(device.udiDi)]);
   // "All lot numbers except lot 123" and "1000-1500, excluding 1200" name units that are NOT affected: the text cannot be read as
   // a plain list, range or "all units", so the unit-level rules are off and a person checks (the answer stays "likely").
-  const excluded = leavesUnitsOut(scoped.codeText || '');
+  const excluded = recallLeavesUnitsOut(scoped, recall);
   const hasLot = !excluded && lotInRecall(device.lotOrSerial, scoped);
   const range = hasLot || excluded ? null : serialInRecallRange(device.lotOrSerial, scoped);
   const unitListed = hasLot || Boolean(range);

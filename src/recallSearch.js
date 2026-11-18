@@ -40,7 +40,7 @@ export const MAX_PAGES_PER_QUERY = 4;
 
 // How many requests run at the same time. openFDA allows about 240 a minute per address; a handful at a time keeps a
 // check well inside that while still finishing in seconds, and stops one big hospital from sending dozens at once.
-export const MAX_CONCURRENT_REQUESTS = 6;
+export const MAX_CONCURRENT_REQUESTS = 3;
 
 // How many model numbers to put in one search. Every model adds two clauses to the URL, so
 // small groups keep URLs short and stop one very common model from crowding out the others.
@@ -185,11 +185,28 @@ export async function findRecallsForDevices(devices, fetchJson, options = {}) {
   };
   report();
 
+  const byNumber = new Map();
+  let failedQueries = 0;
+  let cappedQueries = 0;
+
+  // Each answer is turned into recalls THE MOMENT it arrives and then let go: only how many records it held and how many there are
+  // in all are kept. Holding every raw answer until the last search was done (tens of megabytes of text, a few recalls of several
+  // megabytes each) ran the function out of memory on the live site.
+  const absorb = (value) => {
+    const results = value && Array.isArray(value.results) ? value.results : [];
+    for (const raw of results) {
+      const recall = parseRecallForMatching(raw);
+      if (recall && !byNumber.has(recall.recallNumber)) byNumber.set(recall.recallNumber, recall);
+    }
+    const all = value && value.meta && value.meta.results ? value.meta.results.total : 0;
+    return { count: results.length, all };
+  };
+
   const run = (url) => {
     const remaining = deadlineMs - (Date.now() - startedAt);
     const attempt = remaining <= 0 ? Promise.reject(new Error('Search timed out before it started')) : withDeadline(Promise.resolve().then(() => fetchJson(url)), remaining);
     return attempt.then(
-      (value) => ({ status: 'fulfilled', value }),
+      (value) => ({ status: 'fulfilled', ...absorb(value) }),
       (reason) => ({ status: 'rejected', reason }),
     ).finally(() => {
       finished += 1;
@@ -197,28 +214,15 @@ export async function findRecallsForDevices(devices, fetchJson, options = {}) {
     });
   };
 
-  const byNumber = new Map();
-  let failedQueries = 0;
-  let cappedQueries = 0;
-  const take = (outcome) => {
-    if (outcome.status !== 'fulfilled') {
-      failedQueries += 1;
-      return [];
-    }
-    const results = outcome.value && Array.isArray(outcome.value.results) ? outcome.value.results : [];
-    for (const raw of results) {
-      const recall = parseRecallForMatching(raw);
-      if (recall && !byNumber.has(recall.recallNumber)) byNumber.set(recall.recallNumber, recall);
-    }
-    return results;
-  };
-
   const first = await mapWithLimit(firstPages, concurrency, run);
   const morePages = [];
   first.forEach((outcome, index) => {
-    const results = take(outcome);
-    const matches = outcome.status === 'fulfilled' && outcome.value && outcome.value.meta && outcome.value.meta.results ? outcome.value.meta.results.total : 0;
-    if (!Number.isFinite(matches) || matches <= results.length) return;
+    if (outcome.status !== 'fulfilled') {
+      failedQueries += 1;
+      return;
+    }
+    const matches = outcome.all;
+    if (!Number.isFinite(matches) || matches <= outcome.count) return;
     const pages = Math.min(maxPages, Math.ceil(matches / limit));
     for (let page = 1; page < pages; page += 1) morePages.push(withSkip(firstPages[index], page * limit));
     if (matches > maxPages * limit) cappedQueries += 1;
@@ -228,7 +232,7 @@ export async function findRecallsForDevices(devices, fetchJson, options = {}) {
     total += morePages.length;
     report();
     const rest = await mapWithLimit(morePages, concurrency, run);
-    rest.forEach(take);
+    for (const outcome of rest) if (outcome.status !== 'fulfilled') failedQueries += 1;
   }
   return { recalls: [...byNumber.values()], queryCount: total, failedQueries, cappedQueries };
 }

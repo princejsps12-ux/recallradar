@@ -19,6 +19,29 @@ function foldLetters(lower) {
     .replace(/\p{M}+/gu, '');
 }
 
+// The lower-cased, folded form of a text, which is what tokenize splits. A long text (one real recall has 8.9 million characters of
+// serial numbers) is asked for once per device it is compared with, so the last few long ones are kept: copying 9 MB for every
+// pair ran the check out of memory on the live site.
+const LONG_TEXT = 20000;
+const LONG_TEXT_KEPT = 12;
+/** @type {Map<string, string>} */
+const foldedLongTexts = new Map();
+
+/**
+ * @param {string} text
+ * @returns {string}
+ */
+export function foldedLower(text) {
+  if (text.length < LONG_TEXT) return foldLetters(text.toLowerCase());
+  let folded = foldedLongTexts.get(text);
+  if (folded === undefined) {
+    folded = foldLetters(text.toLowerCase());
+    if (foldedLongTexts.size >= LONG_TEXT_KEPT) foldedLongTexts.delete(/** @type {string} */ (foldedLongTexts.keys().next().value));
+    foldedLongTexts.set(text, folded);
+  }
+  return folded;
+}
+
 // Lower-case a string and split it into alphanumeric "words". Every other character
 // (spaces, hyphens, slashes, commas, dots...) is a separator, so "MMT-1885CLW/0076" and
 // "mmt 1885clw 0076" produce the same words. Letters with marks are folded first (see above), so "Dräger" gives "draeger"
@@ -29,7 +52,7 @@ function foldLetters(lower) {
  */
 export function tokenize(text) {
   if (typeof text !== 'string') return [];
-  return foldLetters(text.toLowerCase())
+  return foldedLower(text)
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
 }
@@ -53,9 +76,13 @@ export function compact(text) {
  * @returns {boolean}
  */
 export function containsPhrase(haystack, needle) {
-  const hay = Array.isArray(haystack) ? haystack : tokenize(haystack);
   const words = Array.isArray(needle) ? needle : tokenize(needle);
-  if (words.length === 0 || hay.length < words.length) return false;
+  if (words.length === 0) return false;
+  // A text is searched as text, not split into millions of words first: the same answer (the words next to each other, each whole,
+  // with anything that is not a letter or digit between them), without a list of every word of a recall that is 9 MB long.
+  if (!Array.isArray(haystack)) return new RegExp(`(?<![a-z0-9])${words.join('[^a-z0-9]+')}(?![a-z0-9])`).test(foldedLower(haystack));
+  const hay = haystack;
+  if (hay.length < words.length) return false;
   for (let start = 0; start <= hay.length - words.length; start += 1) {
     let all = true;
     for (let i = 0; i < words.length; i += 1) {

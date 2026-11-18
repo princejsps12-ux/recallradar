@@ -11,7 +11,7 @@ import { matchDevicesToRecalls } from './matching';
 import { performCheck, getLatestResult } from './matchService';
 import { createJiraClient } from './jiraClient';
 import { createConfluenceClient } from './confluenceClient';
-import { fetchWithOneRetry, withApiKey } from './openfda';
+import { fetchWithOneRetry, withApiKey, slimOpenFdaResponse } from './openfda';
 import { createTaskGuard, getTaskStates, selectMatches } from './taskService';
 import { createPreviewStore } from './agentTools';
 import { createTeamGraph } from './teamGraph';
@@ -80,7 +80,7 @@ async function fetchOpenFdaJson(url) {
   const response = await fetchWithOneRetry(() => fetch(keyed, { headers: { Accept: 'application/json' } }));
   if (response.status === 404) return { results: [] };
   if (!response.ok) throw new Error(`openFDA request failed with status ${response.status}`);
-  return response.json();
+  return slimOpenFdaResponse(await response.json());
 }
 
 // The real search: find recent recalls for the hospital's manufacturers and models, then match

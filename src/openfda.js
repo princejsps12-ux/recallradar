@@ -61,6 +61,28 @@ export function parseRecall(raw) {
   };
 }
 
+// The fields of a record that anything here reads. A record can be megabytes (one carries an unused `openfda` object of 8.7 MB, and
+// openFDA cannot leave a field out), and a check keeps every answer until the last search is done: on the live site that ran the
+// function out of memory ("terminated with SIGKILL"). The caller slims each answer the moment it has it.
+const KEPT_FIELDS = ['recall_number', 'recalling_firm', 'product_description', 'code_info', 'more_code_info', 'reason_for_recall', 'classification', 'report_date', 'recall_initiation_date', 'status'];
+
+/**
+ * @param {any} body  a parsed openFDA answer
+ * @returns {any} the same answer with only the fields that are used (`meta.results` is kept: it says how many recalls there are in all)
+ */
+export function slimOpenFdaResponse(body) {
+  if (!body || !Array.isArray(body.results)) return body;
+  return {
+    meta: body.meta && body.meta.results ? { results: body.meta.results } : undefined,
+    results: body.results.map((record) => {
+      /** @type {Record<string, unknown>} */
+      const kept = {};
+      for (const field of KEPT_FIELDS) if (record && record[field] != null) kept[field] = record[field];
+      return kept;
+    }),
+  };
+}
+
 // Parse a full API response body. Records we cannot identify are dropped.
 // An empty/unknown shape gives an empty list rather than throwing.
 export function parseRecalls(body) {
