@@ -75,13 +75,15 @@ export async function requestCheck({ devices, cache, jobs, enqueue, refresh = fa
 }
 
 // The panel's polling call. `result` is set only for a finished job.
-export async function getCheckStatus({ jobs, cache = null, devices = [] }) {
+// `loadDevices` (optional) lists the devices, and is called ONLY when a finished job's result has to be read from the cache: the
+// panel polls this every two seconds while a check runs, and listing up to 1,000 devices on each poll would be wasted work.
+export async function getCheckStatus({ jobs, cache = null, loadDevices = async () => [] }) {
   const job = await jobs.current();
   if (!job) return { job: null, result: null };
   const { result, ...summary } = job;
   if (job.status !== 'done') return { job: summary, result: null };
   // A result too big for the job record was left out of it and saved in the cache: read it from there.
-  const stored = result || (job.resultInCache && cache ? await getSavedMatches({ devices, cache }) : null);
+  const stored = result || (job.resultInCache && cache ? await getSavedMatches({ devices: await loadDevices(), cache }) : null);
   return { job: summary, result: stored };
 }
 
@@ -93,7 +95,7 @@ export async function getCheckStatus({ jobs, cache = null, devices = [] }) {
 // recorded on the job. Returns 'done', 'failed' or 'skipped'.
 // `afterComplete(result, checkedAt)` (optional) is called with every COMPLETE result (no failed lookups), right after it is saved:
 // the daily alerts use it to notice what is new. It can never fail or slow down the check: its errors are swallowed.
-export async function performCheck({ devices, search, cache, jobs, trigger, jobId = null, nowMs = () => Date.now(), afterComplete = null }) {
+export async function performCheck({ devices, search, cache, jobs, trigger, jobId = null, nowMs = () => Date.now(), afterComplete = null, logError = console.error }) {
   let id = jobId;
   if (id) {
     const job = await jobs.current();
@@ -122,7 +124,9 @@ export async function performCheck({ devices, search, cache, jobs, trigger, jobI
         try {
           await afterComplete(result, checkedAt);
         } catch (error) {
-          // tracking what is new is a side job: it must never fail the check
+          // Tracking what is new is a side job: it must never fail the check. It must not fail silently either: a lock that stayed
+          // held or a record that could not be read means the daily alert missed this look, and the log is the only place that says so.
+          logError('Tracking new matches failed (the check itself is saved):', error instanceof Error ? error.message : String(error));
         }
       }
     }

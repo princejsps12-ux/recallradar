@@ -215,10 +215,80 @@ test('a missing or damaged part makes the saved result unusable instead of wrong
   assert.equal(await cache.peek([{ ...devices[0], id: 'other' }]), null);
   assert.deepEqual(reads, [MATCH_CACHE_KEY], 'only the head was read');
   kv.get = get;
-  kv.data.set(`${MATCH_CACHE_KEY}:part:1`, '{ not json');
+  const partKeys = [...kv.data.keys()].filter((k) => k.includes(':part:')).sort();
+  kv.data.set(partKeys[1], '{ not json');
   assert.equal(await cache.peek(devices), null);
-  kv.data.delete(`${MATCH_CACHE_KEY}:part:0`);
+  kv.data.delete(partKeys[0]);
   assert.equal(await cache.peek(devices), null);
+});
+
+// --- Saving never mixes two results ----------------------------------------------------------------------
+
+// Two results of the same shape and almost the same length: cut at the same places, the parts of one can sit beside the parts of
+// the other and still read as valid JSON, with a damaged value inside. (The earlier design overwrote the parts in place.)
+const resultWith = (mark) => ({ ...result, matches: manyMatches(400).map((m, i) => ({ ...m, reason: `${mark}${m.reason}${i}` })) });
+const partKeysOf = (kv) => [...kv.data.keys()].filter((k) => k.includes(':part:'));
+
+test('a save that dies before its head leaves the earlier result whole, and the next save sweeps the orphans', async () => {
+  const kv = fakeKv();
+  let n = 0;
+  const cache = createMatchCache(kv, () => T0, () => `gen${++n}`);
+  await cache.write(devices, resultWith('A'));
+  const realSet = kv.set.bind(kv);
+  kv.set = async (key, value) => {
+    if (key === MATCH_CACHE_KEY) throw new Error('storage down'); // the parts of the new save are written, its head is not
+    return realSet(key, value);
+  };
+  assert.equal(await cache.write(devices, resultWith('B')), false);
+  kv.set = realSet;
+  assert.deepEqual((await cache.read(devices)).result, resultWith('A'), 'the earlier result is intact, no piece of B in it');
+  assert.ok(!partKeysOf(kv).some((k) => k.includes('gen2')), 'the failed save cleaned up after itself');
+
+  // An orphan that a crash left (the function was cut off before it could clean up) is swept by the next save.
+  kv.data.set('cache:matches:part:gen9:0', 'orphan');
+  await cache.write(devices, resultWith('C'));
+  assert.ok(!kv.data.has('cache:matches:part:gen9:0'));
+  assert.deepEqual((await cache.read(devices)).result, resultWith('C'));
+  assert.ok(partKeysOf(kv).every((k) => k.startsWith('cache:matches:part:gen3:')), 'only the newest generation is left');
+});
+
+test('a reader that already holds the old head when a new save is committed gets nothing, never a mix of the two', async () => {
+  const kv = fakeKv();
+  let n = 0;
+  const cache = createMatchCache(kv, () => T0, () => `gen${++n}`);
+  await cache.write(devices, resultWith('A'));
+  const oldHead = structuredClone(kv.data.get(MATCH_CACHE_KEY));
+  await cache.write(devices, resultWith('B'));
+  const realGet = kv.get.bind(kv);
+  let first = true;
+  kv.get = async (key) => {
+    if (key === MATCH_CACHE_KEY && first) {
+      first = false;
+      return oldHead; // the reader looked at the head just before the new one was written
+    }
+    return realGet(key);
+  };
+  assert.equal(await cache.peek(devices), null, 'the old parts are gone: recompute, never a half-and-half result');
+  kv.get = realGet;
+  assert.deepEqual((await cache.read(devices)).result, resultWith('B'));
+});
+
+test('a result saved before generations existed (parts at "...:part:<i>") is still read, and the next save replaces it', async () => {
+  const kv = fakeKv();
+  const text = JSON.stringify(resultWith('A'));
+  const pieces = splitText(text, 20_000);
+  pieces.forEach((piece, i) => kv.data.set(`cache:matches:part:${i}`, piece));
+  kv.data.set(MATCH_CACHE_KEY, { v: 2, checkedAt: new Date(T0).toISOString(), fingerprint: fingerprintDevices(devices), chunks: pieces.length });
+  const cache = createMatchCache(kv, () => T0, () => 'newgen');
+  assert.deepEqual((await cache.read(devices)).result, resultWith('A'));
+  await cache.write(devices, resultWith('B'));
+  assert.deepEqual((await cache.read(devices)).result, resultWith('B'));
+  assert.ok(partKeysOf(kv).every((k) => k.startsWith('cache:matches:part:newgen:')), 'the old-style parts were swept');
+});
+
+test('a head with a generation that is not a plain token is not trusted', async () => {
+  const kv = fakeKv({ [MATCH_CACHE_KEY]: { v: 2, gen: '../x', checkedAt: new Date(T0).toISOString(), fingerprint: fingerprintDevices(devices), chunks: 1 } });
+  assert.equal(await createMatchCache(kv, () => T0).peek(devices), null);
 });
 
 test('an entry saved the old way (the whole result inline) is still read', async () => {

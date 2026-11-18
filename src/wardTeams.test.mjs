@@ -82,3 +82,27 @@ test('a storage error reads as no mappings', async () => {
   };
   assert.deepEqual(await createWardTeamStore(kv).list(), []);
 });
+
+test('a record that cannot be read is never treated as empty: the change stops and the other wards keep their teams', async () => {
+  const kv = fakeKv();
+  const store = createWardTeamStore(kv);
+  await store.set('ICU', icu);
+  await store.set('ER', er);
+  const realGet = kv.get.bind(kv);
+  kv.get = async (key) => {
+    if (key === WARD_TEAMS_KEY) throw new Error('storage down'); // only this record fails; the lock record reads fine
+    return realGet(key);
+  };
+  await assert.rejects(() => store.set('Cath Lab', icu), /could not be read, so nothing was changed/);
+  await assert.rejects(() => store.set('ICU', null), /could not be read/);
+  assert.deepEqual(await store.list(), [], 'showing is tolerant: it reads as no mappings while the storage is down');
+  kv.get = realGet;
+  assert.deepEqual((await store.list()).map((m) => m.ward), ['ER', 'ICU'], 'and nothing was lost or written');
+});
+
+test('two changes at the same moment both survive', async () => {
+  const kv = fakeKv();
+  const store = createWardTeamStore(kv);
+  await Promise.all([store.set('ICU', icu), store.set('ER', er), store.set('Cath Lab', icu)]);
+  assert.deepEqual((await store.list()).map((m) => m.ward), ['Cath Lab', 'ER', 'ICU']);
+});

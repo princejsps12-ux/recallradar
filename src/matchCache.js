@@ -26,13 +26,26 @@ export const MAX_RETENTION_MS = MAX_RETENTION_HOURS * 60 * 60 * 1000;
 
 // Forge storage rejects any single value above 240 KiB, so a result is SAVED IN PARTS: its JSON text is cut into pieces of at most
 // CHUNK_CHARS characters (at most 150 KB even if every character takes three bytes), each stored under its own key, and a small
-// head record says how many there are. The head is written LAST, so a reader never sees a head that points at missing parts. A
-// result of 1,000 matches is about 10 parts. A result needing more than MAX_CHUNKS parts (about 3 MB, thousands of matches) is not
-// saved, and the check still shows it; only the 6-hour reuse is lost.
+// head record says how many there are. A result of 1,000 matches is about 10 parts. A result needing more than MAX_CHUNKS parts
+// (about 3 MB, thousands of matches) is not saved, and the check still shows it; only the 6-hour reuse is lost.
+//
+// Every save writes its parts under a NEW generation id ("cache:matches:part:<gen>:<i>") and only then the head, which names that
+// generation. A save never touches the parts the current head points at, so a reader can never put the pieces of two different
+// results together (cut at the same places, two results can still read as one valid JSON text with a damaged value inside), and a
+// save that dies halfway leaves orphans that nobody reads and the next save or the daily clean-up deletes. A reader that already
+// holds the old head when the new one is committed finds its parts gone and recomputes. Heads written before generations existed
+// have no `gen` and keep their parts at "cache:matches:part:<i>".
 export const CHUNK_CHARS = 50 * 1000;
 export const MAX_CHUNKS = 60;
 export const MAX_CACHE_BYTES = CHUNK_CHARS * MAX_CHUNKS;
 const PART_PREFIX = `${'cache:matches'}:part:`;
+
+/** @param {any} head @param {number} i */
+const partKey = (head, i) => (head && head.gen ? `${PART_PREFIX}${head.gen}:${i}` : `${PART_PREFIX}${i}`);
+// Whether a part key belongs to this head (an old-style head owns the keys that are only a number).
+/** @param {any} head @param {string} key */
+const ownsKey = (head, key) => Boolean(head) && (head.gen ? key.startsWith(`${PART_PREFIX}${head.gen}:`) : /^\d+$/.test(key.slice(PART_PREFIX.length)));
+const defaultGeneration = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 /**
  * Cut a string into pieces of at most `size` characters, never between the two halves of a surrogate pair.
@@ -82,25 +95,32 @@ export function fingerprintDevices(devices) {
   return `${devices.length}:${fnv1a(rows.join(DEVICE_SEPARATOR))}`;
 }
 
-export function createMatchCache(kv, nowMs = () => Date.now()) {
+export function createMatchCache(kv, nowMs = () => Date.now(), makeGeneration = defaultGeneration) {
   // The saved entry for this device list plus whether it is still fresh, or null if there is
   // none or it cannot be used at all. An EXPIRED entry for the same devices is returned as
   // { fresh: false } so the panel can show it while a new check runs ("stale while revalidate").
   // Damaged data, a different device list, or a date in the future still give null.
   // The head record: an older entry kept the whole result inline (`result`), a newer one says how many parts hold it (`chunks`).
   /** @param {any} head */
-  const isHead = (head) => Boolean(head) && typeof head === 'object' && typeof head.checkedAt === 'string' && (Boolean(head.result) || (head.v === 2 && Number.isInteger(head.chunks) && head.chunks >= 1 && head.chunks <= MAX_CHUNKS));
+  const isHead = (head) => Boolean(head) && typeof head === 'object' && typeof head.checkedAt === 'string' && (Boolean(head.result) || (head.v === 2 && Number.isInteger(head.chunks) && head.chunks >= 1 && head.chunks <= MAX_CHUNKS && (head.gen === undefined || (typeof head.gen === 'string' && /^[a-z0-9]{4,40}$/.test(head.gen)))));
 
-  // Delete a saved result: its parts, then its head.
+  // Delete every part that does NOT belong to `keep` (nothing is kept when it is null): the parts of the result that was just
+  // replaced, and those a save that died halfway left behind.
+  /** @param {any} keep */
+  async function sweepParts(keep) {
+    if (typeof kv.listByPrefix !== 'function') return;
+    for (const { key } of await kv.listByPrefix(PART_PREFIX).catch(() => [])) {
+      if (!ownsKey(keep, key)) await kv.delete(key).catch(() => {});
+    }
+  }
+
+  // Delete a saved result: its parts (and any orphans), then its head.
   /** @param {any} head */
   async function deleteEntry(head) {
     if (head && head.v === 2 && Number.isInteger(head.chunks)) {
-      for (let i = 0; i < Math.min(head.chunks, MAX_CHUNKS); i += 1) await kv.delete(`${PART_PREFIX}${i}`).catch(() => {});
+      for (let i = 0; i < Math.min(head.chunks, MAX_CHUNKS); i += 1) await kv.delete(partKey(head, i)).catch(() => {});
     }
-    if (typeof kv.listByPrefix === 'function') {
-      // parts left behind by a write that died halfway
-      for (const { key } of await kv.listByPrefix(PART_PREFIX).catch(() => [])) await kv.delete(key).catch(() => {});
-    }
+    await sweepParts(null);
     await kv.delete(MATCH_CACHE_KEY);
   }
 
@@ -108,7 +128,7 @@ export function createMatchCache(kv, nowMs = () => Date.now()) {
   /** @param {any} head */
   async function assemble(head) {
     if (head.result) return head.result;
-    const parts = await Promise.all(Array.from({ length: head.chunks }, (_, i) => kv.get(`${PART_PREFIX}${i}`)));
+    const parts = await Promise.all(Array.from({ length: head.chunks }, (_, i) => kv.get(partKey(head, i))));
     if (parts.some((part) => typeof part !== 'string')) return null;
     try {
       return JSON.parse(parts.join(''));
@@ -165,26 +185,28 @@ export function createMatchCache(kv, nowMs = () => Date.now()) {
   }
 
   // Save a result, in parts (see CHUNK_CHARS). Returns true if saved, false if it needed more than MAX_CHUNKS parts or storage failed.
+  // A failed save leaves the result that was there untouched.
   async function write(devices, result, checkedAt = new Date(nowMs()).toISOString()) {
     const pieces = splitText(JSON.stringify(result), CHUNK_CHARS);
     if (pieces.length > MAX_CHUNKS) return false;
+    /** @type {any} */
+    let before = null;
     try {
-      /** @type {any} */
-      let before = null;
-      try {
-        before = await kv.get(MATCH_CACHE_KEY);
-      } catch (error) {
-        before = null;
-      }
-      for (let i = 0; i < pieces.length; i += 1) await kv.set(`${PART_PREFIX}${i}`, pieces[i]);
-      await kv.set(MATCH_CACHE_KEY, { v: 2, checkedAt, fingerprint: fingerprintDevices(devices), chunks: pieces.length });
-      // an earlier, longer result leaves parts the new head does not use
-      const oldChunks = before && before.v === 2 && Number.isInteger(before.chunks) ? before.chunks : 0;
-      for (let i = pieces.length; i < Math.min(oldChunks, MAX_CHUNKS); i += 1) await kv.delete(`${PART_PREFIX}${i}`).catch(() => {});
-      return true;
+      before = await kv.get(MATCH_CACHE_KEY);
     } catch (error) {
+      before = null;
+    }
+    const gen = makeGeneration();
+    const head = { v: 2, gen, checkedAt, fingerprint: fingerprintDevices(devices), chunks: pieces.length };
+    try {
+      for (let i = 0; i < pieces.length; i += 1) await kv.set(partKey(head, i), pieces[i]);
+      await kv.set(MATCH_CACHE_KEY, head);
+    } catch (error) {
+      await sweepParts(isHead(before) ? before : null).catch(() => {}); // the parts of this failed save; the earlier result stays
       return false;
     }
+    await sweepParts(head).catch(() => {}); // the replaced result's parts and any orphans
+    return true;
   }
 
   async function clear() {

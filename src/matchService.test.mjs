@@ -219,7 +219,7 @@ test('a big COMPLETE result no longer fails the check: it is saved in parts and 
   const record = await s.jobs.current();
   assert.equal(record.status, 'done');
   assert.equal(record.result, null, 'the job record does not hold the big copy');
-  const status = await getCheckStatus({ jobs: s.jobs, cache: s.cache, devices });
+  const status = await getCheckStatus({ jobs: s.jobs, cache: s.cache, loadDevices: async () => devices });
   assert.equal(status.result.matches.length, 1500);
   assert.equal((await getSavedMatches({ devices, cache: s.cache })).matches.length, 1500);
 });
@@ -369,14 +369,19 @@ test('performCheck calls afterComplete with a complete result that was saved, an
   assert.deepEqual(calls, [], 'a partial result is shown but never tracked');
 });
 
-test('a failing or throwing afterComplete never fails the check or loses its result', async () => {
+test('a failing or throwing afterComplete never fails the check or loses its result, and says so in the log', async () => {
+  const logged = [];
+  const logError = (...args) => logged.push(args.join(' '));
   const s = setup();
-  const outcome = await performCheck({ devices, search: s.search, cache: s.cache, jobs: s.jobs, trigger: 'user', nowMs: () => s.clock.now, afterComplete: () => { throw new Error('tracking broke'); } });
+  const outcome = await performCheck({ devices, search: s.search, cache: s.cache, jobs: s.jobs, trigger: 'user', nowMs: () => s.clock.now, logError, afterComplete: () => { throw new Error('tracking broke'); } });
   assert.equal(outcome, 'done');
   const again = setup();
-  const second = await performCheck({ devices, search: again.search, cache: again.cache, jobs: again.jobs, trigger: 'user', nowMs: () => again.clock.now, afterComplete: async () => { throw new Error('async tracking broke'); } });
+  const second = await performCheck({ devices, search: again.search, cache: again.cache, jobs: again.jobs, trigger: 'user', nowMs: () => again.clock.now, logError, afterComplete: async () => { throw new Error('async tracking broke'); } });
   assert.equal(second, 'done');
   assert.ok(await again.cache.read(devices), 'the result was saved');
+  assert.equal(logged.length, 2, 'both failures were logged, not swallowed');
+  assert.match(logged[0], /Tracking new matches failed.*tracking broke/);
+  assert.match(logged[1], /async tracking broke/);
 });
 
 test('getLatestResult does not use a finished job\'s copy for devices that were removed or replaced', async () => {
@@ -387,3 +392,19 @@ test('getLatestResult does not use a finished job\'s copy for devices that were 
   assert.equal(await getLatestResult({ devices: [{ ...devices[0], id: 'b' }], cache: s.cache, jobs: s.jobs }), null, 'a replaced device');
 });
 
+
+test('getCheckStatus lists the devices only when a big result has to be read from the cache, not on every poll', async () => {
+  let listed = 0;
+  const loadDevices = async () => {
+    listed += 1;
+    return devices;
+  };
+  const running = setup();
+  await running.jobs.start('user');
+  await getCheckStatus({ jobs: running.jobs, cache: running.cache, loadDevices });
+  const done = setup();
+  const { job } = await done.jobs.start('user');
+  await done.jobs.complete(job.id, found());
+  await getCheckStatus({ jobs: done.jobs, cache: done.cache, loadDevices });
+  assert.equal(listed, 0, 'no device list for a running job or for a result the job holds itself');
+});

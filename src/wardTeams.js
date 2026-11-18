@@ -5,6 +5,7 @@
 // `kv` has get(key), set(key, value). No Forge imports, so this is unit tested with plain Node.
 import { compact } from './text.js';
 import { isTeamAri } from './teamGraph.js';
+import { createLock } from './lock.js';
 
 export const WARD_TEAMS_KEY = 'ward-teams';
 
@@ -15,12 +16,25 @@ export const wardKey = (ward) => compact(ward);
 export const MAX_WARD_LENGTH = 60;
 
 export function createWardTeamStore(kv, nowMs = () => Date.now()) {
+  const lock = createLock(kv);
+  const mappingsOf = (record) => (record && typeof record === 'object' && record.mappings && typeof record.mappings === 'object' ? record.mappings : {});
+
+  // For showing: a record that cannot be read looks like "no mappings", and the page still works.
   async function load() {
     try {
-      const record = await kv.get(WARD_TEAMS_KEY);
-      return record && typeof record === 'object' && record.mappings && typeof record.mappings === 'object' ? record.mappings : {};
+      return mappingsOf(await kv.get(WARD_TEAMS_KEY));
     } catch (error) {
       return {};
+    }
+  }
+
+  // For changing: a record that cannot be READ is not an empty one. Writing back "the one mapping just made" would drop the team of
+  // every other ward, so the change stops here and nothing is written.
+  async function loadForChange() {
+    try {
+      return mappingsOf(await kv.get(WARD_TEAMS_KEY));
+    } catch (error) {
+      throw new Error('The ward-to-team record could not be read, so nothing was changed. Please try again.');
     }
   }
 
@@ -37,15 +51,18 @@ export function createWardTeamStore(kv, nowMs = () => Date.now()) {
   async function set(ward, team) {
     const name = typeof ward === 'string' ? ward.trim() : '';
     if (!name || !wardKey(name) || name.length > MAX_WARD_LENGTH) throw new Error('A ward name is required (at most 60 characters).');
-    const mappings = await load();
-    if (team === null) {
-      delete mappings[wardKey(name)];
-    } else {
-      if (!team || !isTeamAri(team.ari) || !team.name) throw new Error('A valid team is required.');
-      mappings[wardKey(name)] = { ward: name, teamAri: team.ari, teamName: String(team.name), savedAt: nowMs() };
-    }
-    await kv.set(WARD_TEAMS_KEY, { mappings });
-    return mappings[wardKey(name)] || null;
+    if (team !== null && (!team || !isTeamAri(team.ari) || !team.name)) throw new Error('A valid team is required.');
+    // The record is read whole and written whole, so two changes at the same moment run one after the other.
+    return lock.run('ward-teams', async () => {
+      const mappings = await loadForChange();
+      if (team === null) {
+        delete mappings[wardKey(name)];
+      } else {
+        mappings[wardKey(name)] = { ward: name, teamAri: team.ari, teamName: String(team.name), savedAt: nowMs() };
+      }
+      await kv.set(WARD_TEAMS_KEY, { mappings });
+      return mappings[wardKey(name)] || null;
+    });
   }
 
   return { list, get, set };

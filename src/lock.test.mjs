@@ -70,3 +70,40 @@ test('a refused "set only if absent" is read as "the key exists" by its code, it
   assert.equal(isKeyExistsError(undefined), false);
   assert.equal(isKeyExistsError(null), false);
 });
+
+test('a lock whose own lease has run out is taken over at once, and a live one is not', async () => {
+  let now = 1_000_000;
+  const kv = fakeKv({ 'lock:x': { token: 'dead', expiresAt: now - 60_000 } }); // the holder crashed a minute ago; the key was never deleted
+  const lock = createLock(kv, { sleep: noSleep, attempts: 3, nowMs: () => now });
+  assert.equal(await lock.run('x', async () => 'ran'), 'ran', 'taken over, no waiting');
+  assert.equal(kv.data.has('lock:x'), false, 'and released');
+
+  const live = fakeKv({ 'lock:y': { token: 'alive', expiresAt: now + 20_000 } });
+  const waiting = createLock(live, { sleep: noSleep, attempts: 3, nowMs: () => now });
+  await assert.rejects(() => waiting.run('y', async () => 'never'), /Could not get the "y" lock/);
+  assert.equal(live.data.get('lock:y').token, 'alive', 'a live lock is left alone');
+});
+
+test('a lock a few seconds past its lease is still respected (clocks of two servers differ), a minute past is not', async () => {
+  const now = 5_000_000;
+  const justOver = fakeKv({ 'lock:z': { token: 'a', expiresAt: now - 2_000 } });
+  await assert.rejects(() => createLock(justOver, { sleep: noSleep, attempts: 2, nowMs: () => now }).run('z', async () => 1), /Could not get/);
+  const longOver = fakeKv({ 'lock:z': { token: 'a', expiresAt: now - 60_000 } });
+  assert.equal(await createLock(longOver, { sleep: noSleep, attempts: 2, nowMs: () => now }).run('z', async () => 1), 1);
+});
+
+test('only the record that was judged expired is deleted: a lock taken over in the meantime survives', async () => {
+  let now = 9_000_000;
+  const kv = fakeKv({ 'lock:w': { token: 'old', expiresAt: now - 60_000 } });
+  const realGet = kv.get.bind(kv);
+  let reads = 0;
+  kv.get = async (key) => {
+    reads += 1;
+    // After the first look at the stale record, somebody else takes the lock over.
+    if (reads === 2) kv.data.set('lock:w', { token: 'new', expiresAt: now + 30_000 });
+    return realGet(key);
+  };
+  const lock = createLock(kv, { sleep: noSleep, attempts: 2, nowMs: () => now });
+  await assert.rejects(() => lock.run('w', async () => 'never'), /Could not get/);
+  assert.equal(kv.data.get('lock:w').token, 'new', 'the new holder was not deleted');
+});
