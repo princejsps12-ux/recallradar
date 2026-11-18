@@ -70,6 +70,28 @@ export function compact(text) {
 // True if the words of `needle` appear next to each other, in order, as whole words inside
 // `haystack`. Whole-word matching stops "N15" matching inside "N150", and "4842" matching
 // inside "148421". Both inputs may be a string or an already tokenized list.
+// The search expression for a phrase, built once: the same few hundred phrases (the devices' models and serials) are searched in
+// thousands of texts.
+/** @type {Map<string, RegExp>} */
+const phraseExpressions = new Map();
+const PHRASE_EXPRESSIONS_KEPT = 20000;
+
+/**
+ * @param {string} folded  a text that is already lower-case and folded (see foldedLower)
+ * @param {string[]} words
+ * @returns {boolean}
+ */
+export function containsFolded(folded, words) {
+  const key = words.join(' ');
+  let expression = phraseExpressions.get(key);
+  if (!expression) {
+    if (phraseExpressions.size >= PHRASE_EXPRESSIONS_KEPT) phraseExpressions.clear();
+    expression = new RegExp(`(?<![a-z0-9])${words.join('[^a-z0-9]+')}(?![a-z0-9])`);
+    phraseExpressions.set(key, expression);
+  }
+  return expression.test(folded);
+}
+
 /**
  * @param {string | string[]} haystack
  * @param {string | string[]} needle
@@ -80,7 +102,7 @@ export function containsPhrase(haystack, needle) {
   if (words.length === 0) return false;
   // A text is searched as text, not split into millions of words first: the same answer (the words next to each other, each whole,
   // with anything that is not a letter or digit between them), without a list of every word of a recall that is 9 MB long.
-  if (!Array.isArray(haystack)) return new RegExp(`(?<![a-z0-9])${words.join('[^a-z0-9]+')}(?![a-z0-9])`).test(foldedLower(haystack));
+  if (!Array.isArray(haystack)) return containsFolded(foldedLower(haystack), words);
   const hay = haystack;
   if (hay.length < words.length) return false;
   for (let start = 0; start <= hay.length - words.length; start += 1) {

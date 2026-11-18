@@ -32,7 +32,7 @@
 // ("monitor" vs "monitors"); a serial with letters after its digits ("US001A00AW") is never judged by a range.
 //
 // This file has no Forge imports so every rule can be unit tested with plain Node.
-import { tokenize, compact, containsPhrase, foldedLower } from './text.js';
+import { tokenize, compact, containsPhrase, containsFolded, foldedLower } from './text.js';
 import { sameMakerFamily } from './makerAliases.js';
 import { extractUdis, normalizeDi, diVariants } from './udi.js';
 import { parseSerialConstraints, serialInConstraints } from './serials.js';
@@ -110,8 +110,18 @@ const GENERIC_SET = new Set(GENERIC_NAME_WORDS);
  * @returns {string[]}
  */
 export function makerWords(name) {
-  return tokenize(name).filter((word) => !SUFFIX_SET.has(word));
+  if (typeof name !== 'string') return tokenize(name).filter((word) => !SUFFIX_SET.has(word));
+  let words = makerWordsKnown.get(name);
+  if (!words) {
+    if (makerWordsKnown.size >= 20000) makerWordsKnown.clear();
+    words = tokenize(name).filter((word) => !SUFFIX_SET.has(word));
+    makerWordsKnown.set(name, words);
+  }
+  return words;
 }
+// Makers are compared in every pair of device and recall, so their words are worked out once per name.
+/** @type {Map<string, string[]>} */
+const makerWordsKnown = new Map();
 
 // Fact 1. Two makers match when ALL the words of the shorter name appear in the longer one
 // ("Philips" is inside "Philips North America Llc"), and at least one shared word is specific
@@ -133,6 +143,27 @@ export function manufacturersMatch(deviceMaker, recallFirm) {
  * @returns {'words' | 'family' | null}
  */
 export function manufacturerLink(deviceMaker, recallFirm) {
+  if (typeof deviceMaker !== 'string' || typeof recallFirm !== 'string') return linkOf(deviceMaker, recallFirm);
+  const key = `${deviceMaker}\u0000${recallFirm}`;
+  let link = linksKnown.get(key);
+  if (link === undefined) {
+    if (linksKnown.size >= 50000) linksKnown.clear();
+    link = linkOf(deviceMaker, recallFirm);
+    linksKnown.set(key, link);
+  }
+  return link;
+}
+
+// The answer for a pair of names is the same for every device of that maker, so it is worked out once.
+/** @type {Map<string, 'words' | 'family' | null>} */
+const linksKnown = new Map();
+
+/**
+ * @param {unknown} deviceMaker
+ * @param {unknown} recallFirm
+ * @returns {'words' | 'family' | null}
+ */
+function linkOf(deviceMaker, recallFirm) {
   const a = makerWords(deviceMaker);
   const b = makerWords(recallFirm);
   if (a.length === 0 || b.length === 0) return null;
@@ -140,6 +171,29 @@ export function manufacturerLink(deviceMaker, recallFirm) {
   const longerSet = new Set(longer);
   if (shorter.every((word) => longerSet.has(word)) && shorter.some((word) => !GENERIC_SET.has(word))) return 'words';
   return sameMakerFamily(a, b) ? 'family' : null;
+}
+
+// Every device is compared with every recall (a thousand devices and a thousand recalls are a million pairs), and almost every pair
+// has nothing in common. The words of a recall's text are kept in a set, once per recall, so a model or serial that is not even a word
+// of the text is turned away without searching the text (400,000 characters at the most). Measured: matching 1,000 devices took 43 s
+// locally, and this platform runs about twenty times slower than a laptop.
+/** @type {WeakMap<object, Set<string>>} */
+const wordSets = new WeakMap();
+
+/**
+ * @param {import('./types.js').Recall} recall
+ * @param {string} phrase
+ * @returns {boolean} false when the first word of the phrase is not a word of the recall's product or code text
+ */
+function mayContain(recall, phrase) {
+  const first = tokenize(phrase)[0];
+  if (!first) return false;
+  let words = wordSets.get(recall);
+  if (!words) {
+    words = new Set([...tokenize(recall.productText || ''), ...tokenize(recall.codeText || '')]);
+    wordSets.set(recall, words);
+  }
+  return words.has(first);
 }
 
 // Fact 2. The model's words must appear in order, as whole words, in the recall's product
@@ -153,6 +207,7 @@ export function manufacturerLink(deviceMaker, recallFirm) {
  */
 export function modelInRecall(model, recall, minLength = MIN_MODEL_LENGTH) {
   if (compact(model).length < minLength) return false;
+  if (!mayContain(recall, model)) return false;
   return containsPhrase(recall.productText || '', model) || containsPhrase(recall.codeText || '', model);
 }
 
@@ -165,6 +220,7 @@ export function modelInRecall(model, recall, minLength = MIN_MODEL_LENGTH) {
  */
 export function lotInRecall(lotOrSerial, recall) {
   if (compact(lotOrSerial).length < MIN_LOT_LENGTH) return false;
+  if (!mayContain(recall, lotOrSerial)) return false;
   return containsPhrase(recall.codeText || '', lotOrSerial);
 }
 
@@ -349,9 +405,10 @@ function entryBlocks(text) {
  * @returns {import('./types.js').Recall}
  */
 function scopedRecall(recall, phrases) {
+  const wanted = phrases.map((p) => tokenize(p)).filter((words) => words.length > 0);
   for (const withCue of cuePartsOf(recall)) {
-    const mine = withCue.filter((s) => phrases.some((p) => p && containsPhrase(s, p)));
-    if (mine.length > 0) return { ...recall, codeText: mine.join(' ') };
+    const mine = withCue.filter((part) => wanted.some((words) => containsFolded(part.folded, words)));
+    if (mine.length > 0) return { ...recall, codeText: mine.map((part) => part.text).join(' ') };
   }
   return recall;
 }
@@ -359,12 +416,12 @@ function scopedRecall(recall, phrases) {
 // The parts of a recall's code text that carry unit words, cut by entries and by sentences (see above), worked out ONCE per recall:
 // the same text is compared with every device, and a text of millions of characters is cut up in a moment but not thirty times over.
 // Only the cuts that have two or more such parts are kept.
-/** @type {WeakMap<object, string[][]>} */
+/** @type {WeakMap<object, Array<Array<{ text: string, folded: string }>>>} */
 const cuePartsCache = new WeakMap();
 
 /**
  * @param {import('./types.js').Recall} recall
- * @returns {string[][]}
+ * @returns {Array<Array<{ text: string, folded: string }>>}
  */
 function cuePartsOf(recall) {
   let cuts = cuePartsCache.get(recall);
@@ -372,7 +429,7 @@ function cuePartsOf(recall) {
     const text = recall.codeText || '';
     const sentences = text.split(/\n+|(?<=[.;])\s+/).map((s) => s.trim()).filter(Boolean);
     cuts = [entryBlocks(text), sentences]
-      .map((parts) => (parts || []).filter((s) => UNIT_CUE.test(s)))
+      .map((parts) => (parts || []).filter((s) => UNIT_CUE.test(s)).map((text) => ({ text, folded: foldedLower(text) })))
       .filter((withCue) => withCue.length >= 2);
     cuePartsCache.set(recall, cuts);
   }
