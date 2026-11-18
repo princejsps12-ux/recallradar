@@ -10,6 +10,7 @@ import {
   readInputs,
   wardMatches,
   listOpenRecalls,
+  groupByDevice,
   checkDevice,
   recallDetails,
   createRemediationTasks,
@@ -913,4 +914,22 @@ test('assign: assignSuggested may arrive as the text "true"', async () => {
   const s = await setupAssign();
   const out = await run(s, { ward: 'ICU', recallClass: 'I', assignSuggested: 'true' });
   assert.ok(out.willCreate[0].proposedAssignee);
+});
+
+test('groupByDevice makes one entry per device, most urgent first, with counts by class and confidence', () => {
+  const item = (deviceId, recallNumber, recallClass, confidence, jiraTask) => ({ deviceId, deviceName: deviceId, ward: 'ICU', manufacturer: 'M', model: 'X', recallNumber, recallClass, confidence, ...(jiraTask ? { jiraTask } : {}) });
+  const groups = groupByDevice([item('a', 'Z-1', 'II', 'likely'), item('b', 'Z-2', 'I', 'exact', 'MOBL-1'), item('a', 'Z-3', 'I', 'exact'), item('a', 'Z-4', 'I', 'likely')]);
+  assert.deepEqual(groups.map((g) => g.deviceId), ['a', 'b']);
+  assert.deepEqual(groups[0].recalls.map((r) => r.recallNumber), ['Z-3', 'Z-4', 'Z-1']);
+  assert.equal(groups[0].recallCount, 3);
+  assert.deepEqual(groups[0].byRecallClass, { I: 2, II: 1 });
+  assert.deepEqual(groups[0].byConfidence, { exact: 1, likely: 2 });
+  assert.equal(groups[0].withoutTask, 3);
+  assert.equal(groups[1].withoutTask, 0);
+});
+
+test('list_open_recalls also answers grouped by device', async () => {
+  const out = await listOpenRecalls({ snapshot: snap({}) });
+  assert.equal(out.devices.length, new Set(out.items.map((i) => i.deviceId)).size);
+  assert.match(out.presentation, /one line per device/);
 });

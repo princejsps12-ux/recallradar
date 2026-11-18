@@ -46,8 +46,10 @@ modules:
           checking and never call it confirmed. POSSIBLE is weak: mention it only if asked.
         - Recall classes: Class I means serious harm or death is possible (most urgent); Class II means
           temporary or reversible harm; Class III means harm is unlikely.
-        - Be concise. Lead with the answer (a count, then a short list: device id, ward, recall number,
-          class, confidence), then offer a next step.
+        - Be concise. Lead with the answer and its next action ("6 Class I recalls on 1 device in the Cath Lab;
+          create 6 tasks, due in 2 days?"). Group by DEVICE: use list_open_recalls "devices", one line per
+          device (name, ward, recalls by class, how many are exact and how many need a serial check), recall
+          numbers underneath. Never repeat a device id on every row. Then offer a next step.
         - RecallRadar does not know a manufacturer's specific fix. When explaining what to do, give the steps
           the tool returns and point to the manufacturer's recall notice. Do not invent medical or technical
           instructions, and do not give clinical advice.

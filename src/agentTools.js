@@ -154,6 +154,28 @@ function toItem(match, details, taskKey) {
   };
 }
 
+// One entry per device, with its recalls inside, most urgent first. A chat answer that repeats the device on every row makes one
+// device look like six: the agent is told to answer from this list ("Impella Controller, Cath Lab: 6 Class I recalls, 3 exact,
+// 3 need a serial check").
+const CLASS_RANK = { I: 0, II: 1, III: 2 };
+/** @param {ReturnType<typeof toItem>[]} items */
+export function groupByDevice(items) {
+  const byDevice = new Map();
+  for (const item of items) {
+    const entry = byDevice.get(item.deviceId) || { deviceId: item.deviceId, deviceName: item.deviceName, ward: item.ward, manufacturer: item.manufacturer, model: item.model, recalls: [] };
+    entry.recalls.push({ recallNumber: item.recallNumber, recallClass: item.recallClass, confidence: item.confidence, ...(item.jiraTask ? { jiraTask: item.jiraTask } : {}) });
+    byDevice.set(item.deviceId, entry);
+  }
+  const rank = (cls) => (cls in CLASS_RANK ? CLASS_RANK[cls] : 0); // an unknown class is treated as Class I, as the task due date is
+  return [...byDevice.values()]
+    .map((d) => {
+      const recalls = [...d.recalls].sort((a, b) => rank(a.recallClass) - rank(b.recallClass));
+      const tally = (key) => recalls.reduce((acc, r) => { const k = r[key] || 'unknown'; acc[k] = (acc[k] || 0) + 1; return acc; }, /** @type {Record<string, number>} */ ({}));
+      return { ...d, recalls, recallCount: recalls.length, byRecallClass: tally('recallClass'), byConfidence: tally('confidence'), withoutTask: recalls.filter((r) => !r.jiraTask).length };
+    })
+    .sort((a, b) => rank(a.recalls[0].recallClass) - rank(b.recalls[0].recallClass) || b.recallCount - a.recallCount);
+}
+
 // Does this ward match what the user typed? "ICU" matches "ICU"; "med-surg" matches "Med-Surg 3W".
 export function wardMatches(ward, wanted) {
   const wanted_ = tokenize(wanted);
@@ -224,6 +246,8 @@ export async function listOpenRecalls({ snapshot, inputs = {}, deps = {} }) {
     items: shown.map((m) => toItem(m, details[m.recallNumber], taskKeys[pairKey(m.recallNumber, m.deviceId)])),
     citations: citationsOf(shown),
   };
+  answer.devices = groupByDevice(answer.items);
+  answer.presentation = 'Answer from "devices", one line per device (name, ward, how many recalls by class and confidence), never one line per recall. Open with the single next action: how many tasks are still needed (devices[].withoutTask) and offer to preview them.';
   if (selected.length > shown.length) {
     answer.note = `Showing the first ${shown.length} of ${selected.length}. Ask for a narrower filter (ward or class) to see the rest.`;
   }

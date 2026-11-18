@@ -14,9 +14,12 @@ import { normalizeDi, diVariants } from '../src/udi.js';
 import { familiesOf } from '../src/makerAliases.js';
 import { tokenize } from '../src/text.js';
 import { scoreCases, percent, TRUTH_LEVEL } from '../src/accuracy.js';
+import { keywordFlags, scoreFlags } from '../src/baseline.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const DOC_FILE = join(root, 'docs', 'ACCURACY.md');
+// The same head-to-head numbers as data, for the dashboard (static/ui/src/headToHead.json); npm test checks it is current.
+export const UI_FILE = join(root, 'static', 'ui', 'src', 'headToHead.json');
 
 const words = (text) => String(text || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
 const squash = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -53,7 +56,7 @@ export function run() {
   const { recalls, cases } = loadSet();
   const rows = [...cases, ...sweepRows(recalls, cases)].map((c) => {
     const verdict = evaluateMatch(c.device, recalls[c.recall]);
-    return { ...c, predicted: verdict ? verdict.confidence : 'none', rule: verdict ? verdict.rule : '', reason: verdict ? verdict.reason : '' };
+    return { ...c, predicted: verdict ? verdict.confidence : 'none', rule: verdict ? verdict.rule : '', reason: verdict ? verdict.reason : '', flagged: keywordFlags(c.device, recalls[c.recall]) };
   });
   const sweeps = rows.filter((r) => r.template === 'sweep').length;
   return { rows, score: scoreCases(rows), caseCount: cases.length, sweeps, recallCount: Object.keys(recalls).length };
@@ -61,6 +64,27 @@ export function run() {
 
 const pad = (text, n) => String(text).padEnd(n);
 const row = (...cells) => `| ${cells.join(' | ')} |`;
+
+// Head-to-head: RecallRadar's exact-or-likely against a plain keyword search, on the same pairs and the same question ("does this
+// pair need a task?"). Two views: every pair, and only the pairs that share a maker or a model (the hard ones: the 2,858 unrelated
+// pairs are easy for any method and make both numbers look better than they are).
+export function headToHead(result = run()) {
+  const { rows } = result;
+  const needs = (r) => r.truth === 'affected' || r.truth === 'product-covered';
+  const view = (subset) => {
+    const kw = scoreFlags(subset.map((r) => ({ truth: r.truth, flagged: r.flagged })));
+    const rr = scoreFlags(subset.map((r) => ({ truth: r.truth, flagged: r.predicted === 'exact' || r.predicted === 'likely' })));
+    return { pairs: kw.total, needTask: kw.actual, keyword: kw, recallradar: rr };
+  };
+  const hard = rows.filter((r) => r.template !== 'sweep');
+  return { all: view(rows), hard: view(hard), needs: rows.filter((r) => r.truth !== 'excluded' && needs(r)).length };
+}
+
+export function uiData(result = run()) {
+  const h = headToHead(result);
+  const pick = (v) => ({ pairs: v.pairs, needTask: v.needTask, keyword: { precision: v.keyword.precision, recall: v.keyword.recall, falsePositives: v.keyword.falsePositives, missed: v.keyword.missed }, recallradar: { precision: v.recallradar.precision, recall: v.recallradar.recall, falsePositives: v.recallradar.falsePositives, missed: v.recallradar.missed } });
+  return { all: pick(h.all), hard: pick(h.hard) };
+}
 
 export function report(result = run()) {
   const { score, rows, caseCount, sweeps, recallCount } = result;
@@ -81,6 +105,13 @@ export function report(result = run()) {
   lines.push(`- **Over-claims** (said *exact*, the unit is not confirmed affected): **${score.overClaims.length}**${score.overClaims.length ? ` (${score.overClaims.slice(0, 8).join(', ')})` : ''}.`);
   lines.push(`- **Under-claims** (the unit is affected, said less than *exact*): **${score.underClaims.length}**${score.underClaims.length ? ` (${score.underClaims.slice(0, 8).join(', ')})` : ''}.`);
   lines.push(`- **Recalls that rule a unit out** (its serial is outside a range the recall states, or the text names it as excluded): ${score.excluded.total} pairs. The matcher said *exact* for ${score.excluded.saidExact}${score.excluded.saidExact === 0 ? ' (it must never)' : ' (an over-claim, listed above)'} and *likely* for ${score.excluded.saidLikely}. It cannot rule a unit out yet; these are counted here and not in the tables above.`, '');
+  const hh = headToHead(result);
+  lines.push('## Head-to-head with a plain keyword search', '');
+  lines.push('The baseline is what a spreadsheet filter or a saved FDA search does (`src/baseline.js`): flag a recall when the device\'s maker shares a word with the recall\'s firm, or when the device\'s model appears in the recall text. It has no serials, UDI-DI, exclusions, several-products reading or confidence levels. Both methods answer the same question on the same pairs: *does this pair need a task?* (the right answer is *exact* or *likely*).', '');
+  lines.push(row('Pairs', 'Method', 'Flagged', 'False alarms', 'Missed', 'Precision', 'Recall'), row('---', '---', '---:', '---:', '---:', '---:', '---:'));
+  lines.push(row(`all ${hh.all.pairs} pairs`, 'keyword search', hh.all.keyword.flagged, hh.all.keyword.falsePositives, hh.all.keyword.missed, percent(hh.all.keyword.precision), percent(hh.all.keyword.recall)));
+  lines.push(row('', '**RecallRadar**', hh.all.recallradar.flagged, hh.all.recallradar.falsePositives, hh.all.recallradar.missed, percent(hh.all.recallradar.precision), percent(hh.all.recallradar.recall)), '');
+  lines.push(`The ${hh.all.pairs - hh.hard.pairs} unrelated pairs are easy for both methods (neither raises a false alarm on them), so the numbers above come from the ${hh.hard.pairs} pairs that share a maker, a model or a UDI-DI with a recall. A keyword search raises a false alarm for every other model and every other kind of device of the same maker, and misses devices the hospital names differently (a maker's other name, a UDI-DI with no model in the text). It also gives no reason, no serial check and no priority, which is the work that sends a clinical engineer through a recall list by hand. RecallRadar's 100% is measured on labels the developer wrote from the same recall text its rules were built against, so read it as "the rules read real recall wording correctly", not as field accuracy; the keyword search's 57% shows how much of that work a plain filter cannot do.`, '');
   lines.push('## Every case by what it should be and what it was', '');
   lines.push(row('Should be \\ Said', 'exact', 'likely', 'possible', 'no match'), row('---', '---:', '---:', '---:', '---:'));
   for (const e of ['exact', 'likely', 'possible', 'none']) {
@@ -144,11 +175,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const text = report();
   if (process.argv.includes('--write')) {
     writeFileSync(DOC_FILE, text);
+    writeFileSync(UI_FILE, JSON.stringify(uiData(), null, 2) + '\n');
     console.log(text);
     console.log(`\nwritten to docs/ACCURACY.md`);
   } else if (process.argv.includes('--check')) {
     const current = readFileSync(DOC_FILE, 'utf8');
-    if (current !== text) {
+    let ui = '';
+    try { ui = readFileSync(UI_FILE, 'utf8'); } catch { /* missing counts as stale */ }
+    if (current !== text || ui !== JSON.stringify(uiData(), null, 2) + '\n') {
       console.error('docs/ACCURACY.md is out of date: run npm run eval');
       process.exit(1);
     }

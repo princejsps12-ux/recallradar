@@ -23,6 +23,7 @@ import { affectedMatches, heroStats, urgentMatches, taskProgress, screenFor, new
 import { Hero, UrgentList } from './dash/Hero';
 import DevicesTable from './dash/DevicesTable';
 import RecentRecalls from './dash/RecentRecalls';
+import HeadToHead from './dash/HeadToHead';
 import DeviceDrawer from './dash/DeviceDrawer';
 import WardTeamsTab from './dash/WardTeamsTab';
 import ProgressTab from './dash/ProgressTab';
@@ -142,10 +143,9 @@ export default function Dashboard() {
     </div>
   );
   const messages = (
-    <div style={{ display: 'grid', gap: sp(150), marginBottom: d.error || (d.result && (d.result.failedQueries > 0 || d.result.cappedQueries > 0)) ? sp(200) : 0 }}>
+    <div style={{ display: 'grid', gap: sp(150), marginBottom: d.error || (d.result && d.result.failedQueries > 0) ? sp(200) : 0 }}>
       {d.error && <SectionMessage appearance="error" title="Something went wrong">{d.error}</SectionMessage>}
       {d.result && d.result.failedQueries > 0 && <SectionMessage appearance="warning" title="Result may be incomplete">{d.result.failedQueries} FDA lookups failed or timed out. Try Refresh.</SectionMessage>}
-      {d.result && d.result.cappedQueries > 0 && <SectionMessage appearance="information" title="Some older recalls may be missing">{d.result.cappedQueries} {d.result.cappedQueries === 1 ? 'search' : 'searches'} had more matching recalls than could be read (up to 100 each). "No match" is not proof that a device is unaffected.</SectionMessage>}
     </div>
   );
 
@@ -193,6 +193,8 @@ export default function Dashboard() {
         <TabPanel>
           <div style={{ display: 'grid', gap: sp(300), paddingTop: sp(300), width: '100%' }}>
             <Hero stats={stats} devicesCount={d.devicesCount} result={d.result} progressTasks={progressTasks} summaryState={d.summaryState} capped={Boolean(d.summary && d.summary.capped)} covered={d.tasksReady && missing.length === 0} />
+            {/* Under the headline number, not above it: the number is what the page is for. */}
+            {d.result && d.result.cappedQueries > 0 && <SectionMessage appearance="information" title="Some older recalls may be missing">{d.result.cappedQueries} {d.result.cappedQueries === 1 ? 'search' : 'searches'} had more matching recalls than could be read (up to 100 each). "No match" is not proof that a device is unaffected.</SectionMessage>}
             {/* Nothing matches an open recall: the hero says so. A "do this first" list and a table of zero rows with
                 filters would only repeat it (the table's empty state even asked to "clear filters" when none was set). */}
             {all.length > 0 && <UrgentList matches={urgent} canCreate={canCreate} busy={d.creating.active} onCreate={createOne} onOpen={setDrawerDevice} projects={d.projects} projectKey={d.projectKey} onProject={d.setProjectKey} hasAll={all.length > 0} onCreateAll={() => setCreateAllOpen(true)} pendingCount={missing.length} deviceCount={new Set(missing.map((m) => m.deviceId)).size} loading={!d.tasksReady} />}
@@ -204,6 +206,7 @@ export default function Dashboard() {
               </section>
             )}
             <RecentRecalls recent={d.recent} onOpen={d.loadRecent} />
+            <HeadToHead />
           </div>
         </TabPanel>
         <TabPanel>

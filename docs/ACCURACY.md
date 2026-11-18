@@ -24,6 +24,17 @@ Measured against **3438 labeled pairs** of a device and a real FDA recall (589 b
 - **Under-claims** (the unit is affected, said less than *exact*): **7** (Z-2285-2026/listed-unit, Z-0420-2024/listed-unit, Z-0420-2024/udi-listed-unit, Z-0420-2024/range-inside, Z-0420-2024/udi-range-inside, Z-1884-2024/bound-inside, Z-1884-2024/udi-bound-inside).
 - **Recalls that rule a unit out** (its serial is outside a range the recall states, or the text names it as excluded): 9 pairs. The matcher said *exact* for 0 (it must never) and *likely* for 9. It cannot rule a unit out yet; these are counted here and not in the tables above.
 
+## Head-to-head with a plain keyword search
+
+The baseline is what a spreadsheet filter or a saved FDA search does (`src/baseline.js`): flag a recall when the device's maker shares a word with the recall's firm, or when the device's model appears in the recall text. It has no serials, UDI-DI, exclusions, several-products reading or confidence levels. Both methods answer the same question on the same pairs: *does this pair need a task?* (the right answer is *exact* or *likely*).
+
+| Pairs | Method | Flagged | False alarms | Missed | Precision | Recall |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| all 3438 pairs | keyword search | 329 | 140 | 141 | 57.4% | 57.3% |
+|  | **RecallRadar** | 330 | 0 | 0 | 100.0% | 100.0% |
+
+The 2858 unrelated pairs are easy for both methods (neither raises a false alarm on them), so the numbers above come from the 580 pairs that share a maker, a model or a UDI-DI with a recall. A keyword search raises a false alarm for every other model and every other kind of device of the same maker, and misses devices the hospital names differently (a maker's other name, a UDI-DI with no model in the text). It also gives no reason, no serial check and no priority, which is the work that sends a clinical engineer through a recall list by hand. RecallRadar's 100% is measured on labels the developer wrote from the same recall text its rules were built against, so read it as "the rules read real recall wording correctly", not as field accuracy; the keyword search's 57% shows how much of that work a plain filter cannot do.
+
 ## Every case by what it should be and what it was
 
 | Should be \ Said | exact | likely | possible | no match |

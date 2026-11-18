@@ -1,0 +1,34 @@
+{
+  "all": {
+    "pairs": 3438,
+    "needTask": 330,
+    "keyword": {
+      "precision": 0.574468085106383,
+      "recall": 0.5727272727272728,
+      "falsePositives": 140,
+      "missed": 141
+    },
+    "recallradar": {
+      "precision": 1,
+      "recall": 1,
+      "falsePositives": 0,
+      "missed": 0
+    }
+  },
+  "hard": {
+    "pairs": 580,
+    "needTask": 330,
+    "keyword": {
+      "precision": 0.574468085106383,
+      "recall": 0.5727272727272728,
+      "falsePositives": 140,
+      "missed": 141
+    },
+    "recallradar": {
+      "precision": 1,
+      "recall": 1,
+      "falsePositives": 0,
+      "missed": 0
+    }
+  }
+}

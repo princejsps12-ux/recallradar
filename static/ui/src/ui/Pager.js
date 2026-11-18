@@ -4,6 +4,7 @@ import VisuallyHidden from '@atlaskit/visually-hidden';
 import ChevronLeftIcon from '@atlaskit/icon/core/chevron-left';
 import ChevronRightIcon from '@atlaskit/icon/core/chevron-right';
 import { sp, muted } from './kit';
+import { Inline } from './layout';
 import { pageWindow, GAP } from '../tablePaging.mjs';
 
 // Page numbers under a table, built only from Atlaskit's NEW Button (32 px tall, filled blue current page).
@@ -18,8 +19,8 @@ import { pageWindow, GAP } from '../tablePaging.mjs';
 // pageWindow in tablePaging.mjs, unit tested.
 export default function Pager({ page, pages, onChange, label }) {
   return (
-    <nav aria-label={label} style={{ display: 'flex', justifyContent: 'center', marginTop: sp(200) }}>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', alignItems: 'center', gap: sp(50) }}>
+    <nav aria-label={label} style={{ marginTop: sp(200) }}>
+      <Inline as="div" role="list" space="space.050" alignInline="center" alignBlock="center">
         <li>
           <IconButton appearance="subtle" icon={ChevronLeftIcon} label="Previous page" isDisabled={page <= 1} onClick={() => onChange(page - 1)} />
         </li>
@@ -40,7 +41,7 @@ export default function Pager({ page, pages, onChange, label }) {
         <li>
           <IconButton appearance="subtle" icon={ChevronRightIcon} label="Next page" isDisabled={page >= pages} onClick={() => onChange(page + 1)} />
         </li>
-      </ul>
+      </Inline>
     </nav>
   );
 }

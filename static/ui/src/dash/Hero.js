@@ -4,6 +4,7 @@ import Button from '@atlaskit/button/new';
 import Select from '@atlaskit/select';
 import Skeleton from '@atlaskit/skeleton';
 import CheckCircleIcon from '@atlaskit/icon/core/check-circle';
+import { Stack, Inline } from '../ui/layout';
 import { sp, cap, color, card, muted, noBreak, ClassLozenge, MatchLozenge, NameLink, useNarrow } from '../ui/kit';
 import { openRecallsByClass, UNKNOWN_CLASS, CLASSES, taskSummaryParts } from '../dashboardData.mjs';
 
@@ -14,7 +15,8 @@ function SummaryLine({ devicesCount, stats, result, progressTasks, summaryState,
   const tasks = taskSummaryParts(progressTasks, summaryState, capped);
   const item = { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: sp(75) };
   return (
-    <ul aria-label="Summary" style={{ listStyle: 'none', margin: `${sp(200)} 0 0`, padding: `${sp(150)} 0 0`, borderTop: `1px solid ${color.border}`, display: 'flex', flexWrap: 'wrap', gap: `${sp(100)} ${sp(400)}` }}>
+    <div role="group" aria-label="Summary" style={{ margin: `${sp(200)} 0 0`, padding: `${sp(150)} 0 0`, borderTop: `1px solid ${color.border}` }}>
+      <Inline as="div" role="list" space="space.400" rowSpace="space.100" shouldWrap>
       <li style={item}>
         <strong>{devicesCount}</strong> {devicesCount === 1 ? 'device' : 'devices'} monitored
       </li>
@@ -37,7 +39,8 @@ function SummaryLine({ devicesCount, stats, result, progressTasks, summaryState,
           </>
         )}
       </li>
-    </ul>
+      </Inline>
+    </div>
   );
 }
 
@@ -49,7 +52,7 @@ export function Hero({ stats, devicesCount, result, progressTasks, summaryState,
   const tracked = covered && !none;
   return (
     <section aria-label="What needs action" style={{ ...card, borderLeft: `4px solid ${none ? color.borderSuccess : tracked ? color.borderBrand : stats.classIDevices ? color.borderDanger : color.borderBrand}` }}>
-      <div style={{ display: 'flex', gap: sp(300), alignItems: 'center', flexWrap: 'nowrap', minHeight: '72px' }}>
+      <Inline space="space.300" alignBlock="center">
         {none ? (
           <>
             <CheckCircleIcon label="" color={color.success} />
@@ -63,9 +66,9 @@ export function Hero({ stats, devicesCount, result, progressTasks, summaryState,
             <div style={{ fontSize: '56px', fontWeight: 700, lineHeight: 1, color: color.text, flex: '0 0 auto' }} aria-hidden="true">
               {stats.devices}
             </div>
-            <div style={{ minWidth: 0 }}>
+            <Stack space="space.050">
               <Heading size="large">{tracked ? (stats.devices === 1 ? 'device has a task' : 'devices have a task') : stats.devices === 1 ? 'device needs action' : 'devices need action'}</Heading>
-              <div style={{ marginTop: sp(50) }}>
+              <div>
                 {stats.classIDevices > 0 ? (
                   <span style={{ fontWeight: 600 }}>
                     {stats.classIDevices} {stats.classIDevices === 1 ? 'device has' : 'devices have'} a Class I recall, the most serious.
@@ -74,10 +77,10 @@ export function Hero({ stats, devicesCount, result, progressTasks, summaryState,
                   <span style={muted}>No device has a Class I recall.</span>
                 )}
               </div>
-            </div>
+            </Stack>
           </>
         )}
-      </div>
+      </Inline>
       <SummaryLine devicesCount={devicesCount} stats={stats} result={result} progressTasks={progressTasks} summaryState={summaryState} capped={capped} />
     </section>
   );
@@ -92,14 +95,14 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
   const narrow = useNarrow();
   return (
     <section aria-labelledby="rr-urgent" style={{ ...card, minHeight: '120px' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(200), justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: sp(200) }}>
+      <div style={{ marginBottom: sp(200) }}><Inline space="space.200" rowSpace="space.200" spread="space-between" alignBlock="end" shouldWrap>
         <div>
           <div style={{ margin: 0 }}>
             <Heading size="medium" as="h2" id="rr-urgent">Do this first</Heading>
           </div>
           {(loading || pendingCount > 0) && <div style={muted}>{`Most urgent first. ${pendingCount} ${pendingCount === 1 ? 'task' : 'tasks'} for ${deviceCount} ${deviceCount === 1 ? 'device' : 'devices'}, one per device and recall.`}</div>}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'flex-end', ...(narrow ? { width: '100%' } : {}) }}>
+        <div style={{ ...(narrow ? { width: '100%' } : {}) }}><Inline space="space.150" rowSpace="space.150" alignBlock="end" shouldWrap>
           {(loading || pendingCount > 0) && <div style={{ minWidth: '240px', ...(narrow ? { width: '100%' } : {}) }}>
             <label style={muted} htmlFor="rr-project">Create tasks in project</label>
             <Select inputId="rr-project" aria-label="Jira project for new tasks" spacing="compact" options={options} value={options.find((o) => o.value === projectKey) || null} placeholder="Choose a project" onChange={(o) => onProject(o.value)} menuPosition="fixed" />
@@ -109,8 +112,8 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
               {`Create all ${pendingCount} tasks…`}
             </Button>
           )}
-        </div>
-      </div>
+        </Inline></div>
+      </Inline></div>
       {loading ? (
         <div aria-hidden="true" style={{ display: 'grid', gap: sp(150), minHeight: '340px' }}>
           {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} height="58px" width="100%" isShimmering />)}
@@ -123,18 +126,20 @@ export function UrgentList({ matches, canCreate, busy, onCreate, onOpen, project
       ) : (
         <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {matches.map((m, i) => (
-            <li key={m.deviceId} style={{ display: 'flex', flexWrap: 'wrap', gap: sp(150), alignItems: 'center', padding: `${sp(150)} 0`, borderTop: i ? `1px solid ${color.border}` : 'none' }}>
+            <li key={m.deviceId} style={{ padding: `${sp(150)} 0`, borderTop: i ? `1px solid ${color.border}` : 'none' }}>
+              <Inline space="space.150" rowSpace="space.100" alignBlock="center" shouldWrap>
               <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                 <NameLink label={`Details for ${cap(m.deviceName)}, recall ${m.recallNumber}`} onClick={() => onOpen(m.deviceId)}>{cap(m.deviceName)}</NameLink>
                 <div style={muted}>
                   {m.ward || 'No ward'} · {m.deviceManufacturer} {m.deviceModel} · <span style={noBreak}>{m.recallNumber}</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: sp(100) }}>
+              <Inline space="space.100">
                 <div style={{ minWidth: '64px' }}><ClassLozenge recallClass={m.recallClass} /></div>
                 <div style={{ minWidth: '96px' }}><MatchLozenge confidence={m.confidence} /></div>
-              </div>
+              </Inline>
               <Button isDisabled={!canCreate || busy} onClick={() => onCreate(m)}>Create task</Button>
+              </Inline>
             </li>
           ))}
         </ol>
