@@ -167,8 +167,11 @@ export function parseAssignedWork(body) {
 export function createTeamGraph({ request }) {
   async function call(query, variables, operationName) {
     const response = await request(query, variables, operationName);
-    if (!response.ok) throw new Error(`Teamwork Graph answered ${response.status}`);
-    return response.json();
+    if (!response.ok) throw new Error(`Teamwork Graph answered ${response.status} (${operationName})`);
+    const body = await response.json();
+    // A refusal names the call it came from, so a log line is enough to tell which of the four it was.
+    if (body && Array.isArray(body.errors) && body.errors.length > 0) throw new Error(`Teamwork Graph (${operationName}): ${String(body.errors[0].message || 'error').slice(0, 160)}`);
+    return body;
   }
 
   // Call 1: the teams this person is in.

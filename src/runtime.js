@@ -1,7 +1,7 @@
 // The Forge-specific wiring that the resolvers, the queue consumer and the daily trigger share.
 // Everything with real logic lives in the pure modules; this file only connects them to Forge
 // storage and to the network.
-import api, { fetch, route } from '@forge/api';
+import api, { fetch, route, __getRuntime } from '@forge/api';
 import { Queue } from '@forge/events';
 import { createDeviceStore } from './deviceStore';
 import { forgeKv } from './kvAdapter';
@@ -53,8 +53,22 @@ export const confluenceAsUser = createConfluenceClient({
 
 // Teamwork Graph, READ-ONLY, as the signed-in person (the API has no app-level version). The two
 // calls it makes are listed in the README.
+// The Teamwork Graph needs to be told which site the question is about (the X-Query-Context header, a platform site ARI). Forge fills
+// it from the installation's own context, and that came out wrong for this app once it became a Jira + Confluence installation:
+// the graph answered "User is not permitted to query this organization" although the same person gets their teams with the site's
+// ARI (checked live). So the site is taken from the context ARI and written out as the platform site ARI the graph asks for.
+function graphQueryContext() {
+  const ari = (__getRuntime && __getRuntime().contextAri) || '';
+  const site = /^ari:cloud:[a-z-]+::site\/([0-9a-f-]{36})/.exec(ari);
+  console.info(`Teamwork Graph context ${ari || '(none)'}`);
+  return site ? `ari:cloud:platform::site/${site[1]}` : undefined;
+}
+
 export const teamGraph = createTeamGraph({
-  request: (query, variables, operationName) => api.asUser().requestTeamworkGraph(query, variables, operationName),
+  request: (query, variables, operationName) => {
+    const context = graphQueryContext();
+    return api.asUser().requestTeamworkGraph(query, variables, operationName, undefined, context ? { 'X-Query-Context': context } : {});
+  },
 });
 export const wardTeams = createWardTeamStore(forgeKv);
 
