@@ -108,7 +108,7 @@ All 28 are in [`marketplace/screenshots/`](screenshots/), in this order (the fir
 ## Known limits to state honestly
 
 - Each search reads up to 100 matching recalls from the last three years, 25 at a time; a search that still has more is capped and older recalls may be missing.
-- openFDA allows about 1,000 anonymous requests a day per IP; a full check uses about 24, which is why results are saved for 6 hours.
+- openFDA allows about 1,000 anonymous requests a day per IP; a check of the 30-device demo hospital uses about two dozen, a longer list uses more (about one search per manufacturer, per five models and per five UDI-DIs), which is why results are saved for 6 hours. An optional openFDA API key raises the allowance to 120,000 a day.
 - External MCP clients were not tested end to end.
 
 **About the screenshots.** `01` to `19` are generated from the app with invented demo data (`npm run shots`), so their counts agree with each other (for example 25 devices need action). `20` to `23` were taken live on a Forge demo site with its own data (for example one Cath Lab device with six Class I recalls), so their numbers differ from the generated ones. Both show the real app and its real behaviour.

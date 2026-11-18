@@ -158,7 +158,7 @@ export default function Dashboard() {
         {!running && (
           <div style={{ ...card, padding: sp(400), textAlign: 'center' }}>
             <Heading size="large">{d.devicesCount} devices, not checked yet</Heading>
-            <p style={muted}>Compare them with the last year of FDA device recalls.</p>
+            <p style={muted}>Compare them with the last three years of FDA device recalls.</p>
             <Button appearance="primary" onClick={() => d.begin(false)}>Check devices for recalls</Button>
           </div>
         )}

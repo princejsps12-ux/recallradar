@@ -7,7 +7,7 @@ import { sp, color, card, muted } from '../ui/kit';
 
 const STEPS = [
   ['1', 'Add your devices', 'Start with a sample hospital of 30 devices that use real manufacturer and model names, or paste your own list from a spreadsheet.'],
-  ['2', 'We check the FDA recalls', 'RecallRadar compares them with the last year of FDA device recalls and says how sure each match is, and why.'],
+  ['2', 'We check the FDA recalls', 'RecallRadar compares them with the last three years of FDA device recalls and says how sure each match is, and why.'],
   ['3', 'Create the follow-up tasks', 'Create a Jira task for each affected device with the ward, the reason, a link to the recall and a due date.'],
 ];
 
@@ -34,7 +34,7 @@ export default function FirstRun({ onLoadDemo, onImport, error, canManage = true
         <Button appearance="primary" isDisabled={!canManage} isLoading={busy} onClick={async () => { setBusy(true); await onLoadDemo(); setBusy(false); }}>Load demo hospital</Button>
         <Button isDisabled={!canManage} onClick={onImport}>Import your own devices</Button>
       </div>
-      <p style={muted}>Nothing is sent anywhere except manufacturer and model names to the public FDA service.</p>
+      <p style={muted}>Nothing is sent anywhere except manufacturer names, model names and UDI-DIs to the public FDA service.</p>
     </div>
   );
 }

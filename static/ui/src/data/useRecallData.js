@@ -343,7 +343,7 @@ export default function useRecallData({ withProjects = false, light = false, wit
     setDevicesCount(total);
     const plural = (n) => `${n} ${n === 1 ? 'device' : 'devices'}`;
     if (change.imported) {
-      setNote({ kind: 'success', title: `${plural(change.imported)} imported`, text: 'Checking them against the last year of FDA recalls now.' });
+      setNote({ kind: 'success', title: `${plural(change.imported)} imported`, text: 'Checking them against the last three years of FDA recalls now.' });
     } else if (change.removed && before != null && before > total) {
       setNote({ kind: 'success', title: `${plural(before - total)} removed`, text: total > 0 ? 'Checking the rest again.' : 'Nothing is left to check.' });
     }
