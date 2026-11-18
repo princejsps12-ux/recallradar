@@ -130,6 +130,18 @@ test('planRecallQueries makes one firm query per distinct maker, ignoring suffix
   assert.ok(firmUrls.some((u) => u.includes('recalling_firm:"masimo"')));
 });
 
+test('a maker that belongs to a company family is also searched under the family\'s main name, once, and other makers are not', () => {
+  const firmQueries = (devices) => planRecallQueries(devices, NOW).filter((url) => url.includes('recalling_firm'));
+  const hillRom = firmQueries([device('a', 'Hill-Rom', 'P7900B000001')]);
+  assert.equal(hillRom.length, 2, 'Hill-Rom as written, and Baxter');
+  assert.ok(hillRom.some((url) => /recalling_firm.*baxter/i.test(decodeURIComponent(url))), 'Baxter is searched');
+  // Several makers of one family add the main name once, and a maker already written as the main name adds nothing.
+  const family = firmQueries([device('a', 'Hill-Rom', 'P7900B000001'), device('b', 'Baxter Healthcare', '35700BAX2'), device('c', 'Welch Allyn', 'ABC-123')]);
+  assert.equal(family.length, 4, 'hill rom, baxter healthcare, welch allyn, and "baxter" once');
+  assert.equal(firmQueries([device('a', 'Baxter', '35700BAX2')]).length, 1);
+  assert.equal(firmQueries([device('a', 'Acme Medical', 'AC-100')]).length, 1, 'a maker with no family: one query, as before');
+});
+
 test('planRecallQueries uses the look-back window ending today', () => {
   const [first] = planRecallQueries([device('a', 'Masimo', 'M-1000')], NOW);
   assert.equal(LOOKBACK_DAYS, 3 * 365, 'three years: recalls stay open that long');

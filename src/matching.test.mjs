@@ -91,7 +91,7 @@ test('manufacturersMatch accepts a short name contained in a longer one, both wa
 });
 
 test('manufacturersMatch rejects different makers', () => {
-  assert.equal(manufacturersMatch('Getinge', 'Maquet Critical Care AB'), false);
+  assert.equal(manufacturersMatch('Getinge', 'Philips Respironics'), false);
   assert.equal(manufacturersMatch('Baxter Healthcare', 'ICU Medical, Inc.'), false);
 });
 
@@ -256,18 +256,18 @@ test('RULE likely-manufacturer-lot: maker and serial listed, model not mentioned
   assert.match(match.reason, /ZX-900/);
 });
 
-test('RULE possible-model-other-maker: distinctive model from a different firm', () => {
-  const device = { id: 'd3', name: 'SERVO-U', type: 'ventilator', manufacturer: 'Getinge', model: '6693662', lotOrSerial: '21500' };
+test('RULE possible-model-other-maker: distinctive model from a different firm (a distributor or relabelled product)', () => {
+  const device = { id: 'd3', name: 'SERVO-U', type: 'ventilator', manufacturer: 'Acme Surgical Supply', model: '6693662', lotOrSerial: '21500' };
   const match = evaluateMatch(device, servoRecall);
   assert.equal(match.confidence, CONFIDENCE.POSSIBLE);
   assert.equal(match.rule, RULES.POSSIBLE_MODEL_OTHER_MAKER);
   assert.match(match.reason, /Maquet Critical Care AB/);
-  assert.match(match.reason, /Getinge/);
+  assert.match(match.reason, /Acme Surgical Supply/);
 });
 
 test('RULE possible-model-other-maker needs a distinctive (long enough) model', () => {
   const recall = { ...servoRecall, productText: 'Monitor N15', codeText: '' };
-  const device = { id: 'd3', name: 'Monitor', type: 'monitor', manufacturer: 'Getinge', model: 'N15', lotOrSerial: '' };
+  const device = { id: 'd3', name: 'Monitor', type: 'monitor', manufacturer: 'Acme Surgical Supply', model: 'N15', lotOrSerial: '' };
   assert.equal(evaluateMatch(device, recall), null);
 });
 
@@ -635,8 +635,62 @@ test('a maker written with umlauts is the same maker as its two-letter spelling 
   assert.equal(manufacturersMatch('Dräger', 'Draeger Medical Systems, Inc.'), true);
   assert.equal(manufacturersMatch('Draeger', 'Dräger Medical GmbH'), true);
   assert.equal(manufacturersMatch('Müller Medizintechnik', 'Mueller Medizintechnik GmbH'), true);
-  assert.equal(manufacturersMatch('Dräger', 'Draegerwerk AG'), false, 'a different word stays different');
+  assert.equal(manufacturersMatch('Dräger', 'Drägerwerk AG & Co. KGaA'), true, 'the parent company is on the family list');
+  assert.equal(manufacturersMatch('Dräger', 'Draegerx Medical'), false, 'a different word stays different');
   const recall = { recallNumber: 'Z-5', recallClass: 'I', date: '2026-11-01', firm: 'Draeger Medical Systems, Inc.', product: 'Evita V500', productText: 'Evita V500 ventilator, model MK14000', codeText: 'All serial numbers' };
   const match = evaluateMatch({ manufacturer: 'Dräger', model: 'MK14000', type: 'ventilator', lotOrSerial: 'ASDF-1234', ward: 'ICU' }, recall);
   assert.equal(match.rule, RULES.EXACT_MODEL_ALL_UNITS, 'a true exact match is no longer downgraded to "possible" (no task)');
+});
+
+// --- Makers that go by more than one name (src/makerAliases.js) ------------------------------------------------------
+
+test('two names of one company are the same maker: BD, GE, Baxter and the others on the family list', () => {
+  const same = [
+    ['BD', 'Becton, Dickinson and Company'], ['BD', 'CareFusion 303, Inc.'], ['Bard', 'Becton Dickinson'], ['C. R. Bard, Inc.', 'BD'],
+    ['GE Healthcare', 'GE Medical Systems, LLC'], ['GE HealthCare', 'Datex-Ohmeda, Inc.'], ['GE', 'Wipro GE Healthcare'], ['Marquette', 'GE Healthcare'],
+    ['Hill-Rom', 'Baxter Healthcare Corporation'], ['Hillrom', 'Baxter'], ['Welch Allyn', 'Baxter Healthcare Corporation'],
+    ['Hospira', 'ICU Medical, Inc.'], ['Smiths Medical', 'ICU Medical'],
+    ['Covidien', 'Medtronic, Inc.'], ['Nellcor', 'Medtronic'], ['Puritan Bennett', 'Medtronic'], ['MiniMed', 'Medtronic MiniMed, Inc.'],
+    ['Respironics', 'Koninklijke Philips N.V.'], ['Volcano', 'Philips'],
+    ['Maquet', 'Getinge'], ['Getinge', 'Maquet Critical Care AB'],
+    ['Dräger', 'Draeger Medical Systems, Inc.'], ['Drager', 'Drägerwerk AG & Co. KGaA'],
+    ['3M', 'Solventum Corporation'], ['Sorin', 'LivaNova'], ['Physio-Control', 'Stryker Corporation'], ['Varian', 'Siemens Healthineers'],
+    ['Abiomed', 'Johnson & Johnson'], ['St. Jude Medical', 'Abbott Laboratories'], ['Zimmer', 'Biomet'], ['NxStage', 'Fresenius Medical Care'],
+  ];
+  for (const [a, b] of same) {
+    assert.equal(manufacturersMatch(a, b), true, `${a} / ${b}`);
+    assert.equal(manufacturersMatch(b, a), true, `${b} / ${a} (the rule is symmetric)`);
+  }
+});
+
+test('different companies stay different, and a short name joins a family only at the start of the maker', () => {
+  const different = [
+    ['BD', 'Baxter Healthcare Corporation'], ['GE Healthcare', 'Philips'], ['Hill-Rom', 'Hologic'], ['Hospira', 'Pfizer'],
+    ['Bardex Corporation', 'Becton Dickinson'], ['Sage Software', 'Stryker'], ['Vege Medical', 'GE Healthcare'], ['Mage Devices', 'GE Healthcare'],
+    ['Medtronic', 'Boston Scientific'], ['Siemens', 'Philips'],
+  ];
+  for (const [a, b] of different) assert.equal(manufacturersMatch(a, b), false, `${a} / ${b}`);
+  assert.equal(manufacturersMatch('Acme GE Supply', 'GE Healthcare'), false, '"ge" in the middle of a name is not GE');
+  assert.equal(manufacturersMatch('Wipro GE Healthcare', 'GE Medical Systems'), true, 'but "Wipro GE" is on the list as a name of its own');
+});
+
+test('a device recorded as "BD" is matched to a Becton Dickinson recall, and the reason says they are one company', () => {
+  const recall = { recallNumber: 'Z-3', recallClass: 'I', date: '2026-09-01', firm: 'Becton, Dickinson and Company', product: 'Alaris Pump Module', productText: 'Alaris Pump Module, Model 8100', codeText: 'Serial Numbers: 12345678, 12345679' };
+  const device = (lotOrSerial) => ({ id: 'd', name: 'Alaris pump', type: 'pump module', manufacturer: 'BD', model: '8100', lotOrSerial, ward: 'ICU' });
+  const listed = evaluateMatch(device('12345678'), recall);
+  assert.equal(listed.confidence, 'exact');
+  assert.equal(listed.rule, RULES.EXACT_MODEL_AND_LOT);
+  assert.match(listed.reason, /"BD" and the recalling firm "Becton, Dickinson and Company" are the same company/);
+  const unlisted = evaluateMatch(device('99999999'), recall);
+  assert.equal(unlisted.rule, RULES.LIKELY_MODEL);
+  assert.match(unlisted.reason, /are the same company/);
+  assert.doesNotMatch(evaluateMatch({ ...device('12345678'), manufacturer: 'Becton Dickinson' }, recall).reason, /same company/, 'no note when the words already match');
+});
+
+test('Hill-Rom beds recalled by Baxter (the real Z-0228-2025 shape): the company is the same, the bed must still be the bed', () => {
+  const recall = { recallNumber: 'Z-0228-2025', recallClass: 'II', date: '2025-01-10', firm: 'Baxter Healthcare Corporation', product: 'Progressa bed', productText: 'Progressa hospital bed, Model P7900B000001', codeText: 'UDI-DI 00887761985162, all serial numbers' };
+  const bed = { id: 'd', name: 'Progressa', type: 'hospital bed', manufacturer: 'Hill-Rom', model: 'P7900B000001', lotOrSerial: 'A1B2C3D4', ward: 'ICU' };
+  assert.equal(evaluateMatch(bed, recall).rule, RULES.EXACT_MODEL_ALL_UNITS);
+  assert.equal(evaluateMatch({ ...bed, model: 'P3200B000001' }, recall).rule, RULES.POSSIBLE_TYPE, 'another Hill-Rom bed: same company and kind of device, a look but no task');
+  assert.equal(evaluateMatch({ ...bed, model: 'P3200B000001', type: 'patient monitor' }, recall), null, 'another kind of Hill-Rom device: nothing');
 });

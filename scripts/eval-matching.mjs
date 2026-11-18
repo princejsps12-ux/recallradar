@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { parseRecallForMatching } from '../src/openfda.js';
 import { evaluateMatch } from '../src/matching.js';
 import { normalizeDi, diVariants } from '../src/udi.js';
+import { familiesOf } from '../src/makerAliases.js';
+import { tokenize } from '../src/text.js';
 import { scoreCases, percent, TRUTH_LEVEL } from '../src/accuracy.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,7 +28,8 @@ export function loadSet() {
   return { recalls, cases };
 }
 
-// Pairs that are unrelated by a plain test that does not use the matcher: the firms share no word, the device's model and UDI-DI
+// Pairs that are unrelated by a plain test that does not use the matcher: the firms share no word and are not two names of one
+// company on the list in src/makerAliases.js, the device's model and UDI-DI
 // are nowhere in the other recall's text, and neither is its serial. Every such pair must come back as "no match".
 function sweepRows(recalls, cases) {
   const rows = [];
@@ -35,7 +38,7 @@ function sweepRows(recalls, cases) {
     for (const [number, recall] of Object.entries(recalls)) {
       if (number === c.recall) continue;
       const text = squash(`${recall.productText} ${recall.codeText}`);
-      const share = words(c.device.manufacturer).some((w) => words(recall.firm).includes(w));
+      const share = words(c.device.manufacturer).some((w) => words(recall.firm).includes(w)) || familiesOf(tokenize(c.device.manufacturer)).some((f) => familiesOf(tokenize(recall.firm)).includes(f));
       const model = squash(c.device.model);
       const serial = squash(c.device.lotOrSerial);
       const diForms = diVariants(normalizeDi(c.device.udiDi) || '').map(squash);
@@ -108,8 +111,12 @@ export function report(result = run()) {
   const exclusionRows = rows.filter((x) => x.exclusion && x.template !== 'sweep');
   const exclAffected = exclusionRows.filter((x) => x.truth === 'affected');
   const exclNamed = exclusionRows.filter((x) => x.truth === 'excluded');
-  lines.push('## Recalls with several products, and recalls that leave units out', '');
+  const aliasRows = rows.filter((x) => x.template.startsWith('alias-'));
+  const aliasRecalls = [...new Set(aliasRows.map((x) => x.recall))];
+  const aliasRight = aliasRows.filter((x) => x.predicted === TRUTH_LEVEL[x.truth]).length;
+  lines.push('## Recalls with several products, recalls that leave units out, and makers with two names', '');
   lines.push(`- **Several products in one recall** (${multiRecalls.length} real recalls whose code text names the model, UDI-DI and lots of every product: ${multiRecalls.map((n) => `\`${n}\``).join(', ')}): ${multiRows.length} pairs, ${multiRight} right (${percent(multiRight / (multiRows.length || 1))}). In ${crossRows.length} of them the model or UDI-DI is right but the lot or serial is one the recall lists for a *different* product of the same recall; the matcher never called those *exact* (${crossNotExact} of ${crossRows.length}).`);
+  lines.push(`- **Makers that go by two names** (${aliasRecalls.length} real recalls where the hospital might write the maker differently from the firm the FDA filed the recall under: "Hill-Rom" for Baxter, "BD" for CareFusion, "Hospira" for ICU Medical, "GE HealthCare" for Datex-Ohmeda): ${aliasRows.length} pairs, ${aliasRight} right (${percent(aliasRight / (aliasRows.length || 1))}). The short list of company families is in \`src/makerAliases.js\`; without it these pairs were *possible* or not found.`);
   lines.push(`- **Recalls that leave units out** (${exclusionRecalls.length} real recalls: ${exclusionRecalls.map((n) => `\`${n}\``).join(', ')}): ${exclusionRows.length} pairs. Of the ${exclAffected.length} units in them that the text really covers, ${exclAffected.filter((x) => x.predicted === 'likely').length} came out *likely* and ${exclAffected.filter((x) => x.predicted === 'exact').length} *exact* (a unit listed in an entry that has no exclusion of its own): where an entry excludes units the matcher does not read its lists, ranges or "all units" (it would be guessing which units are left out), so a person decides, and a *likely* match still gets a task. Of the ${exclNamed.length} units the text rules out, ${exclNamed.filter((x) => x.predicted === 'exact').length} came out *exact*.`, '');
   const wrong = rows.filter((x) => x.truth !== 'excluded' && x.predicted !== TRUTH_LEVEL[x.truth]);
   lines.push(wrong.length === 1 ? '## The 1 pair the matcher got wrong' : `## The ${wrong.length} pairs the matcher got wrong`, '');
@@ -126,7 +133,7 @@ export function report(result = run()) {
   lines.push('- **Recalls that leave units out are never read as exact.** Where the text says "except", "excluding" and the like, the matcher switches its unit rules off for that product (a list, a range or "all units" cannot be trusted when the text also names units that are left out). So an affected unit in such a recall is *likely*, not *exact*, and an open-ended bound ("Serial Number before K17160001") is not read at all. These pairs are the under-claims listed above; none is missed, because *likely* also gets a task.');
   lines.push('- **Several products: entries are found by their labels.** One product\'s entry is cut at a label with its number ("Model No", "Part No.", "REF", "Product Code") or at a list number ("2.", "3)"). A recall that starts each entry with a bare number and a name and no label ("5855300 Slim-Cath ... Lot Number: REKY1364") cannot be cut, and there a lot of one product can still be read as another\'s. No case in this set has that form, so the number above says nothing about it.');
   lines.push('- **This measures the matcher, not the search.** Every pair is a device and ONE recall that is already in hand. Whether the right recalls are fetched from openFDA in the first place (by manufacturer, by model and by UDI-DI, in a three-year window, up to 100 per search) is not measured here; a search that was capped is flagged on the dashboard.');
-  lines.push('- **Makers are compared by their words, with no list of aliases.** "BD" and "Becton Dickinson and Company", "GE" and "General Electric" are different makers to the matcher. Such a device is still found when its UDI-DI is in the recall text (*exact*) and otherwise, when only the model number is, as *possible*, which does not create a task. Letters with marks are folded ("Dräger" is "Draeger").');
+  lines.push('- **Makers are compared by their words and by a short list of company families.** "BD", "CareFusion", "Bard" and "Becton Dickinson" are one family; so are GE, Datex-Ohmeda and GE HealthCare, Baxter, Hill-Rom and Welch Allyn, ICU Medical and Hospira, and about fifteen others (`src/makerAliases.js`). A company that is not on the list is compared by its words, as before, so a hospital that writes a maker\'s old or brand name still needs its UDI-DI or its model number in the recall text to be found. The list is mine, from public acquisition history, not a registry: a missing company costs a match, a wrong one is still checked against the model, the serial and the kind of device.');
   lines.push(`- **Wording nobody wrote a rule for.** The set holds the ${recallCount} recalls above and the ways they write serials, lots and UDI-DIs. A recall that lists its units in a picture, a link or a PDF cannot be read at all, and is *likely* at best.`);
   lines.push('- **Not a field measurement.** Labels come from the recall text, written by the developer. A hospital\'s own device list (typos, old model names, missing serials) will do worse than this set; the number to trust is the direction, not the last decimal.', '');
   lines.push('## Re-running it', '', '```bash', 'node scripts/make-eval-set.mjs --pull   # fetch the recalls added to the list in that script (one request each; the others stay frozen)', 'node scripts/make-eval-set.mjs          # rebuild the cases from them', 'npm run eval                            # measure and rewrite this page', '```', '');

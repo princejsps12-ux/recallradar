@@ -114,6 +114,70 @@
    }
   },
   {
+   "id": "Z-2723-2026/alias-listed-unit",
+   "recall": "Z-2723-2026",
+   "template": "alias-listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2723-2026-8",
+    "name": "ICU Medical 400020401",
+    "ward": "ICU",
+    "lotOrSerial": "50003704",
+    "udiDi": "",
+    "manufacturer": "Hospira",
+    "model": "400020401",
+    "type": "infusion pump"
+   }
+  },
+  {
+   "id": "Z-2723-2026/alias-model-serial-not-listed",
+   "recall": "Z-2723-2026",
+   "template": "alias-model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-2723-2026-9",
+    "name": "ICU Medical 400020401",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "Hospira",
+    "model": "400020401",
+    "type": "infusion pump"
+   }
+  },
+  {
+   "id": "Z-2723-2026/alias-other-model",
+   "recall": "Z-2723-2026",
+   "template": "alias-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-2723-2026-10",
+    "name": "ICU Medical 400020401",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Hospira",
+    "model": "4000204019",
+    "type": "infusion pump"
+   }
+  },
+  {
+   "id": "Z-2723-2026/alias-other-kind",
+   "recall": "Z-2723-2026",
+   "template": "alias-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-2723-2026-11",
+    "name": "ICU Medical 400020401",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Hospira",
+    "model": "4000204019",
+    "type": "dental chair"
+   }
+  },
+  {
    "id": "Z-2579-2026/listed-unit",
    "recall": "Z-2579-2026",
    "template": "listed-unit",
@@ -1442,6 +1506,54 @@
    }
   },
   {
+   "id": "Z-0228-2025/alias-model-serial-not-listed",
+   "recall": "Z-0228-2025",
+   "template": "alias-model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0228-2025-11",
+    "name": "Baxter Healthcare P7900B000001",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "Hill-Rom",
+    "model": "P7900B000001",
+    "type": "hospital bed"
+   }
+  },
+  {
+   "id": "Z-0228-2025/alias-other-model",
+   "recall": "Z-0228-2025",
+   "template": "alias-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-0228-2025-12",
+    "name": "Baxter Healthcare P7900B000001",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Hill-Rom",
+    "model": "P7900B0000019",
+    "type": "hospital bed"
+   }
+  },
+  {
+   "id": "Z-0228-2025/alias-other-kind",
+   "recall": "Z-0228-2025",
+   "template": "alias-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-0228-2025-13",
+    "name": "Baxter Healthcare P7900B000001",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Hill-Rom",
+    "model": "P7900B0000019",
+    "type": "dental chair"
+   }
+  },
+  {
    "id": "Z-0208-2027/model-serial-not-listed",
    "recall": "Z-0208-2027",
    "template": "model-serial-not-listed",
@@ -2130,6 +2242,54 @@
    }
   },
   {
+   "id": "Z-1877-2024/alias-model-serial-not-listed",
+   "recall": "Z-1877-2024",
+   "template": "alias-model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-1877-2024-13",
+    "name": "Getinge 6682282",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "Maquet",
+    "model": "6682282",
+    "type": "vaporizer"
+   }
+  },
+  {
+   "id": "Z-1877-2024/alias-other-model",
+   "recall": "Z-1877-2024",
+   "template": "alias-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-1877-2024-14",
+    "name": "Getinge 6682282",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Maquet",
+    "model": "66822829",
+    "type": "vaporizer"
+   }
+  },
+  {
+   "id": "Z-1877-2024/alias-other-kind",
+   "recall": "Z-1877-2024",
+   "template": "alias-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-1877-2024-15",
+    "name": "Getinge 6682282",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "Maquet",
+    "model": "66822829",
+    "type": "dental chair"
+   }
+  },
+  {
    "id": "Z-2179-2025/model-serial-not-listed",
    "recall": "Z-2179-2025",
    "template": "model-serial-not-listed",
@@ -2254,6 +2414,54 @@
     "udiDi": "",
     "manufacturer": "Zenith Biomedical",
     "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-2179-2025/alias-model-serial-not-listed",
+   "recall": "Z-2179-2025",
+   "template": "alias-model-serial-not-listed",
+   "truth": "affected",
+   "device": {
+    "id": "Z-2179-2025-9",
+    "name": "CareFusion 303 8100",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "BD",
+    "model": "8100",
+    "type": "pump module"
+   }
+  },
+  {
+   "id": "Z-2179-2025/alias-other-model",
+   "recall": "Z-2179-2025",
+   "template": "alias-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-2179-2025-10",
+    "name": "CareFusion 303 8100",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "BD",
+    "model": "81009",
+    "type": "pump module"
+   }
+  },
+  {
+   "id": "Z-2179-2025/alias-other-kind",
+   "recall": "Z-2179-2025",
+   "template": "alias-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-2179-2025-11",
+    "name": "CareFusion 303 8100",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "BD",
+    "model": "81009",
     "type": "dental chair"
    }
   },
@@ -4738,6 +4946,70 @@
    }
   },
   {
+   "id": "Z-0815-2025/alias-listed-unit",
+   "recall": "Z-0815-2025",
+   "template": "alias-listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-0815-2025-12",
+    "name": "GE Medical Systems 1177-9820-ISO",
+    "ward": "ICU",
+    "lotOrSerial": "SQAD01037",
+    "udiDi": "",
+    "manufacturer": "GE Healthcare",
+    "model": "1177-9820-ISO",
+    "type": "anesthesia vaporizer"
+   }
+  },
+  {
+   "id": "Z-0815-2025/alias-model-serial-not-listed",
+   "recall": "Z-0815-2025",
+   "template": "alias-model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0815-2025-13",
+    "name": "GE Medical Systems 1177-9820-ISO",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "GE Healthcare",
+    "model": "1177-9820-ISO",
+    "type": "anesthesia vaporizer"
+   }
+  },
+  {
+   "id": "Z-0815-2025/alias-other-model",
+   "recall": "Z-0815-2025",
+   "template": "alias-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-0815-2025-14",
+    "name": "GE Medical Systems 1177-9820-ISO",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE Healthcare",
+    "model": "1177-9820-ISO9",
+    "type": "anesthesia vaporizer"
+   }
+  },
+  {
+   "id": "Z-0815-2025/alias-other-kind",
+   "recall": "Z-0815-2025",
+   "template": "alias-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-0815-2025-15",
+    "name": "GE Medical Systems 1177-9820-ISO",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE Healthcare",
+    "model": "1177-9820-ISO9",
+    "type": "dental chair"
+   }
+  },
+  {
    "id": "Z-3190-2026/listed-unit",
    "recall": "Z-3190-2026",
    "template": "listed-unit",
@@ -4914,6 +5186,70 @@
    }
   },
   {
+   "id": "Z-3190-2026/alias-listed-unit",
+   "recall": "Z-3190-2026",
+   "template": "alias-listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-3190-2026-12",
+    "name": "Datex-Ohmeda 1011-9055-000",
+    "ward": "ICU",
+    "lotOrSerial": "AQDF40422",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "1011-9055-000",
+    "type": "anesthesia system"
+   }
+  },
+  {
+   "id": "Z-3190-2026/alias-model-serial-not-listed",
+   "recall": "Z-3190-2026",
+   "template": "alias-model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3190-2026-13",
+    "name": "Datex-Ohmeda 1011-9055-000",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "1011-9055-000",
+    "type": "anesthesia system"
+   }
+  },
+  {
+   "id": "Z-3190-2026/alias-other-model",
+   "recall": "Z-3190-2026",
+   "template": "alias-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-3190-2026-14",
+    "name": "Datex-Ohmeda 1011-9055-000",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "1011-9055-0009",
+    "type": "anesthesia system"
+   }
+  },
+  {
+   "id": "Z-3190-2026/alias-other-kind",
+   "recall": "Z-3190-2026",
+   "template": "alias-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-3190-2026-15",
+    "name": "Datex-Ohmeda 1011-9055-000",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "1011-9055-0009",
+    "type": "dental chair"
+   }
+  },
+  {
    "id": "Z-0083-2025/model-serial-not-listed",
    "recall": "Z-0083-2025",
    "template": "model-serial-not-listed",
@@ -5058,6 +5394,54 @@
    }
   },
   {
+   "id": "Z-0083-2025/alias-model-serial-not-listed",
+   "recall": "Z-0083-2025",
+   "template": "alias-model-serial-not-listed",
+   "truth": "affected",
+   "device": {
+    "id": "Z-0083-2025-10",
+    "name": "Datex-Ohmeda 1011-9055-000",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "1011-9055-000",
+    "type": "anesthesia gas machine"
+   }
+  },
+  {
+   "id": "Z-0083-2025/alias-other-model",
+   "recall": "Z-0083-2025",
+   "template": "alias-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-0083-2025-11",
+    "name": "Datex-Ohmeda 1011-9055-000",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "1011-9055-0009",
+    "type": "anesthesia gas machine"
+   }
+  },
+  {
+   "id": "Z-0083-2025/alias-other-kind",
+   "recall": "Z-0083-2025",
+   "template": "alias-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-0083-2025-12",
+    "name": "Datex-Ohmeda 1011-9055-000",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "1011-9055-0009",
+    "type": "dental chair"
+   }
+  },
+  {
    "id": "Z-3143-2026/model-serial-not-listed",
    "recall": "Z-3143-2026",
    "template": "model-serial-not-listed",
@@ -5198,6 +5582,54 @@
     "udiDi": "",
     "manufacturer": "Zenith Biomedical",
     "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-3143-2026/alias-model-serial-not-listed",
+   "recall": "Z-3143-2026",
+   "template": "alias-model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-3143-2026-10",
+    "name": "GE Medical Systems Information Technologies 5867474-04",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "5867474-04",
+    "type": "central station"
+   }
+  },
+  {
+   "id": "Z-3143-2026/alias-other-model",
+   "recall": "Z-3143-2026",
+   "template": "alias-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-3143-2026-11",
+    "name": "GE Medical Systems Information Technologies 5867474-04",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "5867474-049",
+    "type": "central station"
+   }
+  },
+  {
+   "id": "Z-3143-2026/alias-other-kind",
+   "recall": "Z-3143-2026",
+   "template": "alias-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-3143-2026-12",
+    "name": "GE Medical Systems Information Technologies 5867474-04",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE HealthCare",
+    "model": "5867474-049",
     "type": "dental chair"
    }
   },
@@ -5374,6 +5806,70 @@
     "udiDi": "",
     "manufacturer": "Zenith Biomedical",
     "model": "QX-5150",
+    "type": "dental chair"
+   }
+  },
+  {
+   "id": "Z-0213-2026/alias-listed-unit",
+   "recall": "Z-0213-2026",
+   "template": "alias-listed-unit",
+   "truth": "affected",
+   "device": {
+    "id": "Z-0213-2026-12",
+    "name": "Wipro GE Healthcare MAS800",
+    "ward": "ICU",
+    "lotOrSerial": "STU25210418SA",
+    "udiDi": "",
+    "manufacturer": "GE",
+    "model": "MAS800",
+    "type": "central station"
+   }
+  },
+  {
+   "id": "Z-0213-2026/alias-model-serial-not-listed",
+   "recall": "Z-0213-2026",
+   "template": "alias-model-serial-not-listed",
+   "truth": "product-covered",
+   "device": {
+    "id": "Z-0213-2026-13",
+    "name": "Wipro GE Healthcare MAS800",
+    "ward": "ICU",
+    "lotOrSerial": "ZQ-0042-X",
+    "udiDi": "",
+    "manufacturer": "GE",
+    "model": "MAS800",
+    "type": "central station"
+   }
+  },
+  {
+   "id": "Z-0213-2026/alias-other-model",
+   "recall": "Z-0213-2026",
+   "template": "alias-other-model",
+   "truth": "related",
+   "device": {
+    "id": "Z-0213-2026-14",
+    "name": "Wipro GE Healthcare MAS800",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE",
+    "model": "MAS8009",
+    "type": "central station"
+   }
+  },
+  {
+   "id": "Z-0213-2026/alias-other-kind",
+   "recall": "Z-0213-2026",
+   "template": "alias-other-kind",
+   "truth": "unrelated",
+   "device": {
+    "id": "Z-0213-2026-15",
+    "name": "Wipro GE Healthcare MAS800",
+    "ward": "ICU",
+    "lotOrSerial": "",
+    "udiDi": "",
+    "manufacturer": "GE",
+    "model": "MAS8009",
     "type": "dental chair"
    }
   },

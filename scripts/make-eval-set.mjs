@@ -31,6 +31,11 @@
 //   multi-no-unit                  another product's model, no serial recorded                   -> product-covered
 //   multi-other-product-unit       a model of the recall with a unit the recall lists for a DIFFERENT product -> product-covered
 //   multi-udi-other-product-unit   the same, by UDI-DI only                                      -> product-covered
+// The same company under another name (SPEC field `alias`: how a hospital might write the maker, see src/makerAliases.js):
+//   alias-listed-unit              the alias, the model and a unit the recall lists                -> affected
+//   alias-model-serial-not-listed  the alias, the model, a unit it does not list                  -> product-covered (affected if all units)
+//   alias-other-model              the alias, another model of the same kind of device             -> related
+//   alias-other-kind               the alias, another model and kind of device                     -> unrelated
 // Recalls that name units they leave out (SPEC fields `excludedUnits`, `bound`):
 //   excluded-unit / udi-excluded-unit   a unit the text names as excluded ("Excluding 90425438")   -> excluded (the recall rules it out)
 //   bound-inside                   a unit inside an open-ended bound ("Serial Number Before K17160001") -> affected
@@ -49,7 +54,7 @@ const CASES_FILE = join(root, 'eval', 'cases.json');
 
 // unit: 'serial' | 'lot' | '21' read from the text by a simple pattern, a literal value, or null (nothing usable listed).
 const SPEC = [
-  { recall: 'Z-2723-2026', maker: 'ICU Medical', model: '400020401', type: 'infusion pump', unit: 'serial' },
+  { recall: 'Z-2723-2026', maker: 'ICU Medical', model: '400020401', type: 'infusion pump', unit: 'serial', alias: 'Hospira' },
   { recall: 'Z-2579-2026', maker: 'Philips', model: '867232', type: 'telemetry monitor', unit: 'serial', udi: '00884838102842' },
   { recall: 'Z-2735-2026', maker: 'ResMed', model: 'Astral 100', type: 'ventilator', unit: null, udi: '00619498003259', range: { inside: '22241800001', outside: '22250000001' } },
   { recall: 'Z-3065-2026', maker: 'Baxter Healthcare', model: '40800BAXUS', type: 'syringe pump', unit: null, udi: '05413765852428', allUnits: true },
@@ -57,12 +62,12 @@ const SPEC = [
   { recall: 'Z-2582-2024', maker: 'Baxter Healthcare', model: '36010', type: 'battery modules', unit: null, udi: '00085412498683', qualifiedAll: true },
   { recall: 'Z-2096-2025', maker: 'Baxter Healthcare', model: '35700BAX2', type: 'infusion pump', unit: 'serial', udi: '00085412498683' },
   { recall: 'Z-1121-2026', maker: 'Baxter Healthcare', model: '35700BAX2', type: 'infusion pump', unit: 'serial', udi: '00085412498683' },
-  { recall: 'Z-0228-2025', maker: 'Baxter Healthcare', model: 'P7900B000001', type: 'hospital bed', unit: null, udi: '00887761985162', qualifiedAll: true },
+  { recall: 'Z-0228-2025', maker: 'Baxter Healthcare', model: 'P7900B000001', type: 'hospital bed', unit: null, udi: '00887761985162', qualifiedAll: true, alias: 'Hill-Rom' },
   { recall: 'Z-0208-2027', maker: 'Abiomed', model: '0042-0000-US', type: 'automated impella controller', unit: null, udi: '00813502010022' },
   { recall: 'Z-3148-2026', maker: 'Abiomed', model: '0042-0000-CA', type: 'impella controller', unit: 'serial', udi: '00813502010022' },
   { recall: 'Z-2211-2026', maker: 'Abiomed', model: '0042-0000-US', type: 'automated impella controller', unit: 'serial', udi: '00813502010022' },
-  { recall: 'Z-1877-2024', maker: 'Getinge', model: '6682282', type: 'vaporizer', unit: null, udi: '07325710000212', range: { inside: '20000', outside: '30000' } },
-  { recall: 'Z-2179-2025', maker: 'CareFusion 303', model: '8100', type: 'pump module', unit: null, udi: '10885403222054', allUnits: true },
+  { recall: 'Z-1877-2024', maker: 'Getinge', model: '6682282', type: 'vaporizer', unit: null, udi: '07325710000212', range: { inside: '20000', outside: '30000' }, alias: 'Maquet' },
+  { recall: 'Z-2179-2025', maker: 'CareFusion 303', model: '8100', type: 'pump module', unit: null, udi: '10885403222054', allUnits: true, alias: 'BD' },
   { recall: 'Z-1485-2026', maker: 'Aesculap', model: 'FF399R', type: 'trocar', unit: 'serial', udi: '04038653065547' },
   { recall: 'Z-0289-2024', maker: 'Carestream Health', model: 'DRX-Revolution', type: 'x-ray system', unit: 'serial', udi: '60889971019394' },
   { recall: 'Z-3183-2026', maker: 'Stryker Sustainability', model: '2B5ST', type: 'trocar', unit: 'lot', udi: '00885825017231' },
@@ -76,11 +81,11 @@ const SPEC = [
   { recall: 'Z-1966-2026', maker: 'Philips', model: '782145', type: 'smartpath', unit: '17385', udi: '00884838108684' },
   { recall: 'Z-1767-2026', maker: 'GE Healthcare', model: 'SIGNA Premier', type: 'systems', unit: '415353UMR2', udi: '00840682135269' },
   { recall: 'Z-2535-2025', maker: 'Boston Scientific', model: 'M0062101180', type: 'nephromax kit', unit: 'lot', udi: '08714729077589' },
-  { recall: 'Z-0815-2025', maker: 'GE Medical Systems', model: '1177-9820-ISO', type: 'anesthesia vaporizer', unit: 'serial', udi: '00840682124744' },
-  { recall: 'Z-3190-2026', maker: 'Datex-Ohmeda', model: '1011-9055-000', type: 'anesthesia system', unit: 'serial', udi: '00195278588128' },
-  { recall: 'Z-0083-2025', maker: 'Datex-Ohmeda', model: '1011-9055-000', type: 'anesthesia gas machine', unit: null, udi: '00195278588128', allUnits: true },
-  { recall: 'Z-3143-2026', maker: 'GE Medical Systems Information Technologies', model: '5867474-04', type: 'central station', unit: null, udi: '00195278343512' },
-  { recall: 'Z-0213-2026', maker: 'Wipro GE Healthcare', model: 'MAS800', type: 'central station', unit: 'serial', udi: '00195278343512' },
+  { recall: 'Z-0815-2025', maker: 'GE Medical Systems', model: '1177-9820-ISO', type: 'anesthesia vaporizer', unit: 'serial', udi: '00840682124744', alias: 'GE Healthcare' },
+  { recall: 'Z-3190-2026', maker: 'Datex-Ohmeda', model: '1011-9055-000', type: 'anesthesia system', unit: 'serial', udi: '00195278588128', alias: 'GE HealthCare' },
+  { recall: 'Z-0083-2025', maker: 'Datex-Ohmeda', model: '1011-9055-000', type: 'anesthesia gas machine', unit: null, udi: '00195278588128', allUnits: true, alias: 'GE HealthCare' },
+  { recall: 'Z-3143-2026', maker: 'GE Medical Systems Information Technologies', model: '5867474-04', type: 'central station', unit: null, udi: '00195278343512', alias: 'GE HealthCare' },
+  { recall: 'Z-0213-2026', maker: 'Wipro GE Healthcare', model: 'MAS800', type: 'central station', unit: 'serial', udi: '00195278343512', alias: 'GE' },
   { recall: 'Z-1537-2024', maker: 'Masimo', model: '9847', type: 'pulse oximeter', unit: 'serial', udi: '00843997013284' },
   { recall: 'Z-3218-2026', maker: 'Midmark', model: '1-200-0330', type: 'iqvitals zone', unit: 'serial', udi: '00841709105807' },
   { recall: 'Z-3013-2026', maker: 'Midmark', model: '4-000-0080', type: 'digital ecg', unit: null },
@@ -223,6 +228,19 @@ function build() {
     }
     if (spec.lotCodeLookalike) add('lot-code-lookalike', 'product-covered', { lotOrSerial: spec.lotCodeLookalike });
     if (spec.qualifiedAll) add('qualified-all', 'product-covered', { lotOrSerial: 'ZQ-0042-X' });
+
+    // --- The same company under another name ------------------------------------------------------------------------------
+    // The recall is filed under the firm that is responsible today ("Baxter Healthcare Corporation"); the hospital's list says what
+    // is printed on the device ("Hill-Rom"). Same company, so the answer is the one for the maker as written in the recall.
+    if (spec.alias) {
+      const asAlias = { manufacturer: spec.alias };
+      if (unit) add('alias-listed-unit', 'affected', { ...asAlias, lotOrSerial: unit });
+      add('alias-model-serial-not-listed', unconfirmed, { ...asAlias, lotOrSerial: unlisted });
+      if (!text.includes(otherModel.toLowerCase())) {
+        add('alias-other-model', 'related', { ...asAlias, model: otherModel, type: spec.type });
+        add('alias-other-kind', 'unrelated', { ...asAlias, model: otherModel, type: 'dental chair' });
+      }
+    }
 
     // --- Several products in one recall -------------------------------------------------------------------------------
     // Each product has its own units, so a unit listed for one product says nothing about another: the same text names the model

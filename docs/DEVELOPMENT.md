@@ -65,7 +65,7 @@ Requirements: Node 22+ and the Forge CLI (`npm install -g @forge/cli`, then `for
 npm install
 npm test                                   # unit tests, no network needed
 npm run typecheck                          # tsc over the JSDoc in src/ (the core modules strictly); needs no build
-npm run eval                               # measure the matcher on 3,423 labeled pairs and rewrite docs/ACCURACY.md
+npm run eval                               # measure the matcher on 3,438 labeled pairs and rewrite docs/ACCURACY.md
 
 cd static/ui
 npm install --legacy-peer-deps             # the template pins React 16

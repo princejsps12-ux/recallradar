@@ -21,6 +21,7 @@ import {
   parseRecallForMatching,
 } from './openfda.js';
 import { makerWords } from './matching.js';
+import { familySearchNames } from './makerAliases.js';
 import { normalizeDi } from './udi.js';
 import { tokenize, compact } from './text.js';
 
@@ -85,6 +86,11 @@ export function planRecallQueries(devices, now = new Date(), limit = SEARCH_LIMI
   for (const device of devices) {
     const words = makerWords(device.manufacturer);
     if (words.length) firmKeys.set(words.join(' '), words);
+  }
+  // A maker that belongs to a company family is also searched under the family's main name ("BD" under "Becton Dickinson", "Hill-Rom"
+  // under "Baxter"): the FDA files a recall under the firm that is responsible today. One more search per family at most.
+  for (const words of [...firmKeys.values()]) {
+    for (const name of familySearchNames(words)) if (!firmKeys.has(name.join(' '))) firmKeys.set(name.join(' '), name);
   }
   const firmUrls = [...firmKeys.values()].map((words) => buildFirmRecallsUrl(words, from, to, limit));
 

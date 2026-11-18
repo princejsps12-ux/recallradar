@@ -8,13 +8,13 @@ Forge app (Atlassian Codegeist 2026, Specialized Industries) for hospital teams:
 
 ```bash
 npm test                                   # all unit tests (Node built-in runner, no network)
-npm run typecheck                          # tsc over the JSDoc in src/ (checkJs; tsconfig.check.json for all of it, tsconfig.check.strict.json strictly for the core pure modules: types.js, text, udi, serials, matching, progress, accuracy, alertState, alertSettings). Type a new module fully, then add it to the strict list
+npm run typecheck                          # tsc over the JSDoc in src/ (checkJs; tsconfig.check.json for all of it, tsconfig.check.strict.json strictly for the core pure modules: types.js, text, udi, serials, matching, makerAliases, progress, accuracy, alertState, alertSettings). Type a new module fully, then add it to the strict list
 npm run test:ui                            # jsdom smoke test of the real panel and dashboard (no browser)
 npm run test:preview                       # the real bundle in headless Chrome, every state, light/dark/phone: CSP, console, axe, panel height
 npm run preview                            # http://localhost:4173/ the app without Jira (see scripts/preview/README.md)
 npm run shots                              # regenerate marketplace/screenshots/01..19 from the preview
 node scripts/check-demo-matches.mjs        # live openFDA check of the demo hospital (needs network; --why prints the reasons)
-npm run eval                               # measure the matcher on eval/ (3,423 labeled pairs from 48 real recalls, incl. several products and exclusions), rewrite docs/ACCURACY.md; npm test fails when that page is stale. Adding a recall: put it in SPEC in scripts/make-eval-set.mjs, `node scripts/make-eval-set.mjs --pull` (fetches only the missing ones, the frozen records stay), rebuild, `npm run eval`, name any new miss in src/accuracy.test.mjs
+npm run eval                               # measure the matcher on eval/ (3,438 labeled pairs from 48 real recalls, incl. several products, exclusions and maker aliases), rewrite docs/ACCURACY.md; npm test fails when that page is stale. Adding a recall: put it in SPEC in scripts/make-eval-set.mjs, `node scripts/make-eval-set.mjs --pull` (fetches only the missing ones, the frozen records stay), rebuild, `npm run eval`, name any new miss in src/accuracy.test.mjs
 
 # after ANY change to static/ui/src, rebuild BEFORE deploying
 (cd static/ui && npm run build)   # first time: npm install --legacy-peer-deps (template pins React 16)
@@ -43,6 +43,7 @@ Logic lives in **pure modules with no Forge imports**, each unit tested against 
 | File | Role |
 | --- | --- |
 | `src/matching.js` | The ten match rules (exact / likely / possible; UDI-DI rules first), every threshold a named constant with its reason |
+| `src/makerAliases.js` | `MAKER_FAMILIES`: the short list of companies that go by more than one name (BD / Becton Dickinson / CareFusion / Bard, Baxter / Hill-Rom / Welch Allyn, GE / Datex-Ohmeda, ...). `manufacturerLink` in matching.js returns 'words', 'family' or null (a 'family' match adds "are the same company" to the reason); `planRecallQueries` also searches a family's main name (`familySearchNames`, at most one more search per family); the eval sweeps skip pairs of one family. Names of 3 letters or fewer count only at the START of the maker. Add a company only with a public source (an acquisition or a rename), and a test |
 | `src/udi.js`, `src/serials.js` | UDI-DI (GS1 GTIN) extraction from recall text and device lists; serial ranges/limits read only inside a "serial" clause |
 | `src/accuracy.js`, `scripts/eval-matching.mjs`, `scripts/make-eval-set.mjs`, `eval/` | Accuracy evaluation: frozen real recalls (`eval/recalls.json`), labeled cases built from them, precision/recall per level, `docs/ACCURACY.md` |
 | `src/openfda.js`, `src/recallSearch.js`, `src/text.js` | openFDA URLs and parsing; which searches to run (per manufacturer + per model + per UDI-DI, 3-year window, paged to 100); tokenizing |

@@ -33,6 +33,7 @@
 //
 // This file has no Forge imports so every rule can be unit tested with plain Node.
 import { tokenize, compact, containsPhrase } from './text.js';
+import { sameMakerFamily } from './makerAliases.js';
 import { extractUdis, normalizeDi, diVariants } from './udi.js';
 import { parseSerialConstraints, serialInConstraints } from './serials.js';
 
@@ -121,13 +122,24 @@ export function makerWords(name) {
  * @returns {boolean}
  */
 export function manufacturersMatch(deviceMaker, recallFirm) {
+  return manufacturerLink(deviceMaker, recallFirm) !== null;
+}
+
+// How two makers are the same: by their words ("Philips" inside "Philips North America"), because they are two names of one company
+// on the list in makerAliases.js ("BD" and "Becton, Dickinson and Company", "Hill-Rom" and "Baxter Healthcare"), or not at all (null).
+/**
+ * @param {unknown} deviceMaker
+ * @param {unknown} recallFirm
+ * @returns {'words' | 'family' | null}
+ */
+export function manufacturerLink(deviceMaker, recallFirm) {
   const a = makerWords(deviceMaker);
   const b = makerWords(recallFirm);
-  if (a.length === 0 || b.length === 0) return false;
+  if (a.length === 0 || b.length === 0) return null;
   const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
   const longerSet = new Set(longer);
-  if (!shorter.every((word) => longerSet.has(word))) return false;
-  return shorter.some((word) => !GENERIC_SET.has(word));
+  if (shorter.every((word) => longerSet.has(word)) && shorter.some((word) => !GENERIC_SET.has(word))) return 'words';
+  return sameMakerFamily(a, b) ? 'family' : null;
 }
 
 // Fact 2. The model's words must appear in order, as whole words, in the recall's product
@@ -338,7 +350,10 @@ function result(confidence, rule, reason) {
  * @returns {import('./types.js').Verdict | null}
  */
 export function evaluateMatch(device, recall) {
-  const sameMaker = manufacturersMatch(device.manufacturer, recall.firm);
+  const link = manufacturerLink(device.manufacturer, recall.firm);
+  const sameMaker = link !== null;
+  // Two names of one company (see makerAliases.js): the reason says so, so nobody wonders why "BD" matched "Becton, Dickinson and Company".
+  const company = link === 'family' ? ` "${device.manufacturer}" and the recalling firm "${recall.firm}" are the same company.` : '';
   const hasModel = modelInRecall(device.model, recall);
   const scoped = scopedRecall(recall, [device.model, ...diVariants(device.udiDi)]);
   // "All lot numbers except lot 123" and "1000-1500, excluding 1200" name units that are NOT affected: the text cannot be read as
@@ -375,7 +390,7 @@ export function evaluateMatch(device, recall) {
       return result(
         CONFIDENCE.EXACT,
         RULES.EXACT_MODEL_AND_LOT,
-        `Manufacturer, model "${device.model}" and serial/lot "${device.lotOrSerial}" are all listed in this recall.`,
+        `Manufacturer, model "${device.model}" and serial/lot "${device.lotOrSerial}" are all listed in this recall.${company}`,
       );
     }
     // RULE exact-manufacturer-model-range: maker and model match and this unit's serial is inside a stated range.
@@ -383,7 +398,7 @@ export function evaluateMatch(device, recall) {
       return result(
         CONFIDENCE.EXACT,
         RULES.EXACT_MODEL_AND_RANGE,
-        `Manufacturer and model "${device.model}" match, and serial "${device.lotOrSerial}" falls inside the range the recall gives ("${range}").`,
+        `Manufacturer and model "${device.model}" match, and serial "${device.lotOrSerial}" falls inside the range the recall gives ("${range}").${company}`,
       );
     }
     // RULE exact-manufacturer-model-all: maker and model match and the recall covers every unit.
@@ -391,7 +406,7 @@ export function evaluateMatch(device, recall) {
       return result(
         CONFIDENCE.EXACT,
         RULES.EXACT_MODEL_ALL_UNITS,
-        `Manufacturer and model "${device.model}" match, and the recall covers all serial/lot numbers.`,
+        `Manufacturer and model "${device.model}" match, and the recall covers all serial/lot numbers.${company}`,
       );
     }
     // RULE likely-manufacturer-model: maker and model match but the unit's number is not listed.
@@ -400,7 +415,7 @@ export function evaluateMatch(device, recall) {
     return result(
       CONFIDENCE.LIKELY,
       RULES.LIKELY_MODEL,
-      `Manufacturer and model "${device.model}" match, but ${whyNotListed}.`,
+      `Manufacturer and model "${device.model}" match, but ${whyNotListed}.${company}`,
     );
   }
 
@@ -412,7 +427,7 @@ export function evaluateMatch(device, recall) {
     return result(
       CONFIDENCE.LIKELY,
       RULES.LIKELY_LOT,
-      `Manufacturer and serial/lot "${device.lotOrSerial}" are listed in this recall, but the model "${device.model}" is not mentioned.`,
+      `Manufacturer and serial/lot "${device.lotOrSerial}" are listed in this recall, but the model "${device.model}" is not mentioned.${company}`,
     );
   }
 
@@ -433,7 +448,7 @@ export function evaluateMatch(device, recall) {
     return result(
       CONFIDENCE.POSSIBLE,
       RULES.POSSIBLE_TYPE,
-      `Same manufacturer and the recall is for the same kind of device ("${device.type}"), but model "${device.model}" is not mentioned.`,
+      `Same manufacturer and the recall is for the same kind of device ("${device.type}"), but model "${device.model}" is not mentioned.${company}`,
     );
   }
 
