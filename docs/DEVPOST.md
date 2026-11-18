@@ -30,7 +30,7 @@ RecallRadar is a Forge app that works in four places on one installation:
 - **Daily alerts.** Every day it checks again. When a recall *starts* to affect a device, it creates the task (as the app) and posts one comment. The first look is a baseline, so switching it on never floods a project.
 - **A Rovo agent and MCP tools.** The *RecallRadar Assistant* answers from the saved check, with a list of the only recall numbers and device ids it may quote, and creates tasks only after a preview and a confirmation. The same tools are exposed over MCP, so Claude Desktop can ask "Are any of our infusion pumps recalled?" and get real recall numbers.
 
-It also reads teams and people from the **Teamwork Graph** (read-only) to say who handles a ward, writes one **Confluence** page per recall on request, and imports a pasted spreadsheet of up to 1,000 devices with a preview of how each column was read.
+It also reads teams and people from the **Teamwork Graph** (read-only) to say who handles a ward and how busy each person is, writes one **Confluence** page per recall on request, and imports a pasted spreadsheet of up to 1,000 devices with a preview of how each column was read. A 1,030-device list was imported and checked live on the demo site (894 devices needed action, 2,342 matches).
 
 ## How we built it
 
@@ -45,6 +45,8 @@ It also reads teams and people from the **Teamwork Graph** (read-only) to say wh
 - **A check that works on a laptop and dies on the platform.** Opened for the first time on a real site, the background check was killed for memory: one real recall has 8.9 million characters of serial numbers and the check held 50 MB of answers and split them into millions of words per device. We found it by running the app live, fixed it (each answer is used and released at once; texts are searched as text; matching went from 21 s to 2 s) and documented it.
 - **Recalls are written for people.** One text names several products, each with its own lots, in sentences with no pattern; another says "all units except those with software 1.05.06.00". Our first rule for several products cut the text at every full stop and judged real recalls against the wrong lots. Adding real recalls to the evaluation found it, and it is fixed and guarded.
 - **Concurrency without transactions.** Forge storage has no compare-and-set, so a lease lock and an atomic claim keep two writers from losing each other's updates; a record that cannot be read is never treated as empty.
+- **A platform that is smaller than a laptop.** A Forge function is killed near 250 MB and runs 20 to 40 times slower than a laptop. Making the check fit took parsing each answer as it arrives, a cap on very long serial lists, a 45-second limit per request, and a matcher that compares each group of identical devices once (1,000 devices: 43 s to under 1 s locally).
+- **A Teamwork Graph that suddenly refused everything.** Forge sent the installation's Jira site address as the query context; the graph wants the platform site address. Calling the same query from the browser console with each address found it, and the fix is one header.
 - **Honest limits.** The Teamwork Graph is a preview API, a Forge UI function cannot run longer than 25 seconds, and the anonymous openFDA allowance is small; the README says what was not verified live.
 
 ## Accomplishments that we are proud of
@@ -68,12 +70,13 @@ Atlassian Forge, Forge Custom UI, React, Atlaskit, Rovo agents and actions, Forg
 ## Try it out
 
 - Code: https://github.com/princejsps12-ux/recallradar
-- Install link and a ten-minute walkthrough: the README, section "Judge quick start".
+- Install link and a ten-minute walkthrough: the README, section "Judge quick start". The link opens the **production** distribution of the app ("Get app", then pick the site).
 - Demo hospital: open **Apps**, **RecallRadar**, **Load demo hospital**. No account elsewhere is needed; Rovo and Confluence are optional.
 - Test data: the 30 demo devices use real manufacturer and model names from actual recalls.
 
 ## Notes for the judges
 
 - **Not eligible for "Runs on Atlassian".** The app calls api.fda.gov, so it declares that egress.
-- **What was verified live and what was not:** see the README sections "What was and was not verified". In short: the dashboard, the background check, the daily-alert settings and the Rovo agent were run on a real site; an external MCP client (Claude Desktop) needs a site admin to switch the app's tools on and has not been run end to end by the author.
+- **What a judge must do:** install as a **Jira administrator** (the app asks for Teamwork Graph scopes, which an organization admin must approve); the first person to open **Apps, RecallRadar** loads the demo hospital; **Ward teams** needs the signed-in person to be in a team; **Rovo** needs a site with Rovo; **Confluence pages** need the optional Confluence connection; **MCP** needs the site admin to switch on the app's tools.
+- **What was verified live and what was not:** see the README sections "What was and was not verified" and "Live run on the demo site". In short: the dashboard (light and dark), the background check (also on the production site), the daily alert (it created a task and a comment on its own), the 1,000-row import, the Teamwork Graph and the Rovo agent were run on a real site; an external MCP client (Claude Desktop) needs a site admin to switch the app's tools on and has not been run end to end by the author.
 - **Team and ownership:** Prince Pandey, princejsps12@gmail.com.
