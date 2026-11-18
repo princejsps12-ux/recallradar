@@ -2,6 +2,7 @@
 // Everything with real logic lives in the pure modules; this file only connects them to Forge
 // storage and to the network.
 import api, { fetch, route } from '@forge/api';
+import { Queue } from '@forge/events';
 import { createDeviceStore } from './deviceStore';
 import { forgeKv } from './kvAdapter';
 import { createMatchCache } from './matchCache';
@@ -11,7 +12,7 @@ import { matchDevicesToRecalls } from './matching';
 import { performCheck, getLatestResult } from './matchService';
 import { createJiraClient } from './jiraClient';
 import { createConfluenceClient } from './confluenceClient';
-import { fetchWithOneRetry, withApiKey, slimOpenFdaResponse } from './openfda';
+import { fetchWithOneRetry, withApiKey, slimOpenFdaResponse, withTimeout } from './openfda';
 import { createTaskGuard, getTaskStates, selectMatches } from './taskService';
 import { createPreviewStore } from './agentTools';
 import { createTeamGraph } from './teamGraph';
@@ -70,6 +71,12 @@ export async function openTaskCounts() {
 
 // Name of the queue in manifest.yml (the consumer module listens to the same name).
 export const CHECK_QUEUE_KEY = 'recall-check';
+const stepQueue = new Queue({ key: CHECK_QUEUE_KEY });
+
+// Put the next step of the daily run on the queue: { step: 'check' | 'alerts', trigger }.
+export function enqueueStep(message) {
+  return stepQueue.push({ body: message });
+}
 
 // Fetch one openFDA URL as JSON. openFDA answers 404 when a search has no hits: that is
 // "no results", not an error.
@@ -78,6 +85,8 @@ async function fetchOpenFdaJson(url) {
   // 120,000 requests instead of about 1,000 per address. Without it nothing changes.
   const keyed = withApiKey(url, process.env.OPENFDA_API_KEY);
   const began = Date.now();
+  // The whole request, body included, is bounded: a page that stalls fails ONE search instead of the whole check.
+  return withTimeout(async () => {
   const response = await fetchWithOneRetry(() => fetch(keyed, { headers: { Accept: 'application/json' } }));
   if (response.status === 404) return { results: [] };
   if (!response.ok) throw new Error(`openFDA request failed with status ${response.status}`);
@@ -86,6 +95,7 @@ async function fetchOpenFdaJson(url) {
   const body = slimOpenFdaResponse(JSON.parse(text));
   if (downloaded > 8000 || text.length > 2000000) console.info(`openFDA slow or large answer: ${downloaded} ms to read, ${text.length} characters, ${Date.now() - began} ms in all, ${url.slice(url.indexOf('search='), url.indexOf('search=') + 70)}`);
   return body;
+  });
 }
 
 // The real search: find recent recalls for the hospital's manufacturers and models, then match

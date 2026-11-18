@@ -1,12 +1,21 @@
-// Queue consumer: does the recall check in the background, started by the "Check devices" button.
-// It may run for up to 300 s (timeoutSeconds in manifest.yml), unlike a UI function (25 s).
-import { runCheck } from './runtime';
+// Queue consumer: does the recall check in the background (started by the "Check devices" button or by the daily trigger) and the
+// daily alerts that follow it. Each message is ONE step with its own 300 seconds (timeoutSeconds in manifest.yml), and a step that
+// finishes well queues the next one itself:
+//   { jobId, trigger }                   the button's check
+//   { step: 'check', trigger: 'schedule' }  the daily check; when it is done it queues the alerts
+//   { step: 'alerts' }                   the daily alerts, in their own invocation
+import { runCheck, runDailyAlerts, enqueueStep } from './runtime';
 
-// Forge delivers queue events at least once. The message body is what the resolver pushed:
-// { jobId, trigger }. runCheck never throws, so Forge does not retry a check that already
+// Forge delivers queue events at least once. runCheck and runDailyAlerts never throw, so Forge does not retry a step that already
 // recorded its own failure.
 export async function handler(event) {
   const body = (event && event.body) || {};
-  const outcome = await runCheck({ trigger: body.trigger || 'user', jobId: body.jobId || null });
-  console.info(`Recall check (${body.trigger || 'user'}) finished: ${outcome}`);
+  if (body.step === 'alerts') {
+    console.info(`Daily alerts finished: ${await runDailyAlerts()}`);
+    return;
+  }
+  const trigger = body.trigger || 'user';
+  const outcome = await runCheck({ trigger, jobId: body.jobId || null });
+  console.info(`Recall check (${trigger}) finished: ${outcome}`);
+  if (body.step === 'check' && outcome === 'done') await enqueueStep({ step: 'alerts' });
 }

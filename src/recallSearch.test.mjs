@@ -479,3 +479,10 @@ test('buildRecallDetails keeps one entry per exact or likely recall, and skips p
 test('buildRecallDetails of nothing is empty', () => {
   assert.deepEqual(buildRecallDetails([], []), {});
 });
+
+test('withTimeout fails a request that stalls, passes one that answers, and clears its timer', async () => {
+  const { withTimeout } = await import('./openfda.js');
+  await assert.rejects(() => withTimeout(() => new Promise(() => {}), 20), /did not answer/);
+  assert.equal(await withTimeout(async () => 'ok', 1000), 'ok');
+  await assert.rejects(() => withTimeout(async () => { throw new Error('boom'); }, 1000), /boom/);
+});

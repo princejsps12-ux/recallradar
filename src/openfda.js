@@ -202,6 +202,25 @@ export function buildUdiRecallsUrl(dis, fromYmd, toYmd, limit = MAX_RECALLS_PER_
 export const RETRY_STATUSES = [429, 500, 502, 503, 504];
 export const RETRY_WAIT_MS = 1500;
 
+// One request (answer and body) may take this long. A hung page used to hold the whole check until its 240-second deadline, and then
+// the check was cut off by the 300-second limit; now it is counted as one failed search after this, and the check goes on.
+export const REQUEST_TIMEOUT_MS = 45 * 1000;
+
+/**
+ * @template T
+ * @param {() => Promise<T>} work
+ * @param {number} [ms]
+ * @returns {Promise<T>}
+ */
+export function withTimeout(work, ms = REQUEST_TIMEOUT_MS) {
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let timer;
+  const late = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`openFDA did not answer in ${Math.round(ms / 1000)} seconds`)), ms);
+  });
+  return Promise.race([work(), late]).finally(() => clearTimeout(timer));
+}
+
 export async function fetchWithOneRetry(doFetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))) {
   const first = await doFetch();
   if (!RETRY_STATUSES.includes(first.status)) return first;
