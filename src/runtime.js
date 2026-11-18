@@ -101,10 +101,10 @@ async function fetchOpenFdaJsonUntracked(url) {
   const response = await fetchWithOneRetry(() => fetch(keyed, { headers: { Accept: 'application/json' } }));
   if (response.status === 404) return { results: [] };
   if (!response.ok) throw new Error(`openFDA request failed with status ${response.status}`);
-  const text = await response.text();
-  const downloaded = Date.now() - began;
-  const body = slimOpenFdaResponse(JSON.parse(text));
-  if (downloaded > 8000 || text.length > 2000000) console.info(`openFDA slow or large answer: ${downloaded} ms to read, ${text.length} characters, ${Date.now() - began} ms in all, ${url.slice(url.indexOf('search='), url.indexOf('search=') + 70)}`);
+  // Parsed straight from the stream: holding the body as text as well kept a second copy of a 9 MB answer alive while it was parsed.
+  const body = slimOpenFdaResponse(await response.json());
+  const took = Date.now() - began;
+  if (took > 8000) console.info(`openFDA slow answer: ${took} ms, ${url.slice(url.indexOf('search='), url.indexOf('search=') + 70)}`);
   return body;
   });
 }

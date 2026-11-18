@@ -102,9 +102,9 @@ export const MAX_REASON_LENGTH = 500;
 // list of thousands. Keep these two fields on the server; do not send them to the panel.
 // A recall's code text is kept up to this many characters. Some real recalls list millions of serial numbers (8.9 million characters
 // in one); holding them all, for every such recall of a check, ran the function out of memory on the live site (killed with SIGKILL
-// about 80 seconds in, right after the largest answers). 400,000 characters hold about 40,000 serial numbers; a unit listed beyond that
+// about 80 seconds in, right after the largest answers). 150,000 characters hold about 15,000 serial numbers; a unit listed beyond that
 // is not found by its serial (the UDI-DI and the model still find the recall). docs/MATCHING.md lists this as a limit.
-export const MAX_CODE_TEXT_LENGTH = 400000;
+export const MAX_CODE_TEXT_LENGTH = 150000;
 
 export function parseRecallForMatching(raw) {
   const recall = parseRecall(raw);
