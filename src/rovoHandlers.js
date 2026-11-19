@@ -61,6 +61,7 @@ export function createRovoHandlers(deps) {
             jira: deps.jira,
             guard: deps.taskGuard,
             previewStore: deps.previewStore,
+            routing: deps.routing,
             now,
             defaultProjectKey: projectKeyFrom(payload, context),
             team: { store: deps.wardTeams, graph: deps.teamGraph, openCounts: deps.openTaskCounts },
@@ -74,7 +75,7 @@ export function createRovoHandlers(deps) {
         createRemediationTask({
           snapshot,
           inputs,
-          deps: { jira: deps.jira, guard: deps.taskGuard, now, defaultProjectKey: projectKeyFrom(payload, context) },
+          deps: { jira: deps.jira, guard: deps.taskGuard, routing: deps.routing, now, defaultProjectKey: projectKeyFrom(payload, context) },
         }),
       ),
 

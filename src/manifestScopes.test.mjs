@@ -37,7 +37,7 @@ function requiredScopes() {
     if (/atlassianUserAssignedJiraWorkItems/.test(graph)) need.add('read:graph:issue:jira');
   }
   // JSM Assets (read-only import): the object schema and the objects themselves.
-  if (/route`\/jsm\/assets\//.test(text) || /\/rest\/servicedeskapi\/assets/.test(text)) { need.add('read:cmdb-object:jira'); need.add('read:cmdb-schema:jira'); }
+  if (/route`\/jsm\/assets\//.test(text) || /\/rest\/servicedeskapi\/assets/.test(text)) { need.add('read:cmdb-object:jira'); need.add('read:cmdb-schema:jira'); need.add('read:cmdb-type:jira'); need.add('read:cmdb-attribute:jira'); need.add('read:servicedesk-request'); }
   return need;
 }
 

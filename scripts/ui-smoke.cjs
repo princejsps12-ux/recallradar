@@ -118,7 +118,7 @@ const pickOption = async (el, inputId, optionText) => {
   // 2. ready: one hero with a summary line (no stat cards), the table, the filter, the collapsed recent list
   await run('jira:globalPage', { ...base, listDevices: { ok: true, devices: [1, 2, 3] }, getSavedMatches: { ok: true, result } }, async (el, calls) => {
     check('ready screen shows the hero and do-this-first', /devices? need(s)? action/.test(text(el)) && /Do this first/.test(text(el)));
-    const summary = el.querySelector('ul[aria-label="Summary"]');
+    const summary = el.querySelector('[aria-label="Summary"]');
     check('the hero holds one summary line: devices, open recalls by class, task counts', Boolean(summary) && /3 devices monitored/.test(text(summary)) && /3 open recalls/.test(text(summary)) && /Class I/.test(text(summary)) && /Class III/.test(text(summary)) && /3 tasks open, 1 done/.test(text(summary)));
     check('there are no separate stat cards any more', !el.querySelector('[role="group"][aria-label="Open recalls"]') && !el.querySelector('[role="group"][aria-label="Tasks open"]'));
     check('table has a row per affected device and, with 3 rows, no pager', el.querySelectorAll('tbody tr').length === 3 && !el.querySelector('nav[aria-label="Pages of affected devices"]'));

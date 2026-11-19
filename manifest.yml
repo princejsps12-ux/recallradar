@@ -325,6 +325,11 @@ permissions:
     - read:graph:user:atlassian
     - read:graph:issue:jira
     - read:graph:project:jira
+    - read:cmdb-object:jira
+    - read:cmdb-schema:jira
+    - read:cmdb-type:jira
+    - read:cmdb-attribute:jira
+    - read:servicedesk-request
   external:
     fetch:
       backend:

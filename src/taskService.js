@@ -223,8 +223,8 @@ export async function getTaskStates(args) {
 //
 // `assignees` (optional) is a Map(pairKey -> { accountId }) of people the user has already agreed to
 // assign; pairs not in it stay unassigned. It only matters for tasks that are really created.
-export async function createTasks({ matches, jira, guard, projectKey, today, assignees = new Map() }) {
-  const result = { created: [], existing: [], inProgress: [], failed: [], skipped: [] };
+export async function createTasks({ matches, jira, guard, projectKey, today, assignees = new Map(), routing = null }) {
+  const result = { created: [], existing: [], inProgress: [], failed: [], skipped: [], routed: [] };
 
   // The same pair twice in one request must still produce one task.
   const seen = new Set();
@@ -265,10 +265,21 @@ export async function createTasks({ matches, jira, guard, projectKey, today, ass
     else result.inProgress.push(item.pair);
   }
 
+  // Which team owns each ward, and whether it is already swamped (teamRouting.js). A failure only means "no routing": a task is never
+  // held back because the team could not be looked up.
+  let routes = new Map();
+  if (routing && claimed.length > 0) {
+    try {
+      routes = await routing.route(claimed.map((item) => item.match));
+    } catch (error) {
+      routes = new Map();
+    }
+  }
+
   for (const group of chunk(claimed, BULK_CREATE_LIMIT)) {
     const fields = group.map((item) => {
       const assignee = assignees.get(item.pair);
-      return buildIssueFields({ match: item.match, projectKey, issueTypeId, today, assigneeAccountId: assignee && assignee.accountId });
+      return buildIssueFields({ match: item.match, projectKey, issueTypeId, today, assigneeAccountId: assignee && assignee.accountId, route: routes.get(item.pair) });
     });
     let outcome;
     try {
@@ -278,6 +289,8 @@ export async function createTasks({ matches, jira, guard, projectKey, today, ass
     }
     for (const { index, key } of outcome.created) {
       result.created.push({ pair: group[index].pair, key });
+      const route = routes.get(group[index].pair);
+      if (route) result.routed.push({ pair: group[index].pair, team: route.teamName, escalated: route.escalated });
       await guard.record(group[index].label, key);
     }
     for (const { index, message } of outcome.errors) {

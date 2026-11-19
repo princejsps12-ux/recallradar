@@ -36,7 +36,7 @@
   // that is not in this list, so the preview cannot quietly fall behind the app.
   const RESOLVERS = [
     'listDevices', 'loadDemoHospital', 'importDevices', 'removeImportedDevices', 'clearDevices', 'getSavedMatches', 'startCheck', 'getCheckStatus',
-    'getTaskStates', 'getProgress', 'getTaskSummary', 'createTasks', 'getWardTeams', 'listTeams', 'setWardTeam', 'suggestAssignees', 'listProjects', 'fetchRecalls',
+    'getTaskStates', 'getProgress', 'getTaskSummary', 'createTasks', 'getAssetsChoices', 'previewAssetsImport', 'importFromAssets', 'getWardTeams', 'listTeams', 'setWardTeam', 'suggestAssignees', 'listProjects', 'fetchRecalls',
     'listSpaces', 'createRecallPage', 'getCapabilities', 'getAlerts', 'saveAlertSettings', 'runAlertsNow', 'getWardPeople', 'previewImport',
   ];
 
@@ -448,7 +448,7 @@
         return { ok: true, summary: summary() };
       },
       createTasks({ payload }) {
-        const out = { ok: true, created: [], existing: [], inProgress: [], failed: [], notFound: [], assignedTo: {}, assignRefused: [], assignError: null };
+        const out = { ok: true, created: [], existing: [], inProgress: [], failed: [], notFound: [], assignedTo: {}, assignRefused: [], assignError: null, routed: [] };
         const assignees = (payload && payload.assignees) || {};
         ((payload && payload.pairs) || []).forEach((p) => {
           const pair = pairKey(p.recallNumber, p.deviceId);
@@ -456,6 +456,8 @@
           if (st.tasks[pair]) return out.existing.push({ pair, key: st.tasks[pair] });
           st.tasks[pair] = newTask();
           out.created.push({ pair, key: st.tasks[pair] });
+          const mapped = st.mappings.find((m) => compact(m.ward) === compact(findMatch(p.recallNumber, p.deviceId).ward));
+          if (mapped) out.routed.push({ pair, team: mapped.teamName, escalated: false });
           const who = assignees[pair] && memberById(assignees[pair]);
           if (who) {
             out.assignedTo[pair] = who.name;
@@ -463,6 +465,24 @@
           }
         });
         return out;
+      },
+      getAssetsChoices({ payload }) {
+        if (flags.assetsFails) return { ok: false, error: 'You do not have permission to read Assets here. Ask an Assets administrator to give you view access to the object type, or paste the devices instead.' };
+        if (payload && payload.schemaId) return { ok: true, types: [{ id: '31', name: 'Medical device', objectCount: 3 }, { id: '32', name: 'Location', objectCount: 4 }] };
+        return { ok: true, schemas: [{ id: '4', name: 'Clinical engineering', objectCount: 7 }] };
+      },
+      previewAssetsImport({ payload }) {
+        if (!payload || !payload.typeId) return { ok: false, error: 'Choose an object type first.' };
+        return {
+          ok: true, total: 3, valid: true, count: 3, withoutUdi: 1, errors: [],
+          assetColumns: [],
+          columns: [{ header: 'Name', field: 'name', label: 'Name' }, { header: 'Manufacturer', field: 'manufacturer', label: 'Manufacturer' }, { header: 'Model Number', field: 'model', label: 'Model' }, { header: 'Serial Number', field: 'lotOrSerial', label: 'Serial or lot' }, { header: 'Location', field: 'ward', label: 'Ward' }],
+          rows: [{ name: 'Infusion pump 1', manufacturer: 'CareFusion', model: '8015', lotOrSerial: 'SN123456', ward: 'ICU', udiDi: '' }, { name: 'Infusion pump 2', manufacturer: 'CareFusion', model: '8015', lotOrSerial: 'SN123457', ward: 'ER', udiDi: '' }, { name: 'Ventilator', manufacturer: 'ResMed', model: 'Astral 100', lotOrSerial: '22241800001', ward: 'Respiratory', udiDi: '00619498003259' }],
+        };
+      },
+      importFromAssets({ payload }) {
+        if (!payload || !payload.typeId) return { ok: false, errors: ['Choose an object type first.'] };
+        return { ok: true, count: 3 };
       },
       getWardTeams() {
         return { ok: true, mappings: st.mappings.slice(), wards: wards() };

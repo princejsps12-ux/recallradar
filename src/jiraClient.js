@@ -178,6 +178,14 @@ export function createJiraClient({ request, route }) {
     return countByAssignee(body.issues);
   }
 
+  // How many tasks with this label are not done yet (at most SEARCH_RESULT_LIMIT are counted): the load of one team, for routing.
+  // The label is made by teamLabel(), letters, digits and dashes only, so it is safe inside the JQL quotes.
+  async function countOpenWithLabel(label) {
+    if (!/^[a-z0-9-]+$/.test(label)) throw new Error('Not a team label.');
+    const body = await search({ jql: `labels = "${label}" AND statusCategory != Done`, fields: ['status'], maxResults: SEARCH_RESULT_LIMIT });
+    return (body.issues || []).length;
+  }
+
   // How many RecallRadar tasks are open and how many are done, for the dashboard. One search of at most
   // SEARCH_RESULT_LIMIT issues; `capped` says there may be more than were counted.
   async function taskStatusCounts() {
@@ -243,5 +251,5 @@ export function createJiraClient({ request, route }) {
     return typeof body.baseUrl === 'string' ? body.baseUrl.replace(/\/+$/, '') : '';
   }
 
-  return { findByLabels, findTasks, taskIssueTypeId, bulkCreate, openTaskCounts, taskStatusCounts, listProjects, adminRoles, addComment, issueSummary, baseUrl };
+  return { findByLabels, findTasks, taskIssueTypeId, bulkCreate, openTaskCounts, countOpenWithLabel, taskStatusCounts, listProjects, adminRoles, addComment, issueSummary, baseUrl };
 }

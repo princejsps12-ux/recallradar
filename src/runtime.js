@@ -20,6 +20,8 @@ import { createWardTeamStore } from './wardTeams';
 import { createAlertState } from './alertState';
 import { createAlertSettings } from './alertSettings';
 import { runAlerts } from './alertService';
+import { createTeamRouter } from './teamRouting';
+import { createAssetsClient } from './assets';
 import { openTaskMatches, pairKey } from './taskRules';
 
 export const deviceStore = createDeviceStore(forgeKv);
@@ -42,6 +44,12 @@ export const jiraAsUser = createJiraClient({
 // needs permission to create issues in the project the administrator chose; saving the alert settings tests exactly that.
 export const jiraAsApp = createJiraClient({
   request: (path, options) => api.asApp().requestJira(path, options),
+  route,
+});
+
+// JSM Assets, READ-ONLY, as the signed-in person: the device list can be read from an Assets object type (assets.js).
+export const assetsAsUser = createAssetsClient({
+  request: (path, options) => api.asUser().requestJira(path, options),
   route,
 });
 
@@ -71,6 +79,10 @@ export const teamGraph = createTeamGraph({
   },
 });
 export const wardTeams = createWardTeamStore(forgeKv);
+
+// Routing of new tasks to the team that owns the ward (teamRouting.js), once as the clicking person and once as the app (the daily alert).
+export const routingAsUser = createTeamRouter({ store: wardTeams, countOpen: (label) => jiraAsUser.countOpenWithLabel(label) });
+export const routingAsApp = createTeamRouter({ store: wardTeams, countOpen: (label) => jiraAsApp.countOpenWithLabel(label) });
 
 // Open RecallRadar tasks per person, for the assignee suggestion. A failure only means "no load
 // data": the suggestion then falls back to alphabetical order instead of blocking anything.
@@ -183,7 +195,7 @@ export async function runDailyAlerts() {
   try {
     const result = await loadSnapshot().then((snapshot) => snapshot.result);
     if (!result) return 'no-result';
-    const outcome = await runAlerts({ state: alertState, settings: alertSettings, result, jira: jiraAsApp, guard: taskGuard });
+    const outcome = await runAlerts({ state: alertState, settings: alertSettings, result, jira: jiraAsApp, guard: taskGuard, routing: routingAsApp });
     return outcome.ran ? 'ran' : outcome.reason;
   } catch (error) {
     console.error('Daily alerts failed', error);

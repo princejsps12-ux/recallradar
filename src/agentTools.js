@@ -519,7 +519,7 @@ export async function createRemediationTasks({ snapshot, inputs = {}, deps }) {
         assignNote = 'The Teamwork Graph could not be reached, so the tasks were created without an assignee.';
       }
     }
-    const outcome = await createTasks({ matches, jira: deps.jira, guard: deps.guard, projectKey: entry.projectKey, today: deps.now(), assignees });
+    const outcome = await createTasks({ matches, jira: deps.jira, guard: deps.guard, projectKey: entry.projectKey, today: deps.now(), assignees, routing: deps.routing });
     const created = outcome.created.map((c) => ({
       pair: c.pair,
       jiraTask: c.key,
@@ -699,7 +699,7 @@ export async function createRemediationTask({ snapshot, inputs = {}, deps }) {
     return { ok: false, error: `Recall ${match.recallNumber} is no longer open (status ${result.recallDetails[match.recallNumber].status}), so no task was created.`, citations: citationsOf([match]) };
   }
 
-  const outcome = await createTasks({ matches: [match], jira: deps.jira, guard: deps.guard, projectKey, today: deps.now() });
+  const outcome = await createTasks({ matches: [match], jira: deps.jira, guard: deps.guard, projectKey, today: deps.now(), routing: deps.routing });
   const base = { ok: true, projectKey, taskTitle: buildTaskSummary(match), dueDate: dueDateFor(match.recallClass, deps.now()), citations: citationsOf([match]) };
   if (outcome.created.length) return { ...base, state: 'created', jiraTask: outcome.created[0].key };
   if (outcome.existing.length) return { ...base, state: 'already-exists', jiraTask: outcome.existing[0].key, message: 'A task for this recall and device already exists; nothing new was created.' };

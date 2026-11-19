@@ -71,7 +71,7 @@ export function friendlyIssueError(error, issueKey = '') {
  * { ran: true, summary } with what was done; the summary is also saved as the "last run".
  *   summary: { at, news, created: [keys], existing, failed, left, comment: 'none'|'posted'|'failed', error }
  */
-export async function runAlerts({ state, settings, result, jira, guard, now = () => new Date(), log = console }) {
+export async function runAlerts({ state, settings, result, jira, guard, routing = null, now = () => new Date(), log = console }) {
   const config = await settings.get();
   if (!config.enabled) return { ran: false, reason: 'off' };
   if (!config.projectKey) return { ran: false, reason: 'no-project' };
@@ -92,7 +92,7 @@ export async function runAlerts({ state, settings, result, jira, guard, now = ()
   summary.left = due.length - batch.length;
   let outcome;
   try {
-    outcome = await createTasks({ matches: batch.map((pair) => byPair.get(pair)), jira, guard, projectKey: config.projectKey, today: now() });
+    outcome = await createTasks({ matches: batch.map((pair) => byPair.get(pair)), jira, guard, projectKey: config.projectKey, today: now(), routing });
   } catch (error) {
     log.error('Daily alert could not create tasks', error);
     summary.error = friendlyJiraError(error, config.projectKey);

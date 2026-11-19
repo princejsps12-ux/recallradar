@@ -88,10 +88,37 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
   const mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
 
+  // The second way in: read the devices from a JSM Assets object type (read-only). The choices come from the server as the signed-in
+  // person, so only what that person may see is listed.
+  const [source, setSource] = useState('paste'); // 'paste' | 'assets'
+  const [assets, setAssets] = useState({ status: 'idle', schemas: [], types: [], schemaId: '', typeId: '', error: '' });
+  const fromAssets = !removing && source === 'assets';
+  useEffect(() => {
+    if (!fromAssets || !isOpen || assets.status !== 'idle') return;
+    setAssets((a) => ({ ...a, status: 'loading' }));
+    invoke('getAssetsChoices', {})
+      .then((r) => mounted.current && setAssets((a) => (r && r.ok ? { ...a, status: 'ready', schemas: r.schemas || [] } : { ...a, status: 'error', error: (r && r.error) || 'Could not read Assets.' })))
+      .catch(() => mounted.current && setAssets((a) => ({ ...a, status: 'error', error: 'Could not reach RecallRadar.' })));
+  }, [fromAssets, isOpen, assets.status]);
+  const chooseSchema = (schemaId) => {
+    setAssets((a) => ({ ...a, schemaId, typeId: '', types: [] }));
+    setPreview({ status: 'idle', data: null, error: '' });
+    invoke('getAssetsChoices', { schemaId })
+      .then((r) => mounted.current && setAssets((a) => (r && r.ok ? { ...a, types: r.types || [] } : { ...a, status: 'error', error: (r && r.error) || 'Could not read Assets.' })))
+      .catch(() => mounted.current && setAssets((a) => ({ ...a, status: 'error', error: 'Could not reach RecallRadar.' })));
+  };
+  const chooseType = (typeId) => {
+    setAssets((a) => ({ ...a, typeId }));
+    setPreview({ status: 'loading', data: null, error: '' });
+    invoke('previewAssetsImport', { typeId })
+      .then((r) => mounted.current && setPreview(r && r.ok ? { status: 'ready', data: r, error: '' } : { status: 'error', data: null, error: (r && r.error) || 'Could not read that object type.' }))
+      .catch(() => mounted.current && setPreview({ status: 'error', data: null, error: 'Could not reach RecallRadar.' }));
+  };
+
   // Read the paste a moment after the last key, so what will be imported is on screen before the button is pressed. A reading that
   // arrives after the text changed again is dropped.
   useEffect(() => {
-    if (removing || !isOpen) return undefined;
+    if (removing || !isOpen || source !== 'paste') return undefined;
     if (!text.trim()) {
       setPreview({ status: 'idle', data: null, error: '' });
       return undefined;
@@ -110,14 +137,14 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [text, isOpen, removing]);
+  }, [text, isOpen, removing, source]);
 
   const submit = async () => {
     setBusy(true);
     setProblems([]);
     setDone('');
     try {
-      const r = await invoke('importDevices', { text });
+      const r = fromAssets ? await invoke('importFromAssets', { typeId: assets.typeId }) : await invoke('importDevices', { text });
       if (r && r.ok) {
         setText('');
         onImported({ imported: r.count });
@@ -151,7 +178,35 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
         <Modal onClose={onClose} width="medium" label={removing ? 'Remove devices' : 'Import your own devices'}>
           <ModalHeader hasCloseButton><ModalTitle appearance={removing ? 'danger' : undefined}>{removing ? 'Remove devices' : 'Import your own devices'}</ModalTitle></ModalHeader>
           <ModalBody>
-            {!removing && (<>
+            {!removing && (
+              <div role="group" aria-label="Where the devices come from" style={{ display: 'flex', gap: sp(100), marginBottom: sp(200) }}>
+                <Button appearance={source === 'paste' ? 'primary' : 'default'} aria-pressed={source === 'paste'} onClick={() => { setSource('paste'); setPreview({ status: 'idle', data: null, error: '' }); }}>Paste from a spreadsheet</Button>
+                <Button appearance={source === 'assets' ? 'primary' : 'default'} aria-pressed={source === 'assets'} onClick={() => { setSource('assets'); setPreview({ status: 'idle', data: null, error: '' }); }}>Read from JSM Assets</Button>
+              </div>
+            )}
+            {fromAssets && (
+              <>
+                <p style={{ marginTop: 0, marginBottom: sp(200) }}>Choose the Assets object type that holds your devices. RecallRadar only <strong>reads</strong> it, as you, and matches the attribute names (Manufacturer, Model, Serial number, Location, UDI-DI, ...) to its own fields. Up to 1,000 devices at a time; importing replaces the devices you imported before and leaves the demo hospital alone.</p>
+                {assets.status === 'loading' && <div role="status"><Spinner size="small" /> Reading Assets…</div>}
+                {assets.status === 'error' && <SectionMessage appearance="warning" title="Could not read Assets">{assets.error} You can still paste the devices.</SectionMessage>}
+                {assets.status === 'ready' && (
+                  <div style={{ display: 'grid', gap: sp(150) }}>
+                    <div>
+                      <label style={muted} htmlFor="rr-assets-schema">Schema</label>
+                      <Select inputId="rr-assets-schema" spacing="compact" placeholder={assets.schemas.length ? 'Choose a schema' : 'No schemas found'} options={assets.schemas.map((x) => ({ label: `${x.name} (${x.objectCount} objects)`, value: x.id }))} value={assets.schemas.map((x) => ({ label: `${x.name} (${x.objectCount} objects)`, value: x.id })).find((o) => o.value === assets.schemaId) || null} onChange={(o) => chooseSchema(o.value)} menuPosition="fixed" />
+                    </div>
+                    {assets.schemaId && (
+                      <div>
+                        <label style={muted} htmlFor="rr-assets-type">Object type</label>
+                        <Select inputId="rr-assets-type" spacing="compact" placeholder="Choose an object type" options={assets.types.map((x) => ({ label: `${x.name} (${x.objectCount})`, value: x.id }))} value={assets.types.map((x) => ({ label: `${x.name} (${x.objectCount})`, value: x.id })).find((o) => o.value === assets.typeId) || null} onChange={(o) => chooseType(o.value)} menuPosition="fixed" />
+                      </div>
+                    )}
+                  </div>
+                )}
+                <ImportPreview state={preview} />
+              </>
+            )}
+            {!removing && !fromAssets && (<>
             <p style={{ marginTop: 0, marginBottom: sp(200) }}>Copy rows from a spreadsheet (or a .csv) and paste them here. The first row names the columns: <strong>Manufacturer</strong> and <strong>Model</strong> are required; Name, Type, Serial (or Lot) and Ward are optional. Up to 1,000 devices at a time. Importing replaces the devices you imported before and leaves the demo hospital alone. <strong>Do not include patient data.</strong></p>
             <Textarea isInvalid={problems.length > 0 || (preview.status === 'ready' && !preview.data.valid)} aria-label="Devices to import" placeholder={EXAMPLE} minimumRows={6} resize="vertical" value={text} onChange={(e) => setText(e.target.value)} />
             <ImportPreview state={preview} />
@@ -183,7 +238,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
           <ModalFooter>
             <Button appearance="subtle" onClick={onClose}>Cancel</Button>
             {removing && <Button appearance="danger" isLoading={busy} onClick={remove}>{(removeAsk || defaultChoice) === 'all' ? `Remove all ${total} devices` : `Remove ${importedCount} imported ${importedCount === 1 ? 'device' : 'devices'}`}</Button>}
-            {!removing && <Button appearance="primary" isLoading={busy && !removeAsk} isDisabled={!text.trim() || preview.status !== 'ready' || !preview.data.valid} onClick={submit}>{preview.status === 'ready' && preview.data.valid ? `Import ${preview.data.count} ${preview.data.count === 1 ? 'device' : 'devices'}` : 'Import devices'}</Button>}
+            {!removing && <Button appearance="primary" isLoading={busy && !removeAsk} isDisabled={(fromAssets ? !assets.typeId : !text.trim()) || preview.status !== 'ready' || !preview.data.valid} onClick={submit}>{preview.status === 'ready' && preview.data.valid ? `Import ${preview.data.count} ${preview.data.count === 1 ? 'device' : 'devices'}` : 'Import devices'}</Button>}
           </ModalFooter>
         </Modal>
       )}

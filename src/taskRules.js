@@ -119,7 +119,7 @@ const paragraph = (...parts) => ({ type: 'paragraph', content: parts });
 
 // The task body: where the device is, why we think it is affected, what the recall is, and
 // where to read it. `dueDate` is shown with the rule so the reader knows why it is that soon.
-export function buildTaskDescription(match, dueDate) {
+export function buildTaskDescription(match, dueDate, route) {
   const confidence = match.confidence.toUpperCase();
   const classText = match.recallClass ? `Class ${match.recallClass}` : 'class unknown';
   const days = dueDaysFor(match.recallClass);
@@ -128,6 +128,8 @@ export function buildTaskDescription(match, dueDate) {
     version: 1,
     content: [
       paragraph(bold('Ward: '), text(match.ward || 'not recorded')),
+      ...(route ? [paragraph(bold('Owning team: '), text(`${route.teamName} (the team mapped to this ward in RecallRadar)`))] : []),
+      ...(route && route.escalated ? [paragraph(bold('Escalated: '), text(`${route.teamName} already has ${route.open} open RecallRadar tasks (limit ${route.limit}). Ask a lead to rebalance the work or confirm who takes this one.`))] : []),
       paragraph(
         bold('Device: '),
         text(
@@ -155,15 +157,15 @@ export function buildTaskDescription(match, dueDate) {
 
 // All the Jira fields for one task. `assigneeAccountId` is optional: a task is only assigned when
 // the person was asked and said yes (the caller passes it), never by default.
-export function buildIssueFields({ match, projectKey, issueTypeId, today, assigneeAccountId }) {
+export function buildIssueFields({ match, projectKey, issueTypeId, today, assigneeAccountId, route }) {
   const dueDate = dueDateFor(match.recallClass, today);
   const fields = {
     project: { key: projectKey },
     issuetype: { id: issueTypeId },
     summary: buildTaskSummary(match),
-    description: buildTaskDescription(match, dueDate),
+    description: buildTaskDescription(match, dueDate, route),
     duedate: dueDate,
-    labels: [APP_LABEL, taskLabel(match.recallNumber, match.deviceId)],
+    labels: [APP_LABEL, taskLabel(match.recallNumber, match.deviceId), ...(route ? [route.label, ...(route.escalated ? ['recallradar-escalated'] : [])] : [])],
   };
   if (assigneeAccountId) fields.assignee = { accountId: assigneeAccountId };
   return fields;

@@ -44,3 +44,11 @@ A task is only useful when it is finished, so RecallRadar reads Jira's status of
 - **Project.** On the dashboard you choose the project next to the button; on the issue panel it is the project of that issue; in a Rovo chat you name it, or it is the project of the Jira page you are on.
 - **Progress is read, not recorded.** The percentages are computed from Jira each time they are opened. There is no history ("how did the share resolved move this week") and no audit trail: Jira's own issue history is the record.
 - **A pair with two tasks.** If somebody creates a second task by hand with the same label, the first one found is used.
+
+## Routing to the owning team, and escalation
+
+When a ward has a team on the **Ward teams** tab, every task created for a device on that ward (dashboard, panel, Rovo, MCP and the daily alert) is **labelled for that team** (`recallradar-team-<team name>`, for example a filter `labels = recallradar-team-team-atlas` per team) and its description says "Owning team: ...". A Jira task cannot be assigned to a team, only to a person, and nobody is assigned unless a person asked (see the Teamwork Graph page), so routing is a label and a line of text, not a notification.
+
+**Escalation.** Before creating tasks, RecallRadar counts the team's open RecallRadar tasks in Jira (`labels = <team label> AND statusCategory != Done`, at most 100 counted). When that count, plus the tasks planned in the same batch, has reached `TEAM_OPEN_TASK_LIMIT` (10, `src/teamRouting.js`), the new task also gets the label `recallradar-escalated` and a paragraph "Escalated: ... already has N open RecallRadar tasks (limit 10). Ask a lead to rebalance the work." In a batch of 40 tasks for one team only the ones beyond the limit are escalated. The panel says how many were labelled and how many escalated.
+
+Failure rules: if the team's load cannot be read the task is routed but not escalated; if routing fails altogether the task is created as before. A ward without a team is not routed. Nothing about a person is stored or written: only the team's name.

@@ -54,7 +54,7 @@ export function detectDelimiter(headerLine) {
   return headerLine.includes('\t') ? '\t' : ',';
 }
 
-function fieldFor(header) {
+export function fieldFor(header) {
   const key = compact(header);
   return Object.keys(COLUMN_ALIASES).find((field) => COLUMN_ALIASES[field].includes(key)) || null;
 }
@@ -174,7 +174,7 @@ export const PREVIEW_ROWS = 5;
 // limit in 7 columns, is 840 KB); more than this is refused without parsing it, so a huge paste cannot make the server work for nothing.
 export const MAX_PREVIEW_TEXT = 600 * 1000;
 
-const FIELD_LABELS = { name: 'Name', type: 'Type', manufacturer: 'Manufacturer', model: 'Model', lotOrSerial: 'Serial or lot', ward: 'Ward', udiDi: 'UDI-DI' };
+export const FIELD_LABELS = { name: 'Name', type: 'Type', manufacturer: 'Manufacturer', model: 'Model', lotOrSerial: 'Serial or lot', ward: 'Ward', udiDi: 'UDI-DI' };
 
 /**
  * @param {unknown} text

@@ -511,3 +511,35 @@ test('guard.claim: a fresh claim is refused, an expired one can be taken, and a 
   assert.equal(await guard.claim('a'), true);
 });
 
+
+// --- Team routing and escalation ---------------------------------------------------------------------------------------------
+import { createTeamRouter } from './teamRouting.js';
+
+test('createTasks labels each task for the team that owns the ward, escalates when the team is swamped, and reports it', async () => {
+  const fields = [];
+  const jira = {
+    findByLabels: async () => new Map(),
+    taskIssueTypeId: async () => '10001',
+    bulkCreate: async (list) => { fields.push(...list); return { created: list.map((_, index) => ({ index, key: `MOBL-${index + 1}` })), errors: [] }; },
+  };
+  const guard = { read: async () => null, claim: async () => true, record: async () => {}, release: async () => {}, reserve: async () => {} };
+  const match = (n, ward) => ({ recallNumber: 'Z-1-2026', deviceId: `d${n}`, deviceName: 'Pump', deviceManufacturer: 'Acme', deviceModel: 'X', ward, recallClass: 'I', confidence: 'exact', reason: 'r', firm: 'Acme', date: '2026-01-01', product: 'p' });
+  const routing = createTeamRouter({ store: { async get(ward) { return ward === 'ICU' ? { teamName: 'Team Atlas' } : null; } }, countOpen: async () => 9, limit: 10 });
+  const out = await createTasks({ matches: [match(1, 'ICU'), match(2, 'ICU'), match(3, 'ER')], jira, guard, projectKey: 'MOBL', today: new Date('2026-11-18T00:00:00Z'), routing });
+  assert.equal(out.created.length, 3);
+  assert.deepEqual(out.routed, [{ pair: 'Z-1-2026|d1', team: 'Team Atlas', escalated: false }, { pair: 'Z-1-2026|d2', team: 'Team Atlas', escalated: true }]);
+  assert.ok(fields[0].labels.includes('recallradar-team-team-atlas'));
+  assert.ok(!fields[0].labels.includes('recallradar-escalated'));
+  assert.ok(fields[1].labels.includes('recallradar-escalated'));
+  assert.ok(!fields[2].labels.some((l) => l.startsWith('recallradar-team-')), 'a ward without a team is created as before');
+  assert.match(JSON.stringify(fields[1].description), /Escalated/);
+});
+
+test('a routing failure never stops a task from being created', async () => {
+  const jira = { findByLabels: async () => new Map(), taskIssueTypeId: async () => '1', bulkCreate: async (list) => ({ created: list.map((_, index) => ({ index, key: `K-${index}` })), errors: [] }) };
+  const guard = { read: async () => null, claim: async () => true, record: async () => {}, release: async () => {}, reserve: async () => {} };
+  const m = { recallNumber: 'Z-1', deviceId: 'd1', deviceName: 'P', deviceManufacturer: 'A', deviceModel: 'X', ward: 'ICU', recallClass: 'II', confidence: 'likely', reason: 'r', firm: 'A', date: '2026-01-01', product: 'p' };
+  const out = await createTasks({ matches: [m], jira, guard, projectKey: 'K', today: new Date(), routing: { route: async () => { throw new Error('graph'); } } });
+  assert.equal(out.created.length, 1);
+  assert.deepEqual(out.routed, []);
+});

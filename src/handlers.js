@@ -19,6 +19,7 @@ import { assigneesForMatches, checkExplicitAssignees, setWardTeam, wardOwnership
 import { createRecallPages } from './recallPageService.js';
 import { isNotConnected, NOT_CONNECTED_MESSAGE } from './confluenceClient.js';
 import { importDevices, previewDeviceCsv } from './deviceCsv.js';
+import { readAssetsDevices, friendlyAssetsError } from './assets.js';
 import { refuseUnlessAdministrator, refuseUnlessTeamManager } from './permissions.js';
 
 // Jira project keys: letters, digits and underscores, starting with a letter (for example MOBL).
@@ -42,6 +43,7 @@ export function projectKeyFrom(context, chosen) {
  *   jira            the Jira client as the signed-in person (jiraClient.js)
  *   confluence      the Confluence client as the signed-in person (confluenceClient.js)
  *   teamGraph, wardTeams, openTaskCounts               Teamwork Graph reads and the saved ward-to-team mapping
+ *   assets          the read-only Assets client as the signed-in person (assets.js); without it the Assets import is off
  *   jiraApp         the Jira client as the app itself (asApp), for the daily alert only (jiraClient.js)
  *   alertState, alertSettings                          what has been seen of the affected pairs, and the administrator's alert choices
  *   loadSnapshot, taskKeyLookup                        the saved check and the Jira task keys for a snapshot (runtime.js)
@@ -151,6 +153,46 @@ export function createHandlers(deps) {
       }
     }),
 
+    // The read-only import from JSM Assets (assets.js): the schemas and object types the person can see, a preview of what one object type
+    // would import (the same preview as a paste), and the import itself. Everything is read as the signed-in person, so Assets' own
+    // permissions apply, and nothing is ever written to Assets. All of it is for Jira administrators, like every device-list change.
+    getAssetsChoices: forAdministrators(async ({ payload }) => {
+      if (!deps.assets) return { ok: false, error: 'Importing from Assets is not available.' };
+      try {
+        const schemaId = payload && typeof payload.schemaId === 'string' && /^\d{1,12}$/.test(payload.schemaId) ? payload.schemaId : '';
+        return schemaId ? { ok: true, types: await deps.assets.objectTypes(schemaId) } : { ok: true, schemas: await deps.assets.schemas() };
+      } catch (error) {
+        log.error('Could not read Assets', error);
+        return { ok: false, error: friendlyAssetsError(error) };
+      }
+    }),
+    previewAssetsImport: forAdministrators(async ({ payload }) => {
+      if (!deps.assets) return { ok: false, error: 'Importing from Assets is not available.' };
+      try {
+        const typeId = payload && typeof payload.typeId === 'string' && /^\d{1,12}$/.test(payload.typeId) ? payload.typeId : '';
+        if (!typeId) return { ok: false, error: 'Choose an object type first.' };
+        const read = await readAssetsDevices(deps.assets, typeId);
+        return { ok: true, total: read.total, assetColumns: read.columns, ...previewDeviceCsv(read.text) };
+      } catch (error) {
+        log.error('Could not preview the Assets import', error);
+        return { ok: false, error: friendlyAssetsError(error) };
+      }
+    }),
+    importFromAssets: forAdministrators(async ({ payload }) => {
+      if (!deps.assets) return { ok: false, errors: ['Importing from Assets is not available.'] };
+      try {
+        const typeId = payload && typeof payload.typeId === 'string' && /^\d{1,12}$/.test(payload.typeId) ? payload.typeId : '';
+        if (!typeId) return { ok: false, errors: ['Choose an object type first.'] };
+        const read = await readAssetsDevices(deps.assets, typeId);
+        const outcome = await importDevices(deps.deviceStore, read.text);
+        if (outcome && outcome.ok) await devicesChanged();
+        return outcome;
+      } catch (error) {
+        log.error('Could not import from Assets', error);
+        return { ok: false, errors: [friendlyAssetsError(error)] };
+      }
+    }),
+
     // What the panel shows when it opens: the saved result (fresh or expired), if any.
     async getSavedMatches() {
       try {
@@ -247,7 +289,7 @@ export function createHandlers(deps) {
             assignError = 'The Teamwork Graph could not be reached, so the tasks were created without an assignee.';
           }
         }
-        const outcome = await createTasks({ matches, jira: deps.jira, guard: deps.taskGuard, projectKey, today: now(), assignees });
+        const outcome = await createTasks({ matches, jira: deps.jira, guard: deps.taskGuard, projectKey, today: now(), assignees, routing: deps.routing });
         const assignedTo = {};
         for (const { pair } of outcome.created) if (assignees.has(pair)) assignedTo[pair] = assignees.get(pair).name;
         return { ok: true, ...outcome, notFound, assignedTo, assignRefused, assignError };

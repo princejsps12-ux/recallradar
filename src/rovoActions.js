@@ -8,6 +8,7 @@ import {
   previewStore,
   teamGraph,
   wardTeams,
+  routingAsUser,
   openTaskCounts,
   taskKeyLookup,
 } from './runtime';
@@ -23,6 +24,7 @@ const actions = createRovoHandlers({
   previewStore,
   teamGraph,
   wardTeams,
+  routing: routingAsUser,
   openTaskCounts,
   taskKeyLookup,
   now: () => new Date(),
