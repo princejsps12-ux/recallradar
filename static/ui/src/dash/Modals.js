@@ -198,7 +198,7 @@ export function ImportModal({ isOpen, onClose, onImported, mode = 'import', impo
                     {assets.schemaId && (
                       <div>
                         <label style={muted} htmlFor="rr-assets-type">Object type</label>
-                        <Select inputId="rr-assets-type" spacing="compact" placeholder="Choose an object type" options={assets.types.map((x) => ({ label: `${x.name} (${x.objectCount})`, value: x.id }))} value={assets.types.map((x) => ({ label: `${x.name} (${x.objectCount})`, value: x.id })).find((o) => o.value === assets.typeId) || null} onChange={(o) => chooseType(o.value)} menuPosition="fixed" />
+                        <Select inputId="rr-assets-type" spacing="compact" placeholder="Choose an object type" options={assets.types.map((x) => ({ label: (x.objectCount > 0 ? `${x.name} (${x.objectCount})` : x.name), value: x.id }))} value={assets.types.map((x) => ({ label: (x.objectCount > 0 ? `${x.name} (${x.objectCount})` : x.name), value: x.id })).find((o) => o.value === assets.typeId) || null} onChange={(o) => chooseType(o.value)} menuPosition="fixed" />
                       </div>
                     )}
                   </div>

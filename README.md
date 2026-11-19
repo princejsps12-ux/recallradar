@@ -22,7 +22,7 @@ It runs as a Jira dashboard and issue panel, as a **Rovo agent**, as **MCP tools
 
 Needs from a judge: Jira administrator rights; **Ward teams** needs you to be in a team; **Confluence pages** need the optional connection; **MCP** needs an admin to switch the app's tools on ([steps](docs/mcp-demo.md)).
 
-**Known limits, up front.** Devices come from the demo, a pasted spreadsheet or a read-only JSM Assets object type (the Assets import is code- and unit-tested; see [verification](docs/VERIFICATION.md) for whether it has been run live), not a CMMS. Accuracy was measured on recalls and labels the author wrote, not on a real hospital ([ACCURACY](docs/ACCURACY.md)). The app calls api.fda.gov, so it is not eligible for "Runs on Atlassian". The MCP connection from Claude Desktop has not been run end to end. Full list: [what was and was not verified](docs/VERIFICATION.md).
+**Known limits, up front.** Devices come from the demo, a pasted spreadsheet or a read-only JSM Assets object type (run live on the demo site, see [verification](docs/VERIFICATION.md)), not a CMMS. Accuracy was measured on recalls and labels the author wrote, not on a real hospital ([ACCURACY](docs/ACCURACY.md)). The app calls api.fda.gov, so it is not eligible for "Runs on Atlassian". The MCP connection from Claude Desktop has not been run end to end. Full list: [what was and was not verified](docs/VERIFICATION.md).
 
 ## Where things are
 
