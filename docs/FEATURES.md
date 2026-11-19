@@ -157,3 +157,12 @@ They are the same tools as the in-Jira agent, so they read the **saved recall ch
 The tools can be added to agents you build in Rovo Studio, with no setup beyond installing the app.
 
 Step by step for Claude Desktop, Claude Code, Cursor and others: [`docs/MCP.md`](MCP.md).
+
+
+## Importing devices from JSM Assets (read-only)
+
+**...** menu, **Import devices**, **Read from JSM Assets**: pick a schema and an object type; RecallRadar reads the objects as you (Assets' own permissions apply; nothing is ever written to Assets), matches the attribute names (Manufacturer, Model Number, Serial Number, Location, UDI-DI, ...) to its own fields the way a spreadsheet's column names are matched, shows the same preview as a paste, and imports through the same all-or-nothing path (up to 1,000 devices, stable device ids, replaces the earlier import, leaves the demo hospital alone). Code: `src/assets.js`; scopes `read:cmdb-object:jira`, `read:cmdb-schema:jira`, `read:cmdb-type:jira`, `read:cmdb-attribute:jira` and `read:servicedesk-request` (for the Assets workspace id). A site without Assets, or a person without view access, gets one plain sentence and can paste instead.
+
+## The head-to-head with a keyword search
+
+The dashboard's **How much better than a keyword search?** section, `docs/ACCURACY.md` and the README quote the same numbers (`npm run eval` writes them; `npm test` fails when they are stale): on 3,438 labeled pairs a plain maker-or-model keyword search is 57% precise and finds 57% of the devices that need a task; RecallRadar is 100% and 100% on the same pairs, with the caveat that the labels are the developer's.
