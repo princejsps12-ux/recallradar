@@ -746,6 +746,9 @@ test('a recall that also lists lots or adds units is never used to rule a unit o
     'Model QX-200: serial numbers 100000 through 100500; Lot numbers A1, B2',
     'Model QX-200: serial numbers 100000 through 100500. Updated to also include serial numbers 100900',
     'Model QX-200: all serial numbers except 100000 through 100500',
+    'Model QX-200: serial numbers 100000 through 100500, and units shipped before 2019',
+    'Model QX-200: serial numbers 100000 through 100500; units with software version 2.1',
+    'Model QX-200: serial numbers 100000 through 100500. Distributed between March and May',
   ]) {
     const recall = real('Z-6-2026', 'Acme Medical Inc', 'Acme Pump Model QX-200', code);
     assert.notEqual(evaluateMatch(own('Acme Medical', 'QX-200', '100900'), recall).rule, RULES.POSSIBLE_UNIT_OUT, code);

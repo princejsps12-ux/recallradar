@@ -318,8 +318,9 @@ export function serialInRecallRange(serial, recall) {
 //      serial is outside all of them, and the text has no other way to cover a unit (no lot or batch list, no "all units",
 //      no exclusion words that could turn the range into the excluded part: "all serials except 1000-1500").
 // Anything else stays "likely" and a person checks, because a wrongly read range would hide a real recall.
-// ("additionally included", "updated to include": the text adds units that may lie outside the range.)
-const RANGE_OUT_BLOCKERS = /\b(lots?|batch(?:es)?|all\s+(?:serial|units|devices|lots)|includ(?:e|es|ed|ing)|additional(?:ly)?|also|added|updated|expanded)\b/i;
+// ("additionally included", "updated to include", "units shipped before 2019", "software versions": the text adds or limits units in a way we do not parse,
+// so the range alone cannot be trusted to be the whole story. A review found the first, shorter list too narrow: when in doubt the unit stays "likely".)
+const RANGE_OUT_BLOCKERS = /\b(lots?|batch(?:es)?|all\s+(?:serial|units|devices|lots)|includ(?:e|es|ed|ing)|additional(?:ly)?|also|added|updated|expanded|ship(?:ped|ments?)|manufactur(?:e|ed|ing)|distribut(?:e|ed|ion)|sold|produced|built|dated?|versions?|firmware|software|years?|units?\s+(?:with|that|which|where)|20\d\d|19\d\d)\b/i;
 // What may sit between an exclusion word and a serial in a plain list of excluded units. Numbers and codes (anything with a digit)
 // and punctuation are dropped before this is applied.
 const LIST_FILLER = /\b(?:serial|numbers?|nos?|s\/n|sn|units?|devices?|and|or|the|following|of|lots?)\b|\b\w*\d\w*\b/gi;

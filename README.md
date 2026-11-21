@@ -6,7 +6,7 @@ A Forge app for hospital teams. It compares **FDA medical device recalls** ([ope
 
 ![The RecallRadar dashboard: about 25 of the 30 demo devices need action, the most urgent first](marketplace/screenshots/01-dashboard-overview-light.jpg)
 
-*Screenshots are generated from the app with invented demo data (25 devices, 68 tasks). On a live site the counts follow the day's FDA data: the production demo showed 26 devices on 18 Nov.*
+*Screenshots come from the app with invented demo data (25 devices, 68 tasks). On a live site the counts follow the day's FDA data, so they move a little from day to day.*
 
 It runs as a Jira dashboard and issue panel, as a **Rovo agent**, as **MCP tools** for other agents, and it reads **teams from the Teamwork Graph** (read-only) to say who handles a ward.
 
@@ -32,7 +32,6 @@ Needs from a judge: Jira administrator rights; **Ward teams** needs you to be in
 | [`docs/VERIFICATION.md`](docs/VERIFICATION.md) | What was and was not verified live, by date |
 | [`docs/ACCURACY.md`](docs/ACCURACY.md) | Precision and recall on 3,438 labeled pairs, and the head-to-head with a keyword matcher |
 | [`docs/MATCHING.md`](docs/MATCHING.md) | Each fact check, every threshold and why, ordering, known limits |
-| [`docs/ACCURACY.md`](docs/ACCURACY.md) | Precision and recall per match level on 3,438 labeled pairs from 48 real recalls (including recalls with several products, with exclusions and with maker aliases), every wrong pair, the limits of the measurement |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The background check job, its rules and measurements |
 | [`docs/TASKS.md`](docs/TASKS.md) | The due-date rule, how duplicates are prevented, tracking tasks to closure, limits |
 | [`docs/ALERTS.md`](docs/ALERTS.md) | What "new" means, what the daily run does, who it acts as, what it stores, limits |

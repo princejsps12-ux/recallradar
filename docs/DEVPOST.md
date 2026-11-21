@@ -30,14 +30,14 @@ RecallRadar is a Forge app that works in four places on one installation:
 - **Daily alerts.** Every day it checks again. When a recall *starts* to affect a device, it creates the task (as the app) and posts one comment. The first look is a baseline, so switching it on never floods a project.
 - **A Rovo agent and MCP tools.** The *RecallRadar Assistant* answers from the saved check, with a list of the only recall numbers and device ids it may quote, and creates tasks only after a preview and a confirmation. The same tools are exposed over MCP, so Claude Desktop can ask "Are any of our infusion pumps recalled?" and get real recall numbers.
 
-It also reads teams and people from the **Teamwork Graph** (read-only) to say who handles a ward and how busy each person is, writes one **Confluence** page per recall on request, and imports a pasted spreadsheet of up to 1,000 devices with a preview of how each column was read. A 1,030-device list was imported and checked live on the demo site (894 devices needed action, 2,342 matches).
+It reads teams and people from the **Teamwork Graph** (read-only) to say who handles a ward and how busy each person is, and uses the ward-to-team mapping to **route every new task to the owning team** (a team label and an "Owning team" line) and **escalate** it when that team already holds 10 open RecallRadar tasks. It writes one **Confluence** page per recall on request. Devices come from the demo hospital, a pasted spreadsheet (up to 1,000 devices, with a preview of how each column was read) or a **read-only import from a JSM Assets object type** (verified live on a demo site). A 1,030-device list was imported and checked live on the demo site (894 devices needed action, 2,342 matches).
 
 ## How we built it
 
 - **Forge, Custom UI (React)** with Atlaskit components and design tokens only, so the dashboard follows Jira's light and dark themes. Resolvers for the page, a **queue consumer** (300 s) for the check because a UI function is cut off at 25 s, a **scheduled trigger** for the daily refresh and alerts, a **Rovo agent with six actions and a skill**, a **`rovo:mcp` module**, Forge storage (`@forge/kvs`) and the Jira, Confluence and Teamwork Graph APIs. Tasks are created as the signed-in person; only the daily alert acts as the app.
 - **Pure logic, thin Forge shells.** Matching, UDI parsing, serial ranges, alert state, task rules and the rest are plain modules with injected storage and fetch, unit tested without Forge (800+ tests), type-checked from JSDoc (the core strictly), linted, and run in CI. A headless-Chrome preview harness serves the real production bundle under Forge's content policy and checks every screen in light, dark and phone width for policy violations, console errors and accessibility.
 - **A matcher built on facts, not scores.** Ten rules, UDI-DI first (a GS1 GTIN names the product version exactly, whoever sold it), then maker plus model plus the unit's serial, lot or range. It understands recalls that list several products (a lot of one never confirms another), recalls that leave units out ("except", "not affected"), umlauts, and companies that go by two names (BD and Becton Dickinson, Hill-Rom and Baxter).
-- **Measured, not claimed.** `docs/ACCURACY.md` is generated from 48 real openFDA recalls and about 3,400 labeled pairs, with the right answer decided before the matcher is asked. It never called a device *exact* when it was not, and no pair that needs a task was missed; every miss is named. The page says what it does not measure.
+- **Measured, not claimed.** `docs/ACCURACY.md` is generated from 48 real openFDA recalls and 3,438 labeled pairs, with the right answer decided before the matcher is asked. It never called a device *exact* when it was not, and no pair that needs a task was missed; every miss is named. A **head-to-head with a plain maker-or-model keyword search** on the same pairs: 57% precision and 57% recall for the keyword search, 100% and 100% for RecallRadar. The labels are the developer's, so this shows what the rules add on real recall wording, not field accuracy, and the page says so. When a recall itself leaves a unit out (a serial named after "excluding", or outside a clean range with no other wording that could cover it) the matcher drops it to *possible* (no task); anything doubtful stays *likely*.
 - **Private by construction.** No patient data. The only thing that leaves Atlassian is searches to openFDA with manufacturer names, model names and UDI-DIs. Nothing about a person is stored (ids of devices and recalls only); the saved check is deleted after 24 hours.
 
 ## Challenges we ran into
@@ -61,7 +61,7 @@ Run it for real, early. Fakes have no memory limit, no slow network and no real 
 
 ## What's next
 
-A read-only import from Jira Service Management Assets, so the device list is the CMDB; a maker alias list that hospitals can extend; a history of progress over time; ruling a unit *out* when a recall's range excludes it, once that can be done without hiding a real recall.
+A validation with a real clinical-engineering team on a real device inventory (the labels today are the developer's); a CMMS connector next to the Assets import; a maker alias list that hospitals can extend; a history of progress over time; richer routing (rebalancing across teams by load and class, not one fixed limit).
 
 ## Built with
 
@@ -70,7 +70,7 @@ Atlassian Forge, Forge Custom UI, React, Atlaskit, Rovo agents and actions, Forg
 ## Try it out
 
 - Code: https://github.com/princejsps12-ux/recallradar
-- Install link and a ten-minute walkthrough: the README, section "Judge quick start". The link opens the **production** distribution of the app ("Get app", then pick the site).
+- Install link and a ten-minute walkthrough: the README, section "Judge path (2 minutes)". The link opens the **production** distribution of the app ("Get app", then pick the site).
 - Demo hospital: open **Apps**, **RecallRadar**, **Load demo hospital**. No account elsewhere is needed; Rovo and Confluence are optional.
 - Test data: the 30 demo devices use real manufacturer and model names from actual recalls.
 
@@ -78,5 +78,5 @@ Atlassian Forge, Forge Custom UI, React, Atlaskit, Rovo agents and actions, Forg
 
 - **Not eligible for "Runs on Atlassian".** The app calls api.fda.gov, so it declares that egress.
 - **What a judge must do:** install as a **Jira administrator** (the app asks for Teamwork Graph scopes, which an organization admin must approve); the first person to open **Apps, RecallRadar** loads the demo hospital; **Ward teams** needs the signed-in person to be in a team; **Rovo** needs a site with Rovo; **Confluence pages** need the optional Confluence connection; **MCP** needs the site admin to switch on the app's tools.
-- **What was verified live and what was not:** see the README sections "What was and was not verified" and "Live run on the demo site". In short: the dashboard (light and dark), the background check (also on the production site), the daily alert (it created a task and a comment on its own), the 1,000-row import, the Teamwork Graph and the Rovo agent were run on a real site; an external MCP client (Claude Desktop) needs a site admin to switch the app's tools on and has not been run end to end by the author.
+- **What was verified live and what was not:** see [docs/VERIFICATION.md](VERIFICATION.md). In short: the dashboard (light and dark), the background check (also on the production site), the daily alert (it created a task and a comment on its own), the 1,000-row import, the JSM Assets import, task routing to a team, the Teamwork Graph and the Rovo agent were run on a real site (escalation at 10 open tasks is covered by unit tests only); an external MCP client (Claude Desktop) needs a site admin to switch the app's tools on and has not been run end to end by the author.
 - **Team and ownership:** Prince Pandey, princejsps12@gmail.com.

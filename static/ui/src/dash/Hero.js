@@ -16,7 +16,7 @@ function SummaryLine({ devicesCount, stats, result, progressTasks, summaryState,
   const item = { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: sp(75) };
   return (
     <div role="group" aria-label="Summary" style={{ margin: `${sp(200)} 0 0`, padding: `${sp(150)} 0 0`, borderTop: `1px solid ${color.border}` }}>
-      <Inline as="div" role="list" space="space.400" rowSpace="space.100" shouldWrap>
+      <Inline as="div" role="list" space="space.400" rowSpace="space.100" alignBlock="center" shouldWrap>
       <li style={item}>
         <strong>{devicesCount}</strong> {devicesCount === 1 ? 'device' : 'devices'} monitored
       </li>
